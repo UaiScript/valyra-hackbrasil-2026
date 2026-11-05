@@ -1,0 +1,100 @@
+{
+  "openingBalanceCents": 840000,
+  "transactions": [
+    {
+      "id": "b-01",
+      "date": "2026-11-01",
+      "description": "Recebimento de serviços",
+      "category": "Vendas",
+      "amountCents": 1850000
+    },
+    {
+      "id": "b-02",
+      "date": "2026-11-02",
+      "description": "Compra de matéria-prima",
+      "category": "Insumos",
+      "amountCents": -420000
+    },
+    {
+      "id": "b-03",
+      "date": "2026-11-03",
+      "description": "Equipe e prestadores",
+      "category": "Pessoas",
+      "amountCents": -680000
+    },
+    {
+      "id": "b-04",
+      "date": "2026-11-03",
+      "description": "Recebimento de encomendas",
+      "category": "Vendas",
+      "amountCents": 720000
+    },
+    {
+      "id": "b-05",
+      "date": "2026-11-04",
+      "description": "Entrega e distribuição",
+      "category": "Logística",
+      "amountCents": -125000
+    },
+    {
+      "id": "b-06",
+      "date": "2026-11-05",
+      "description": "Aluguel do espaço",
+      "category": "Estrutura",
+      "amountCents": -230000
+    }
+  ],
+  "commitments": [
+    {
+      "id": "b-c1",
+      "date": "2026-11-10",
+      "description": "Fornecedor de embalagens",
+      "amountCents": 185000
+    },
+    {
+      "id": "b-c2",
+      "date": "2026-11-16",
+      "description": "Serviços de operação",
+      "amountCents": 240000
+    },
+    {
+      "id": "b-c3",
+      "date": "2026-11-25",
+      "description": "Parcela de equipamento",
+      "amountCents": 320000
+    }
+  ],
+  "interests": ["Insumos", "Logística", "Energia"],
+  "radar": [
+    {
+      "id": "b-r1",
+      "topic": "Insumos",
+      "region": "Cadeia de suprimentos · cenário fictício",
+      "title": "E se o custo da matéria-prima subir?",
+      "summary": "Uma alta hipotética no custo de reposição pede atenção ao próximo ciclo de compras.",
+      "context": "Compare o custo de insumos com o caixa e os vencimentos antes de renegociar um pedido.",
+      "limitation": "Sem cotações, cálculo de margem ou integração com fornecedores.",
+      "premise": "A próxima reposição custaria 8% a mais. Não se trata de um reajuste comunicado por fornecedor."
+    },
+    {
+      "id": "b-r2",
+      "topic": "Logística",
+      "region": "Operação · cenário fictício",
+      "title": "Frete mais caro no próximo pedido?",
+      "summary": "Um cenário hipotético de frete maior ajuda a discutir a exposição da distribuição.",
+      "context": "O histórico de Logística mostra saídas realizadas; condições futuras devem ser verificadas com o prestador.",
+      "limitation": "Não representa cotação, atraso confirmado ou previsão de demanda.",
+      "premise": "Uma futura entrega teria custo adicional. Nenhum valor é lançado automaticamente no caixa."
+    },
+    {
+      "id": "b-r3",
+      "topic": "Energia",
+      "region": "Operação · cenário fictício",
+      "title": "Energia como exposição da operação",
+      "summary": "Uma possível mudança de custo estimula a revisão do consumo e dos compromissos fixos.",
+      "context": "Na próxima etapa, a equipe poderá relacionar consumo informado e cenários com fontes verificadas.",
+      "limitation": "Sem tarifa verificada, medição de consumo ou cálculo de impacto.",
+      "premise": "A despesa futura seria diferente, sem atribuir essa hipótese a qualquer distribuidora real."
+    }
+  ]
+}

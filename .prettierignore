@@ -1,0 +1,9 @@
+node_modules/
+dist/
+package-lock.json
+docs/FARO_BASE_PRODUTO_NEGOCIO_E_IMPLEMENTACAO_v1.md
+.agents/
+.agent/
+.codex/
+.gemini/
+.impeccable/

@@ -1,0 +1,92 @@
+{
+  "openingBalanceCents": 125000,
+  "transactions": [
+    {
+      "id": "p-01",
+      "date": "2026-11-01",
+      "description": "Salário",
+      "category": "Trabalho",
+      "amountCents": 620000
+    },
+    {
+      "id": "p-02",
+      "date": "2026-11-02",
+      "description": "Aluguel",
+      "category": "Moradia",
+      "amountCents": -180000
+    },
+    {
+      "id": "p-03",
+      "date": "2026-11-02",
+      "description": "Supermercado",
+      "category": "Alimentação",
+      "amountCents": -48590
+    },
+    {
+      "id": "p-04",
+      "date": "2026-11-03",
+      "description": "Projeto freelance",
+      "category": "Trabalho",
+      "amountCents": 85000
+    },
+    {
+      "id": "p-05",
+      "date": "2026-11-04",
+      "description": "Transporte da semana",
+      "category": "Transporte",
+      "amountCents": -16000
+    },
+    {
+      "id": "p-06",
+      "date": "2026-11-05",
+      "description": "Conta de energia",
+      "category": "Moradia",
+      "amountCents": -21840
+    },
+    {
+      "id": "p-07",
+      "date": "2026-11-05",
+      "description": "Café e encontro",
+      "category": "Lazer",
+      "amountCents": -7800
+    }
+  ],
+  "commitments": [
+    { "id": "p-c1", "date": "2026-11-10", "description": "Internet", "amountCents": 11990 },
+    { "id": "p-c2", "date": "2026-11-15", "description": "Curso de idiomas", "amountCents": 34000 },
+    { "id": "p-c3", "date": "2026-11-20", "description": "Plano de saúde", "amountCents": 42500 }
+  ],
+  "interests": ["Custo de vida", "Juros", "Mobilidade"],
+  "radar": [
+    {
+      "id": "p-r1",
+      "topic": "Custo de vida",
+      "region": "Brasil · cenário fictício",
+      "title": "E se a cesta de compras ficar mais cara?",
+      "summary": "Uma alta hipotética nos alimentos convida a revisar a margem do orçamento do mês.",
+      "context": "Observe a categoria Alimentação e compare diferentes listas de compras antes de alterar seu plano.",
+      "limitation": "Não representa inflação observada nem prevê o preço das suas compras.",
+      "premise": "Suponha um aumento de 5% em uma próxima compra. A hipótese não modifica os lançamentos cadastrados."
+    },
+    {
+      "id": "p-r2",
+      "topic": "Juros",
+      "region": "Brasil · cenário fictício",
+      "title": "Juros maiores, novas perguntas para o plano",
+      "summary": "Um cenário hipotético de juros mais altos pode mudar o custo de um parcelamento futuro.",
+      "context": "Compare o custo total e as condições do contrato antes de assumir um novo compromisso.",
+      "limitation": "Sem taxas de mercado, recomendação de investimento ou análise de crédito.",
+      "premise": "A taxa seria maior em um novo contrato; nenhum contrato real é consultado nesta demonstração."
+    },
+    {
+      "id": "p-r3",
+      "topic": "Mobilidade",
+      "region": "Local · cenário fictício",
+      "title": "O transporte merece espaço no orçamento",
+      "summary": "Uma possível mudança no custo dos deslocamentos ajuda a discutir alternativas para a rotina.",
+      "context": "A categoria Transporte permite visualizar o que já saiu, sem estimar trajetos pessoais.",
+      "limitation": "Nenhuma tarifa, localização ou notícia real foi consultada.",
+      "premise": "O custo de uma próxima semana seria diferente. O cenário é exclusivamente educativo."
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "valyre",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace @valyre/web -- --host 127.0.0.1",
+    "build": "npm run build --workspace @valyre/web",
+    "preview": "npm run preview --workspace @valyre/web -- --host 127.0.0.1",
+    "typecheck": "npm run typecheck --workspace @valyre/web",
+    "test": "npm run test --workspace @valyre/web",
+    "check:data": "python scripts/check_demo_data.py",
+    "check": "npm run typecheck && npm test && npm run check:data && npm run build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.9.10"
+  }
+}

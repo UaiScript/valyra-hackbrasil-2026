@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.vite/
+coverage/
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Ferramentas locais dos assistentes
+/.agent/
+/.agents/
+/.codex/
+/.gemini/
