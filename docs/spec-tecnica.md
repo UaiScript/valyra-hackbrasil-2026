@@ -25,7 +25,7 @@ A seção 11 lista todas as propostas em um só lugar.
 **Produto [Doc v0.3].** Três módulos dentro de um mesmo app:
 
 - **Valyra Finance**: transações de demonstração, categorização, gastos atípicos e projeção de caixa.
-- **Alternative Alpha**: radar de clima e soja em Mato Grosso, relação com ativos acompanhados e histórico de sinais.
+- **Alternative Alpha**: análise preditiva do mercado financeiro utilizando cotações, notícias e dados alternativos para identificar tendências e riscos, com foco inicial na cadeia da soja em Mato Grosso.
 - **Valyra AI**: explica os dois contextos com fonte, data, premissas e incerteza.
 
 **Restrições [Doc v0.3].**
