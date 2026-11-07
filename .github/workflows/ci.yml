@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: ["**"]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
@@ -27,4 +29,84 @@ jobs:
             exec psql -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
               -v ON_ERROR_STOP=1 -c "SELECT 1;"
           '
+
+  api:
+    name: API
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # Banco descartável do runner, sem credenciais de produção.
+      POSTGRES_DB: valyra
+      POSTGRES_USER: valyra
+      POSTGRES_PASSWORD: valyra_ci_only
+      DATABASE_URL: postgresql+psycopg://valyra:valyra_ci_only@127.0.0.1:5432/valyra
+      TEST_DATABASE_URL: postgresql+psycopg://valyra:valyra_ci_only@127.0.0.1:5432/valyra_test
+      DEMO_USER_ID: "00000000-0000-0000-0000-000000000001"
+      UV_FROZEN: "true"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Conferir dependências das Issues 8–10
+        run: |
+          missing=0
+          for file in Makefile services/api/pyproject.toml services/api/uv.lock services/api/alembic.ini packages/contracts/openapi.json; do
+            if [ ! -f "$file" ]; then
+              echo "::error file=$file::Pré-requisito ausente. Integrar fundação/API/migrations das Issues 8–10."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Instalar uv e Python
+        uses: astral-sh/setup-uv@eb1897b8dc4b5d5bfe39a428a8f2304605e0983c # v7.0.0
+        with:
+          python-version: "3.12"
+          enable-cache: false
+
+      - name: Instalar dependências
+        run: uv sync --directory services/api --frozen
+
+      - name: Validar código
+        run: make lint
+
+      - name: Iniciar PostgreSQL e verificar banco de testes
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+          docker compose up -d --wait --wait-timeout 60 postgres
+          exists=$(docker compose exec -T postgres sh -c '
+            export PGPASSWORD="$POSTGRES_PASSWORD"
+            psql -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+              -v ON_ERROR_STOP=1 -Atc "SELECT 1 FROM pg_database WHERE datname = '\''valyra_test'\'';"
+          ')
+          if [ "$exists" != "1" ]; then
+            echo "::error::Banco valyra_test ausente. Integrar o script de inicialização do Compose da Issue 8."
+            exit 1
+          fi
+
+      - name: Aplicar e conferir migrações
+        run: |
+          make migrate
+          uv run --directory services/api alembic check
+          heads=$(uv run --directory services/api alembic heads)
+          printf '%s\n' "$heads"
+          count=$(printf '%s\n' "$heads" | awk '/\(head\)/ { n++ } END { print n+0 }')
+          if [ "$count" -ne 1 ]; then
+            echo "::error::Esperada uma única cabeça Alembic; encontradas $count."
+            exit 1
+          fi
+
+      - name: Executar testes
+        run: make test
+
+      - name: Conferir contrato OpenAPI gerado
+        run: |
+          make openapi
+          git diff --exit-code -- packages/contracts/
+          if [ -n "$(git ls-files --others --exclude-standard -- packages/contracts/)" ]; then
+            echo "::error::O exportador produziu contratos não versionados em packages/contracts/."
+            exit 1
+          fi
 
