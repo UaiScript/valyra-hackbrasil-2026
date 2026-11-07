@@ -18,6 +18,8 @@ Cada decisão está marcada com a origem, para o time debater só o que é novo:
 
 A seção 11 lista todas as propostas em um só lugar.
 
+**Atualização documental de 07/11/2026 (dados da Issue #7).** O Finance adota dinheiro em centavos conforme as Issues #7/#10; veja [modelagem](modelagem-db.md), [contrato inicial de dados](api-design.md) e [preparação da migração/seed](revisao-modelagem.md). Este spec descreve arquitetura e propostas, não comprova implementação. No checkout revisado há PostgreSQL/Compose e CI, mas ainda não há backend, ORM, Alembic, seed, Makefile ou contrato gerado. As decisões/propostas de frontend deste documento foram preservadas; a referência da Issue #7 à base antiga de frontend está desatualizada e não foi aplicada.
+
 ---
 
 ## 1. Contexto e objetivos
@@ -35,6 +37,7 @@ A seção 11 lista todas as propostas em um só lugar.
 - Somente dados sintéticos ou públicos.
 - Sem data leakage: observação, publicação e ingestão são instantes distintos.
 - O LLM interpreta evidências; números vêm de estatística, nunca do LLM.
+- **[Escopo atual do MVP]** Um usuário demo, pessoa física, sem login ou isolamento por sessão; o identificador do demo será configurável.
 
 **Contexto de desenvolvimento [Decisão do time].**
 
@@ -62,6 +65,7 @@ A seção 11 lista todas as propostas em um só lugar.
                 ┌────────────▼─────────────┐
                 │ services/api (FastAPI)   │
                 │ finance · alpha · ai     │
+                │ alerts (PR #6)           │
                 └──┬───────────┬────────┬──┘
      lê/escreve    │  só lê    │        │ chamadas LLM
         ┌──────────▼──┐  ┌─────▼─────┐ ┌▼─────────────┐
@@ -81,22 +85,26 @@ A seção 11 lista todas as propostas em um só lugar.
 
 | Componente | Escreve | Lê |
 |---|---|---|
-| `pipelines/` | Parquet/DuckDB (séries históricas); tabela `signals` no Postgres | Fontes externas |
-| `services/api` | Postgres: transações-demo, watchlist, conversas | Postgres e DuckDB (somente leitura) |
+| `pipelines/` | Parquet/DuckDB (séries históricas); `signals` e `signal_sectors` no Postgres (desenho do PR #6) | Fontes externas |
+| `services/api` | Postgres: transações-demo, watchlist, alertas, conversas | Postgres (somente leitura em `signals`/`signal_sectors`) e DuckDB (somente leitura) |
 | `apps/web` | — | API |
 
 - `pipelines/` é o **único** componente que acessa fontes externas.
 - A API **nunca** chama fonte externa durante uma requisição. Isso protege a demo contra queda de APIs de terceiros.
 
+**[Desenho registrado no PR #6, em revisão]** Pipelines também escrevem `signal_sectors`; a API deverá apenas ler sinais e suas relações. O desenho prevê triggers de imutabilidade e papéis de banco para aplicar essa fronteira, conforme a [modelagem, seções 5.2 e 8.3](modelagem-db.md#83-papéis-do-banco-previstos). Essas garantias ainda não estão implementadas.
+
 ### 2.2 Campos temporais dos sinais [Doc v0.3]
 
 Todo sinal tem: `observation_date`, `published_at`, `ingested_at`, `source_url`, `source_id`, `revision_id` e `confidence` (quando aplicável).
 
+**[Desenho registrado no PR #6, em revisão]** `source_id` é UUID e FK para `sources(id)`, identificando a fonte; `signal_key` é a identidade lógica do sinal, compartilhada pelas revisões. A unicidade prevista é `(signal_key, revision_id)`. Uma nova revisão é outra linha, sem atualizar a anterior.
+
 ### 2.3 Corte temporal `as_of` [Proposta]
 
-- Toda consulta de sinais aceita o parâmetro `as_of` e aplica `published_at <= as_of`.
+- Toda consulta de sinais aceita o parâmetro `as_of` e aplica `published_at <= as_of`; para cada `signal_key`, seleciona a revisão mais recente dentro do corte, conforme o desenho do PR #6. A consulta prevista está na [modelagem, seção 5.2](modelagem-db.md#52-regras-dos-sinais).
 - O **Replay Histórico é a mesma API chamada com `as_of` no passado**; não existe caminho de código paralelo.
-- O filtro vive em uma única função em `alpha/domain.py`, coberta por um teste obrigatório de "não vazamento".
+- O filtro está previsto para implementação em uma única função em `alpha/domain.py`, com teste obrigatório de "não vazamento".
 
 ### 2.4 Fronteira do LLM [Doc v0.3 + Proposta]
 
@@ -116,6 +124,8 @@ Todo sinal tem: `observation_date`, `published_at`, `ingested_at`, `source_url`,
 ```
 
 - Validação adicional [Proposta]: todo número citado em `answer` precisa aparecer em `evidences`; caso contrário, a resposta é rejeitada.
+
+O exemplo genérico acima não define valores monetários: quando uma evidência contiver dinheiro, a API deve usar inteiros em centavos com sufixo `_cents`. O formato tipado e a persistência dessas evidências ainda precisam de alinhamento, conforme as seções 6 e 7 da [modelagem](modelagem-db.md); valores textuais genéricos não autorizam serializar dinheiro como string.
 
 ### 2.5 Execução e deploy
 
@@ -147,6 +157,7 @@ services/api/
 │   │   ├── repository.py       # acesso a Postgres/DuckDB
 │   │   └── models.py           # ORM (SQLAlchemy)
 │   ├── alpha/                  # mesma forma; as_of em domain.py
+│   ├── alerts/                 # desenho do PR #6; chamado via service
 │   └── ai/                     # mesma forma + llm_client.py e prompts/
 └── tests/
     ├── finance/
@@ -156,7 +167,7 @@ services/api/
 
 ### 3.2 Regras de dependência [Proposta]
 
-Verificadas no CI com `import-linter`:
+Previstas para verificação no CI com `import-linter`:
 
 1. Dentro de um módulo: `router → service → domain | repository`. Nunca no sentido inverso.
 2. `domain.py` não importa banco, HTTP nem LLM.
@@ -173,8 +184,9 @@ Verificadas no CI com `import-linter`:
   { "error": { "code": "SIGNAL_NOT_FOUND", "message": "...", "details": {} } }
   ```
 - **Configuração** somente por variáveis de ambiente (`pydantic-settings`), com `.env.example` versionado. Secrets fora do Git [Doc v0.3].
-- **Datas** sempre em UTC e timezone-aware.
-- **Contrato**: `make openapi` exporta `openapi.json` para `packages/contracts/`. O CI falha se o arquivo commitado estiver desatualizado.
+- **Datas**: instantes em UTC e timezone-aware; datas de negócio do Finance são `DATE`, sem fuso, serializadas como `YYYY-MM-DD`.
+- **Dinheiro [Registrado, Issues #7/#10]**: `BIGINT` em centavos de BRL no Finance (`balance_cents`, `amount_cents`); inteiros JSON na API; cálculo e conversão sem `float`. Detalhes e pendências de precisão ficam na [modelagem](modelagem-db.md#33-tipos).
+- **Contrato [Proposta de fluxo; exportador previsto na Issue #9]**: `make openapi` deverá exportar `openapi.json` para `packages/contracts/`, com verificação de atualização no CI. Esses arquivos/comandos ainda não existem. O [contrato inicial de dados](api-design.md) registra apenas interfaces explícitas das tarefas; o OpenAPI será gerado pela implementação da API.
 
 ### 3.4 Testes [Proposta]
 
@@ -441,6 +453,12 @@ Formato sugerido de ADR [Proposta]: Contexto, Decisão, Alternativas considerada
 ## 11. Propostas para debate
 
 Resumo de tudo marcado como [Proposta]:
+
+**Alinhamento com o desenho do [PR #6](https://github.com/UaiScript/valyra-hackbrasil-2026/pull/6), em revisão**
+
+- Backend inclui `alerts/`, chamado por Finance e Alpha via `service`.
+- `source_id` referencia a fonte; `signal_key` identifica o sinal lógico e agrupa suas revisões.
+- Pipelines escrevem `signals`/`signal_sectors`; API só lê essas tabelas. Triggers e papéis são garantias planejadas na modelagem, sem implementação neste checkout.
 
 **Arquitetura**
 1. `pipelines/` como único componente que acessa fontes externas; API só lê DuckDB.

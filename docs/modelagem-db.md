@@ -1,16 +1,20 @@
 # Modelagem de dados do Postgres — Design
 
+> **Atualização de 07/11/2026 — dados do Finance (Issue #7).** Dinheiro passa a ser `BIGINT` em centavos de BRL, com sufixo `_cents`, conforme as Issues #7 e #10. Esta revisão é documental: não há ORM, migrações ou seed implementados. Complementos de integridade ainda não registrados nas tarefas estão identificados como **[Proposta]**.
+
 | Campo | Valor |
 |---|---|
 | Status | Em revisão pelo time |
 | Data | 07/11/2026 |
-| Base | Documento de Alinhamento v0.3 e `2026-11-06-fundacao-tecnica-design.md` |
+| Base | Documento de Alinhamento v0.3, [fundação técnica](spec-tecnica.md) e Issues [#7](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/7) / [#10](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/10) |
 | Escopo | Schema do PostgreSQL: dados do app e tabela `signals` |
 | Fora de escopo | Séries históricas em DuckDB/Parquet (spec próprio), modelos preditivos, telas |
 
 ## Como ler este documento
 
 O conteúdo foi construído no brainstorming de 07/11 e está aberto à revisão do time. Itens marcados como **[Altera fundação]** mudam algo já definido no spec de fundação técnica; a seção 10 lista esses impactos.
+
+**[Registrado]** indica uma regra explícita das Issues consultadas ou do desenho anterior; não significa implementação ou aprovação de todo o desenho. **[Proposta]** indica um refinamento novo que precisa de alinhamento antes da Issue #10. A seção 4 é a referência do Finance; o [contrato inicial](api-design.md) trata das interfaces e a [preparação da migração](revisao-modelagem.md) reúne dependências, seed e aceite.
 
 ---
 
@@ -76,7 +80,7 @@ erDiagram
         uuid id PK
         uuid user_id FK
         varchar name
-        numeric balance
+        bigint balance_cents
         date balance_as_of
         timestamptz created_at
         timestamptz updated_at
@@ -113,7 +117,7 @@ erDiagram
         uuid import_batch_id FK
         date date
         text description
-        numeric amount
+        bigint amount_cents
         uuid category_id FK
         uuid predicted_category_id FK
         varchar category_source
@@ -252,7 +256,7 @@ erDiagram
 
 ### 3.2 Nomes
 
-Configurados uma vez na `MetaData` do SQLAlchemy:
+Previstos uma vez na `MetaData` do SQLAlchemy; a base declarativa será entregue pela Issue #9:
 
 - Tabelas em `snake_case` no plural; chaves estrangeiras `<entidade>_id`.
 - Constraints com prefixos fixos: `pk_`, `fk_`, `uq_`, `ix_`, `ck_`.
@@ -271,8 +275,8 @@ NAMING_CONVENTION = {
 
 | Uso | Tipo | Regra |
 |---|---|---|
-| Dinheiro | `NUMERIC(14,2)` | Sempre BRL, nunca `float` |
-| Valor de transação | `NUMERIC(14,2)` | Negativo = saída, positivo = entrada; `CHECK (amount <> 0)` |
+| Dinheiro no Finance | `BIGINT` | Centavos de BRL; nomes `*_cents`; nunca `float` |
+| Valor de transação | `BIGINT` | Negativo = saída, positivo = entrada; `CHECK (amount_cents <> 0)` |
 | Quantidade de ativo | `NUMERIC(18,6)` | `CHECK (quantity > 0)` |
 | Scores e confiança | `NUMERIC(4,3)` / `NUMERIC(5,4)` | Entre 0 e 1 |
 | Data de negócio | `DATE` | Sem fuso |
@@ -280,9 +284,15 @@ NAMING_CONVENTION = {
 | Enum | `VARCHAR` + `CHECK` | Não usar enum nativo do Postgres |
 | Estrutura variável | `JSONB` | Somente `alerts.evidence` e `signals.payload` |
 
+`balance_cents = 500000` significa R$ 5.000,00; `amount_cents = -12990` significa saída de R$ 129,90. Na API são inteiros JSON, sem aspas ou formatação. Conversões devem partir de texto decimal validado ou aritmética decimal exata; não usar `float`, nem truncar frações de centavo silenciosamente. A Issue #13 define rejeitar valores CSV com mais de duas casas, conforme o [contrato de entrada](api-design.md#entrada-csv-e-domínio--issue-13).
+
+Quantidade, indicadores, scores e confiança não são dinheiro. `holdings.average_price` e valores genéricos de Alpha/IA têm pendências específicas nas seções 5.4 e 7; esta revisão não define arredondamento para esses casos.
+
 ### 3.4 Colunas padrão
 
-- Toda tabela tem `created_at`; tabelas atualizáveis têm `updated_at`.
+- As colunas temporais são as explicitadas em cada tabela e no diagrama. Não se presume `created_at` nas tabelas de relação nem em `import_rejections`.
+- No Finance inicial, `accounts` e `transactions` têm `created_at` e `updated_at`; `users` e `categories` têm somente `created_at`; `import_batches` registra criação e término. Acrescentar outros timestamps exigiria novo alinhamento.
+- **[Proposta]** Onde presentes, `created_at` recebe `CURRENT_TIMESTAMP` e não muda; `updated_at` inicia com o mesmo instante e é atualizado em toda alteração pelo ORM/service, com `CHECK (updated_at >= created_at)`. O default isolado não atualiza registros. Escritas diretas precisam respeitar a mesma regra; trigger de atualização automática não está decidido.
 - `signals` não tem `updated_at`.
 - Sem soft delete.
 
@@ -304,72 +314,154 @@ Chaves estrangeiras entre módulos são permitidas no banco. Em código, o acess
 
 ### 4.1 Tabelas
 
-**`users`** (`core`): `id`, `name`, `created_at`.
+As colunas mantêm o desenho existente, com as duas renomeações monetárias registradas. Nas tabelas abaixo, **NN** = `NOT NULL`; **NULL** = opcional; **—** = sem default, informado na escrita. IDs têm default `gen_random_uuid()` conforme a seção 3.1; o seed fornece IDs explícitos. Nulabilidade, defaults adicionais, exclusões e constraints além das explicitamente citadas na Issue #10 são **[Proposta]** para tornar o desenho implementável, sem tratá-los como decisões aprovadas. Valores iniciais escritos pelo service na Issue #14 não aprovam, por si só, defaults no DDL.
 
-**`accounts`**
+**`users`** (`core`) — uma linha identifica o usuário demo; não representa login ou sessão.
 
-| Coluna | Tipo | Observação |
+| Coluna | Tipo / nulabilidade | Default | Chave / significado |
+|---|---|---|---|
+| `id` | UUID NN | `gen_random_uuid()` | PK; demo configurado por `DEMO_USER_ID` |
+| `name` | VARCHAR NN | — | Nome de exibição |
+| `created_at` | TIMESTAMPTZ NN | `CURRENT_TIMESTAMP` | Criação |
+
+Índices: somente o da PK. **[Proposta] Exclusão:** `RESTRICT` quando houver contas; demais domínios continuam fora desta migração.
+
+**`accounts`** — uma linha representa uma conta do usuário e seu saldo de referência, não o saldo recalculado do dia.
+
+| Coluna | Tipo / nulabilidade | Default | Chave / significado |
+|---|---|---|---|
+| `id` | UUID NN | `gen_random_uuid()` | PK |
+| `user_id` | UUID NN | — | FK `users(id)` |
+| `name` | VARCHAR NN | — | Ex.: "Conta principal" |
+| `balance_cents` | BIGINT NN | — | Saldo de referência em centavos, inclusive negativo |
+| `balance_as_of` | DATE NN | — | Data de referência; convenção proposta na seção 4.2 |
+| `created_at`, `updated_at` | TIMESTAMPTZ NN | `CURRENT_TIMESTAMP` | Seção 3.4 |
+
+**[Proposta]** Índice `(user_id)`; check temporal da seção 3.4. FK de usuário com `ON DELETE RESTRICT`; excluir conta com lotes ou transações também é bloqueado. Não há cascata de histórico financeiro nem default implícito de saldo zero.
+
+**`import_batches`** — uma linha representa uma tentativa de importar um CSV para uma conta, inclusive reenvios do mesmo arquivo.
+
+| Coluna | Tipo / nulabilidade | Default | Chave / significado |
+|---|---|---|---|
+| `id` | UUID NN | `gen_random_uuid()` | PK |
+| `account_id` | UUID NN | — | FK `accounts(id)`; conta escolhida no upload |
+| `file_name` | VARCHAR NN | — | Nome recebido; não é chave de deduplicação |
+| `status` | VARCHAR NN | `'processing'` | `processing` \| `completed` \| `failed` |
+| `rows_total` | INT NN | `0` | Quantidade de registros de dados contabilizados |
+| `rows_imported` | INT NN | `0` | Novas transações persistidas neste lote |
+| `rows_duplicated` | INT NN | `0` | Registros já existentes, não inseridos |
+| `rows_rejected` | INT NN | `0` | Registros inválidos com detalhe de rejeição |
+| `created_at` | TIMESTAMPTZ NN | `CURRENT_TIMESTAMP` | Início |
+| `completed_at` | TIMESTAMPTZ NULL | `NULL` | Término; semântica proposta abaixo |
+
+**[Registrado, Issue #10]** `CHECK (status IN ('processing','completed','failed'))`.
+
+**[Proposta] Integridade no banco:**
+
+- Cada contador é `>= 0`; `rows_imported + rows_duplicated + rows_rejected <= rows_total`. Avaliar a soma promovendo os contadores para `BIGINT` para não estourar `INT`.
+- Se `status = 'completed'`, exigir igualdade nessa soma. A Issue #14 registra conclusão mesmo com rejeições de linhas. Se futuramente houver lote `failed` persistido, sua contagem parcial e semântica de término continuam como proposta; a seção 4.5 explica o efeito do rollback.
+- `processing` exige `completed_at IS NULL`; `completed` e `failed` exigem `completed_at IS NOT NULL` e `completed_at >= created_at`. Aqui o campo significa término de qualquer resultado terminal; confirmar essa escolha com o backend.
+- `UNIQUE (id, account_id)` como alvo da FK composta de `transactions`; índice `(account_id)` para consulta e FK. FK de conta com `ON DELETE RESTRICT`.
+
+Contagem de registros segue o [contrato CSV da Issue #13](api-design.md#entrada-csv-e-domínio--issue-13). A conciliação pelo service e os limites das garantias do banco estão nas seções 4.4 e 4.5. **[Proposta]** Lotes terminais não são reabertos; reenvio cria outro lote conforme o fluxo da Issue #14.
+
+**`import_rejections`** — uma linha guarda o motivo consolidado de rejeição de um registro de dados do lote.
+
+| Coluna | Tipo / nulabilidade | Default | Chave / significado |
+|---|---|---|---|
+| `id` | UUID NN | `gen_random_uuid()` | PK |
+| `import_batch_id` | UUID NN | — | FK `import_batches(id)` |
+| `line_number` | INT NN | — | Linha física do arquivo; cabeçalho = 1 (#13); registros multilinha ainda exigem alinhamento |
+| `reason` | VARCHAR NN | — | Motivo legível de rejeição |
+| `raw_line` | TEXT NN | — | Texto rejeitado conforme contrato CSV/HTTP |
+
+**[Proposta]** `CHECK (line_number > 0)` e `UNIQUE (import_batch_id, line_number)`; o índice da unicidade cobre a consulta pelo lote. FK com `ON DELETE CASCADE`: detalhes só são removidos junto de um lote cuja exclusão seja permitida (sem transações). Não há timestamp próprio; o contexto temporal vem do lote.
+
+**`categories`** — uma linha representa uma categoria global fixa do seed; o usuário não cria categorias.
+
+| Coluna | Tipo / nulabilidade | Default | Chave / significado |
+|---|---|---|---|
+| `id` | UUID NN | `gen_random_uuid()` | PK |
+| `slug` | VARCHAR NN | — | UNIQUE; identidade usada no seed |
+| `name` | VARCHAR NN | — | Nome de exibição |
+| `kind` | VARCHAR NN | — | `expense` \| `income` |
+| `created_at` | TIMESTAMPTZ NN | `CURRENT_TIMESTAMP` | Criação |
+
+**[Registrado, Issue #10]** `CHECK (kind IN ('expense','income'))`; as 12 categorias estão na [preparação do seed](revisao-modelagem.md#seed-previsto-na-issue-10). PK e unicidade de `slug` bastam como índices. **[Proposta] Exclusão:** `RESTRICT` nas referências atual e prevista, preservando classificação e sugestão original.
+
+**`transactions`** — uma linha representa uma movimentação importada, com sinal, conta, lote de origem e classificação.
+
+| Coluna | Tipo / nulabilidade | Default | Chave / significado |
+|---|---|---|---|
+| `id` | UUID NN | `gen_random_uuid()` | PK |
+| `account_id` | UUID NN | — | FK `accounts(id)` |
+| `import_batch_id` | UUID NN | — | Parte da FK composta para o lote e sua conta |
+| `date` | DATE NN | — | Data de negócio da movimentação |
+| `description` | TEXT NN | — | Descrição recebida |
+| `amount_cents` | BIGINT NN | — | Entrada positiva; saída negativa; diferente de zero |
+| `category_id` | UUID NN | — | FK `categories(id)`; categoria exibida |
+| `predicted_category_id` | UUID NN | — | FK `categories(id)`; sugestão original preservada |
+| `category_source` | VARCHAR NN | — | `rule` \| `model` \| `user` |
+| `category_confidence` | NUMERIC(4,3) NULL | `NULL` | Confiança da sugestão original, entre 0 e 1 inclusive |
+| `is_recurring` | BOOLEAN NN | `false` | Identificação de recorrência |
+| `recurrence_key` | VARCHAR NULL | `NULL` | Descrição normalizada que agrupa recorrências |
+| `anomaly_score` | NUMERIC(5,4) NULL | `NULL` | Entre 0 e 1 inclusive; pode ser recalculado |
+| `row_hash` | VARCHAR NN | — | SHA-256 hexadecimal de 64 caracteres (#13) |
+| `created_at`, `updated_at` | TIMESTAMPTZ NN | `CURRENT_TIMESTAMP` | Seção 3.4 |
+
+**[Registrado, Issue #10]** `UNIQUE (account_id, row_hash)`, `CHECK (amount_cents <> 0)`, `CHECK (category_source IN ('rule','model','user'))`; índices `(account_id, date)` e `(category_id)`.
+
+**[Proposta]** FK composta `(import_batch_id, account_id) REFERENCES import_batches(id, account_id)` para impedir que uma transação use lote de outra conta. Ela substitui a FK simples de lote; mantém-se a FK de conta. Todas essas FKs usam `ON DELETE RESTRICT`, sem alteração de identidade da conta/lote. Índices adicionais `(import_batch_id, account_id)` e `(predicted_category_id)` cobrem referências e consultas. Checks dos scores: `category_confidence IS NULL OR category_confidence BETWEEN 0 AND 1` e equivalente para `anomaly_score`; check temporal conforme seção 3.4.
+
+**[Proposta] Exclusão de transação:** não oferecer remoção física no fluxo inicial, pois ela quebraria a conciliação histórica de `rows_imported` e permitiria reimportação do hash removido. FKs não impedem apagar a própria linha; a política deve ser respeitada pelo service/permissões futuros. Uma função de exclusão exigiria alinhar os contadores e a auditoria.
+
+### 4.2 Saldo e datas
+
+**[Registrado no desenho anterior]** O saldo é derivado da referência da conta e das transações posteriores; não existe coluna de saldo diário. O desenho não definia se a referência era de abertura ou fechamento nem o limite superior da soma.
+
+**[Proposta de convenção]** `balance_cents` é o saldo de **fechamento** de `balance_as_of`, já incluindo todas as movimentações dessa data. Para uma data de consulta `D >= balance_as_of`:
+
+```text
+saldo_realizado_cents(D) = balance_cents
+  + soma(amount_cents onde balance_as_of < date <= D)
+```
+
+Para hoje, propõe-se obter `D` pelo calendário `America/Sao_Paulo`; timestamps continuam em UTC. Transações da data de referência ou anteriores não entram novamente. Consulta anterior à referência não pode ser reconstruída por essa fórmula e deve ser tratada como indisponível.
+
+Exemplo: referência `500000` em `2026-11-01`; movimentação `-12990` em `2026-11-02`; realizado em `2026-11-07` = `487010` (R$ 4.870,10). Uma linha de `-20000` em `2026-11-10` não participa desse realizado. Confirmar a convenção antes de implementar cálculos ou importar extratos que tragam saldo de abertura.
+
+O modelo representa movimentações efetivadas de extrato, sem estado de agendamento/liquidação. A data futura fica excluída do realizado na data de consulta; contas previstas e projeções não devem ser gravadas como movimentações realizadas. `date <= D` só é suficiente sob essa premissa de origem; suportar agendamentos exigiria outro alinhamento.
+
+### 4.3 Categorização, deduplicação e cálculos
+
+- **[Registrado, Issues #13/#14] Deduplicação:** SHA-256 por conta e índice de ocorrência no arquivo. Normalização, expressão exata e índice inicial estão no [contrato do domínio](api-design.md#entrada-csv-e-domínio--issue-13). Duas transações idênticas no mesmo dia e arquivo são aceitas; o reenvio do mesmo CSV não duplica.
+- **Limitação:** o índice é local ao arquivo. Se um CSV tem duas movimentações idênticas e outro contém apenas uma delas, não há como identificar universalmente qual é a mesma movimentação. Arquivos parcialmente sobrepostos podem confundir movimentações distintas com duplicatas; o hash não garante conciliação universal nem substitui um identificador bancário estável.
+- **[Registrado] Correção pelo usuário:** altera `category_id` e grava `category_source = 'user'`; `predicted_category_id` não muda. **[Proposta]** Preservar também a confiança original; a escrita deve atualizar `updated_at`. Essa imutabilidade depende do service futuro; a FK sozinha não a garante.
+- **[Registrado, Issues #13/#14] Classificação e fallback:** regras por sinal, slugs de fallback e valores iniciais da transação estão no [contrato do domínio](api-design.md#entrada-csv-e-domínio--issue-13). Ausência de score não equivale a zero. **[Proposta]** O service deve validar também a compatibilidade do `kind` das categorias resolvidas com o sinal, incluindo a prevista; um `CHECK` simples não consulta outra tabela.
+- **[Registrado no desenho]** Dashboard, recorrências, gastos atípicos e projeção são cálculos futuros em `finance/domain.py`, sem tabelas próprias. Não há código desses cálculos. A projeção deve identificar valores previstos separadamente do realizado; precisão de estimativas e limiar de anomalia continuam pendentes.
+
+### 4.4 Responsabilidade das validações
+
+| Camada prevista | Responsabilidade | Fonte principal |
 |---|---|---|
-| `id` | UUID | PK |
-| `user_id` | UUID | FK `users` |
-| `name` | VARCHAR | Ex.: "Conta principal" |
-| `balance` | NUMERIC(14,2) | Informado pelo usuário |
-| `balance_as_of` | DATE | Data em que `balance` valia |
-| `created_at`, `updated_at` | TIMESTAMPTZ | |
+| Banco / ORM | `NOT NULL`, PKs/FKs, `UNIQUE (account_id, row_hash)` e checks de linha aplicáveis. Checks de scores, contadores, timestamps e FK composta continuam propostas explicitadas na seção 4.1 | Seção 4.1 e Issue #10 |
+| Importador / domínio | Ler e validar CSV, converter dinheiro sem `float`, normalizar cópia da descrição, calcular hash e categorizar por regras/fallback; sem banco ou HTTP | [Contrato CSV/domínio](api-design.md#entrada-csv-e-domínio--issue-13), Issue #13 |
+| Router / schemas HTTP | Limitar leitura do upload, validar parâmetros e inteiro estrito no PATCH; traduzir `CsvFormatError` para `AppError` | [Operações e erros HTTP](api-design.md#operações-http--issues-14-e-15), Issues #9/#14/#15 |
+| Service | Validar propriedade da conta pelo demo via `get_account_for_user`; controlar a transação de importação, resolver categorias do seed, conciliar contadores e tratar conflitos/erros | Seção 4.5, Issue #14 |
 
-**`import_batches`**
+A FK garante existência da conta, não que ela pertença ao usuário demo da requisição. A unicidade garante a chave de deduplicação, não a correção do hash produzido. Checks de linha não contam registros de outras tabelas. **[Proposta de conciliação]** Antes de concluir, conferir `rows_imported` contra transações ligadas ao lote e `rows_rejected` contra os detalhes persistidos, além da igualdade dos quatro contadores; a operação transacional registrada na Issue #14 fornece o contexto para essa validação.
 
-| Coluna | Tipo | Observação |
-|---|---|---|
-| `id` | UUID | PK |
-| `account_id` | UUID | FK `accounts`; conta escolhida no upload |
-| `file_name` | VARCHAR | |
-| `status` | VARCHAR | `processing` \| `completed` \| `failed` |
-| `rows_total`, `rows_imported`, `rows_duplicated`, `rows_rejected` | INT | |
-| `created_at` | TIMESTAMPTZ | |
-| `completed_at` | TIMESTAMPTZ NULL | |
+### 4.5 Transação e falhas da importação
 
-**`import_rejections`**: `id`, `import_batch_id` (FK), `line_number`, `reason`, `raw_line`.
+**[Registrado, Issue #14]** `service.import_csv(session, user_id, account_id, file_name, content) -> ImportBatch` executa, em **uma única transação**: validar conta; criar lote `processing`; gravar rejeições; inserir transações com `INSERT … ON CONFLICT (account_id, row_hash) DO NOTHING`; calcular `rows_duplicated = quantidade de linhas válidas − quantidade inserida`; marcar `completed` e preencher `completed_at`. `rows_total` vem do parser, `rows_imported` das inserções efetivas e `rows_rejected` das rejeições. Reenvios são novas tentativas, com duplicatas contabilizadas sem reinserção. A lista pública de códigos e status HTTP está no [contrato de erros](api-design.md#erros-registrados).
 
-**`categories`**: `id`, `slug` (UNIQUE), `name`, `kind` (`expense` \| `income`), `created_at`. Lista fixa criada no seed.
+| Situação | Efeito previsto sobre dados |
+|---|---|
+| Rejeição de linha | É resultado de processamento: persistir o detalhe junto do lote e concluir as demais linhas; pode haver lote concluído sem nenhuma transação válida |
+| Erro que impede iniciar | Arquivo acima do limite, erro de formato de arquivo ou conta inválida não garantem criação de lote; a ordem completa de validações não foi fixada |
+| Falha técnica com rollback | Desfaz as escritas da mesma transação, incluindo o lote recém-criado, rejeições e transações; o lote pode não existir para consulta posterior |
 
-**`transactions`**
-
-| Coluna | Tipo | Observação |
-|---|---|---|
-| `id` | UUID | PK |
-| `account_id` | UUID | FK `accounts` |
-| `import_batch_id` | UUID | FK `import_batches` |
-| `date` | DATE | |
-| `description` | TEXT | |
-| `amount` | NUMERIC(14,2) | Com sinal; `<> 0` |
-| `category_id` | UUID | FK `categories`; categoria exibida |
-| `predicted_category_id` | UUID | FK `categories`; sugestão original, preservada |
-| `category_source` | VARCHAR | `rule` \| `model` \| `user` |
-| `category_confidence` | NUMERIC(4,3) NULL | Confiança da sugestão |
-| `is_recurring` | BOOLEAN | |
-| `recurrence_key` | VARCHAR NULL | Descrição normalizada que agrupa recorrências |
-| `anomaly_score` | NUMERIC(5,4) NULL | Recalculado a cada importação |
-| `row_hash` | VARCHAR | Deduplicação |
-| `created_at`, `updated_at` | TIMESTAMPTZ | |
-
-Constraints e índices:
-
-- `UNIQUE (account_id, row_hash)`
-- `CHECK (amount <> 0)`
-- `CHECK (category_source IN ('rule','model','user'))`
-- Índices: `(account_id, date)`, `(category_id)`
-
-### 4.2 Regras
-
-- **Saldo de hoje** = `accounts.balance` + soma de `transactions.amount` com `date > balance_as_of`.
-- **Projeção de 30 dias** = saldo de hoje + recorrentes previstas + estimativa de gastos variáveis. Calculada em `finance/domain.py`; não é armazenada.
-- **Dashboard** (gasto por categoria, tendência, atípicos) é calculado a partir de `transactions` e `categories`; sem tabelas próprias.
-- **Deduplicação**: `row_hash` = hash de `account_id` + `date` + `amount` + descrição normalizada + **índice da ocorrência** daquela combinação no arquivo. Duas transações idênticas no mesmo dia são aceitas; reenviar o CSV não duplica.
-- **Correção de categoria** pelo usuário altera `category_id` e grava `category_source = 'user'`; `predicted_category_id` nunca muda. Isso permite medir a acurácia da categorização.
-- **Regras de categorização** ficam no código (`finance/domain.py`), não em tabela.
-- **Categorias** não são criadas pelo usuário.
-- **Gasto atípico**: o dashboard filtra `anomaly_score` acima de um limiar definido no código.
+O enum `failed` no modelo não garante que toda tentativa fracassada produza uma linha persistida. **[Pendente]** Persistir falhas em outra transação ou mecanismo exige decisão própria; esta revisão não escolhe essa solução. As regras propostas de contadores e `completed_at` para `failed` só se aplicam quando houver registro persistido, sem comprometer a atomicidade da importação definida na Issue #14.
 
 ---
 
@@ -408,9 +500,9 @@ Constraints e índices:
 
 ### 5.2 Regras dos sinais
 
-- **Somente inserção**: um trigger bloqueia `UPDATE` e `DELETE` em `signals`. Revisão nova = linha nova com o mesmo `signal_key` e `revision_id` maior.
-- **View `signals_current`**: revisão mais recente de cada `signal_key`, usada pelo radar ao vivo.
-- **Corte temporal `as_of`**: para cada `signal_key`, a revisão mais recente com `published_at <= as_of`. Implementado em uma única função em `alpha/domain.py`.
+- **Somente inserção**: trigger previsto para bloquear `UPDATE` e `DELETE` em `signals`. Revisão nova = linha nova com o mesmo `signal_key` e `revision_id` maior.
+- **View `signals_current` prevista**: revisão mais recente de cada `signal_key`, para uso no radar ao vivo.
+- **Corte temporal `as_of`**: para cada `signal_key`, a revisão mais recente com `published_at <= as_of`. Previsto para implementação em uma única função em `alpha/domain.py`.
 
 ```sql
 SELECT DISTINCT ON (signal_key) *
@@ -464,6 +556,7 @@ signals ─< signal_sectors >─ sectors ─< asset_sector_exposures >─ assets
 
 Regras:
 
+- **Pendência de precisão (Alpha):** `average_price` / `NUMERIC(14,2)` acima e no diagrama são o desenho herdado, ainda não conciliado com a convenção monetária `_cents`. Preço médio pode exigir frações de centavo; é necessário decidir precisão, unidade e representação antes de renomear ou migrar. Não se assume arredondamento para `BIGINT`, nem se inclui `holdings` na Issue #10. `quantity` continua quantidade. `signals.value` é indicador genérico acompanhado de `unit`, não um campo monetário por definição; sinais de preço precisarão de contrato próprio.
 - Toda posição é um ativo acompanhado; a busca de sinais relevantes usa só a watchlist.
 - Remover a posição mantém o ativo na watchlist; remover da watchlist remove a posição.
 - Posições vêm pré-populadas no seed e podem ser editadas. Sem importação de nota de corretagem.
@@ -503,16 +596,16 @@ Constraints e índices:
   - `kind = 'market_signal'` exige `signal_id` e `asset_id` e proíbe `account_id`.
 - Índice: `(user_id, status, created_at)`
 
-Formato de `evidence` (mesmo formato de `message_evidences`):
+Exemplo não monetário de `evidence` (estrutura genérica relacionada a `message_evidences`):
 
 ```json
 [
-  { "label": "Saldo projetado em 30 dias", "value": "-320.00", "unit": "BRL",
-    "source_url": null, "published_at": null },
   { "label": "Produtividade soja MT", "value": "3480", "unit": "kg/ha",
     "source_url": "https://...", "published_at": "2026-10-10T12:00:00Z" }
 ]
 ```
+
+**Pendência de contrato:** o antigo exemplo monetário em `value` textual foi retirado. Dinheiro em respostas da API precisa de inteiro com sufixo `_cents`; o formato tipado de evidências monetárias em alertas/IA ainda exige alinhamento. Esta revisão não acrescenta colunas nem muda silenciosamente a estrutura genérica de `message_evidences`.
 
 Regras:
 
@@ -564,6 +657,8 @@ Regras:
 | `published_at` | TIMESTAMPTZ NULL | |
 | `signal_id` | UUID NULL | FK `signals`; revisão exata usada |
 
+`value` textual é mantido como desenho de evidências genéricas não monetárias. Ele não define serialização monetária válida para a API. A representação persistida de dinheiro e métricas de precisão variável nessas evidências permanece pendente, junto com o contrato citado na seção 6.
+
 Regras:
 
 - A resposta estruturada do LLM é desmontada em colunas e em `message_evidences`, sem JSONB.
@@ -577,6 +672,8 @@ Regras:
 
 ### 8.1 Migrações
 
+As regras desta seção descrevem o fluxo planejado, não ferramentas já presentes. A Issue #10 cobre somente as seis tabelas iniciais do Finance/core; triggers, views e papéis de Alpha não fazem parte dela. Dependências, seed e critérios de aceite estão em [revisao-modelagem.md](revisao-modelagem.md).
+
 - Histórico único em `services/api/alembic/`; todo PR que altera models traz sua migração.
 - `--autogenerate` é rascunho e sempre revisado à mão.
 - Trigger de `signals`, view `signals_current`, `CHECK`s e papéis do banco vão por `op.execute`.
@@ -587,7 +684,9 @@ Regras:
   - `alembic check` (falha se model mudou sem migração);
   - falha se houver mais de uma cabeça.
 
-### 8.2 Seed (`make seed`, idempotente)
+### 8.2 Seed planejado (`make seed`, ainda inexistente)
+
+Para a Issue #10, a especificação exata e única do seed inicial está em [preparação da migração e seed](revisao-modelagem.md#seed-previsto-na-issue-10). A tabela abaixo descreve a visão futura do produto, sem ampliar o seed inicial:
 
 | Dado | Observação |
 |---|---|
@@ -600,14 +699,14 @@ Regras:
 
 Sinais de exemplo **não** vêm do seed da API: são inseridos pelo pipeline em modo amostra, exercitando o caminho real de escrita.
 
-### 8.3 Papéis do banco
+### 8.3 Papéis do banco previstos
 
 | Papel | Permissões |
 |---|---|
 | `valyra_api` | Leitura e escrita nas tabelas do app; **somente leitura** em `signals` e `signal_sectors` |
 | `valyra_pipelines` | `INSERT` em `signals` e `signal_sectors`; `SELECT` em `sources` e `sectors` |
 
-Junto com o trigger, garante no banco que só os pipelines escrevem sinais e que nenhum sinal é alterado.
+Junto com o trigger previsto, esses papéis deverão garantir no banco que só os pipelines escrevam sinais e que nenhum sinal seja alterado. O desenho está registrado no PR #6, ainda em revisão, e não foi implementado.
 
 ---
 
@@ -634,9 +733,9 @@ Junto com o trigger, garante no banco que só os pipelines escrevem sinais e que
 |---|---|---|
 | Módulos do backend | `finance`, `alpha`, `ai` | + `alerts/`, chamado por `finance` e `alpha` via `service` |
 | Identificação de sinais | "Mesmo `source_id`, novo `revision_id`" | `source_id` = fonte (FK); `signal_key` = identidade lógica; revisões compartilham `signal_key` |
-| Acesso ao banco | Convenção: pipelines são o único escritor de sinais | Garantido por trigger e papéis do banco |
+| Acesso ao banco | Convenção: pipelines são o único escritor de sinais | Garantia prevista por trigger e papéis do banco |
 
-Após aprovação, o spec de fundação deve ser atualizado nas seções 2.1, 2.2, 2.3, 3.1 e 11.
+As representações da [fundação técnica](spec-tecnica.md) nas seções 2.1, 2.2, 2.3, 3.1 e 11 foram alinhadas ao desenho registrado no [PR #6](https://github.com/UaiScript/valyra-hackbrasil-2026/pull/6), já integrado. O próprio PR declara o design **em revisão pelo time**; integração documental não comprova implementação nem aprovação de cada proposta.
 
 ---
 
