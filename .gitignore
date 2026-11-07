@@ -1,0 +1,4 @@
+# Configuração local e credenciais; mantenha o modelo público versionável.
+.env
+.env.*
+!.env.example
