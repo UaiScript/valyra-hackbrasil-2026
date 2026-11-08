@@ -1,5 +1,7 @@
 # Contrato de dados — Finance
 
+> **Integração #11/#12 (08/11/2026):** persistência/seed #17, domínio CSV #19 e core HTTP mínimo (/health, erros, paginação, OpenAPI) estão implementados nesta branch. Endpoints Finance #14/#15, projeções e módulos analíticos continuam planejados. A [arquitetura atual](architecture.md) e o [registro de integração](integracao-11-12.md) atualizam o estado; notas históricas anteriores abaixo descrevem suas respectivas etapas.
+
 > **Atualização de 07/11/2026 — Issues #7/#10.** Contratos registrados nas Issues [#9](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/9), [#10](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/10), [#13](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/13), [#14](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/14) e [#15](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/15). Persistência e seed foram implementados na etapa #10; endpoints, schemas HTTP e domínio CSV abaixo continuam previstos. O [registro de implementação](revisao-modelagem.md) informa a validação disponível.
 
 ## Representação dos dados
