@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Persistência do Finance do Valyra"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.34,<1",
     "alembic>=1.14,<2",
     "psycopg[binary]>=3.2,<4",
     "pydantic-settings>=2.7,<3",
@@ -11,7 +13,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.3,<10", "ruff>=0.9,<1", "import-linter>=2.1,<3"]
+dev = ["pytest>=8.3,<10", "httpx>=0.28,<1", "ruff>=0.9,<1", "import-linter>=2.1,<3"]
 
 [build-system]
 requires = ["hatchling>=1.27,<2"]
@@ -37,9 +39,16 @@ known-third-party = ["alembic", "sqlalchemy"]
 
 [tool.importlinter]
 root_package = "valyra"
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Core não depende de Finance"
 type = "forbidden"
 source_modules = ["valyra.core"]
 forbidden_modules = ["valyra.finance"]
+
+[[tool.importlinter.contracts]]
+name = "Domínio Finance sem banco, HTTP ou IA"
+type = "forbidden"
+source_modules = ["valyra.finance.domain"]
+forbidden_modules = ["sqlalchemy", "fastapi", "httpx", "requests", "openai", "google"]

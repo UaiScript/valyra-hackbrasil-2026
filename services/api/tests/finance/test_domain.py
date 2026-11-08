@@ -12,6 +12,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
+
 from valyra.finance.domain import (
     CATEGORY_RULES,
     MAX_FILE_BYTES,
