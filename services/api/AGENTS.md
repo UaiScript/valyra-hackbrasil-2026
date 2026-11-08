@@ -48,3 +48,5 @@ Fontes: [contrato Finance](../../docs/api-design.md), [modelagem](../../docs/mod
 Comandos disponíveis na raiz: `make dev`, `make lint`, `make migrate`, `make seed`, `make test`, `make openapi`. A configuração oficial é services/api/pyproject.toml com uv.lock. make test-domain roda os 168 casos puros sem conexão PostgreSQL; pytest completo usa banco exclusivo para persistência/health. A dependência de fixtures de banco é explícita, não autouse.
 
 No CSV, line_number é a primeira linha física; raw_line preserva quebras internas. Registros malformados e estouro de csv.field_size_limit são wrong_column_count; o limite do processo (normalmente 131072 caracteres) não é alterado. O enquadramento lógico impede importar fragmentos após erro. Arquivo acima de 1 MiB é responsabilidade do router futuro.
+
+O exportador gera JSON com indentação 2, chaves ordenadas e LF explícito em todas as plataformas; regenere, não normalize o contrato à mão.

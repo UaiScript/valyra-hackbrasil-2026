@@ -93,3 +93,18 @@ def test_identidade_demo_e_page(monkeypatch):
         }
     finally:
         get_settings.cache_clear()
+
+
+def test_exportador_openapi_reprodutivel_com_lf_sem_banco(app, monkeypatch, tmp_path):
+    import json
+
+    from valyra.scripts import export_openapi
+
+    monkeypatch.setattr(export_openapi, "PROJECT_ROOT", tmp_path)
+    export_openapi.main()
+    generated = tmp_path / "packages/contracts/openapi.json"
+    first = generated.read_bytes()
+    assert b"\r" not in first
+    assert json.loads(first) == app.openapi()
+    export_openapi.main()
+    assert generated.read_bytes() == first

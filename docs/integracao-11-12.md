@@ -26,9 +26,9 @@ Resultados locais em 08/11/2026, com Python 3.13.15, uv 0.13.7, GNU Make 4.4.1, 
 
 - make lint: Ruff e formatação (31 arquivos) e dois contratos import-linter aprovados.
 - make test-domain: 168 testes com URLs inacessíveis na porta 1, sem conexão PostgreSQL.
-- make test: 257 aprovados (77 persistência + 168 domínio + 12 core), zero ignorados. Um aviso de depreciação Starlette TestClient/httpx foi mantido visível; não foi desativado.
+- make test: 257 aprovados (77 persistência + 168 domínio + 12 core), zero ignorados. Após essa suíte, foi adicionada uma regressão do exportador (1 caso aprovado separadamente, sem repetir as suítes já aprovadas); a coleção passa a 258 casos, sendo 13 de core. Um aviso de depreciação Starlette TestClient/httpx foi mantido visível; não foi desativado.
 - make migrate, Alembic check online e exatamente uma cabeça aprovados. Seed duas vezes preservou integralmente as linhas na segunda execução; comparação antes/depois da suíte confirmou desenvolvimento inalterado.
-- make openapi gerou somente /health e duas execuções produziram bytes idênticos; JSON não editado à mão. O CI compara esse contrato versionado.
+- make openapi gerou somente /health e duas execuções produziram bytes idênticos; JSON não editado à mão. Uma correção posterior fixa LF explicitamente para eliminar diferença CRLF no Windows, com teste de regressão. O CI compara esse contrato versionado.
 - Landing: npm ci pelo lockfile sem scripts, TypeScript/build, 10 testes de configuração e 18 testes Chromium/Chrome em desktop e duas larguras móveis aprovados; auditoria sem vulnerabilidades conhecidas.
 - Actionlint 1.7.12 sem erros; checagem de contexto/CLAUDE/links locais e git diff --check aprovados. O checker de documentação é infra/check_docs.py.
 
