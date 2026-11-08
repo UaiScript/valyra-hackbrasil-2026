@@ -4,6 +4,9 @@ on:
   push:
     branches: ["**"]
 
+  pull_request:
+    branches: [main]
+
 permissions:
   contents: read
 
@@ -28,42 +31,47 @@ jobs:
               -v ON_ERROR_STOP=1 -c "SELECT 1;"
           '
 
-  api-persistence:
-    name: Finance / PostgreSQL 18
+  api:
+    name: API
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_USER: valyra
-          POSTGRES_PASSWORD: valyra
-          POSTGRES_DB: valyra_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U valyra -d valyra_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      # A conexão de aplicação é somente consultada para comparar a identidade.
-      DATABASE_URL: postgresql+psycopg://valyra:valyra@localhost:5432/postgres
-      TEST_DATABASE_URL: postgresql+psycopg://valyra:valyra@localhost:5432/valyra_test
-      DEMO_USER_ID: 00000000-0000-0000-0000-000000000001
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           persist-credentials: false
-      - name: Preparar persistência
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: '0.13.7'
+          python-version: '3.12'
+          enable-cache: false
+      - name: Instalar dependências oficiais
+        run: make sync
+      - name: Lint e arquitetura
+        run: make lint
+      - name: Domínio sem PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg://127.0.0.1:1/unreachable
+          TEST_DATABASE_URL: postgresql+psycopg://127.0.0.1:1/unreachable_test
+        run: make test-domain
+      - name: Iniciar PostgreSQL isolado do runner
         run: |
-          python3 -m venv .tools/uv
-          .tools/uv/bin/pip install uv==0.13.7
-          .tools/uv/bin/uv sync --project services/api --locked --python 3.12
-      - name: Validar código e banco dedicado
+          cp .env.example .env
+          docker compose config --quiet
+          docker compose up -d --wait --wait-timeout 60 postgres
+          docker compose exec -T postgres sh -c '
+            export PGPASSWORD="$POSTGRES_PASSWORD"
+            exec psql -h 127.0.0.1 -U "$POSTGRES_USER" -d valyra_test -v ON_ERROR_STOP=1 -c "SELECT 1;"
+          '
+      - name: Migrações e sincronismo
         run: |
-          .tools/uv/bin/uv run --locked --directory services/api ruff check .
-          .tools/uv/bin/uv run --locked --directory services/api ruff format --check .
-          .tools/uv/bin/uv run --locked --directory services/api lint-imports
-          .tools/uv/bin/uv run --locked --directory services/api pytest
-
+          make migrate
+          uv run --locked --env-file "$PWD/.env" --directory services/api alembic check
+          uv run --locked --directory services/api python -c 'from alembic.config import Config; from alembic.script import ScriptDirectory; heads = ScriptDirectory.from_config(Config("alembic.ini")).get_heads(); assert len(heads) == 1, heads'
+      - name: Suíte integrada em banco dedicado
+        run: make test
+      - name: Contrato gerado e documentação
+        run: |
+          make openapi
+          git diff --exit-code -- packages/contracts/
+          test -z "$(git ls-files --others --exclude-standard -- packages/contracts/)"
+          python infra/check_docs.py

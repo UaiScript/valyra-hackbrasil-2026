@@ -1,0 +1,36 @@
+name: Bug
+description: Relatar um comportamento incorreto com passos para reprodução.
+title: "[Bug] "
+body:
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Camada
+      options:
+        - api
+        - web
+        - pipelines
+        - infra
+        - docs
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Passos para reproduzir
+      description: Inclua ambiente, versão/commit e dados sintéticos suficientes para reproduzir.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Resultado esperado
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Resultado obtido
+      description: Inclua erros ou logs relevantes, removendo segredos e dados pessoais.
+    validations:
+      required: true
