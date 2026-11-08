@@ -10,8 +10,9 @@ Rejection precedence is column structure, date, description, then amount.
 Malformed data records use wrong_column_count, as agreed for Issue #13.
 An unterminated quoted record consumes the remaining input: guessing a new
 record boundary would risk importing fragments of the rejected description.
-The process's csv.field_size_limit is left unchanged (normally 128 KiB per
-field). A record exceeding it is rejected as wrong_column_count, even within
+The process's csv.field_size_limit is left unchanged (normally 131072 decoded
+characters per field, not UTF-8 bytes). A record exceeding it is rejected as
+wrong_column_count, even within
 the 1 MiB upload limit; this restriction was explicitly accepted for Issue #13.
 Logical records are framed before csv.reader validates fields, so a reader
 error cannot turn a later physical line inside a quoted field into a transaction.
