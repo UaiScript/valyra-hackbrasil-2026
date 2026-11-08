@@ -1,13 +1,13 @@
 # Contrato de dados — Finance
 
-> **Atualização de 07/11/2026 — Issue #7.** Contratos previstos nas Issues [#9](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/9), [#10](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/10), [#13](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/13), [#14](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/14) e [#15](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/15). Descrições e comentários consultados; nenhuma dessas Issues tem comentários adicionais. Os endpoints, schemas e funções abaixo ainda não estão implementados neste checkout.
+> **Atualização de 07/11/2026 — Issues #7/#10.** Contratos registrados nas Issues [#9](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/9), [#10](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/10), [#13](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/13), [#14](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/14) e [#15](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/15). Persistência e seed foram implementados na etapa #10; endpoints, schemas HTTP e domínio CSV abaixo continuam previstos. O [registro de implementação](revisao-modelagem.md) informa a validação disponível.
 
 ## Representação dos dados
 
 - Dinheiro: PostgreSQL `BIGINT`, nome `*_cents`; na API, número inteiro JSON em centavos de BRL. `accounts.balance_cents` e `transactions.amount_cents` são os campos registrados. Entrada positiva, saída negativa, zero proibido em transação. Conversão e cálculo sem `float`.
 - Identificadores: `UUID` no backend e strings UUID no JSON, inclusive FKs. IDs de usuário e conta demo são fornecidos pelo seed; não são IDs de sessão.
 - Datas de negócio (`date`, `balance_as_of`): `DATE`, JSON `YYYY-MM-DD`, sem fuso. Instantes (`created_at`, `updated_at`, `completed_at` quando presentes): `TIMESTAMPTZ`, ISO 8601 com fuso, normalizados para UTC, por exemplo `2026-11-07T17:00:00Z`.
-- **Banco/ORM:** tipos, nulabilidade, defaults e constraints têm fonte única na [modelagem, seção 4](modelagem-db.md#4-finance). **CSV:** contrato de entrada textual abaixo. **HTTP:** somente os campos explicitados nos schemas desta página são previstos como públicos; uma coluna do banco não implica exposição na API. Refinamentos marcados como propostas na modelagem continuam sujeitos a alinhamento.
+- **Banco/ORM:** tipos, nulabilidade, defaults e constraints têm fonte única na [modelagem, seção 4](modelagem-db.md#4-finance); os refinamentos autorizados para a #10 estão no código. **CSV:** contrato de entrada textual abaixo. **HTTP:** somente os campos explicitados nos schemas desta página são previstos como públicos; uma coluna do banco não implica exposição na API. Propostas de comportamento ainda identificadas na modelagem continuam sujeitas a alinhamento.
 
 Exemplos isolados de campos, **não payloads de endpoint**:
 
@@ -23,13 +23,16 @@ São R$ 5.000,00 de referência e saída de R$ 129,90. Formatação em reais per
 
 A busca por strings sugerida na Issue #7 também captura `balance_as_of`, campo de data cuja serialização é string ISO. A validação deve distinguir datas de campos monetários.
 
-## Interfaces já descritas nas tarefas, ainda a implementar
+## Interfaces internas e estado atual
+
+Implementados: configuração, `Base`/`User`, engine/sessão, modelos Finance e seed. Demais interfaces do core HTTP e do domínio CSV seguem previstas, sem implementação nesta etapa.
 
 | Origem | Interface | Campos / tipos registrados |
 |---|---|---|
 | Issue #9 | `Settings` / `get_settings()` | `database_url: str`, `cors_origin: str`, `demo_user_id: UUID`; configuração de ambiente da Issue #8 |
 | Issue #9 | `get_current_user_id() -> UUID` | Retorna o usuário demo configurado, sem autenticação ou isolamento por sessão |
 | Issue #9 | `get_session() -> Iterator[Session]` | Sessão de banco; não representa sessão de usuário |
+| Mínimo da #9 para #10 | `Base`, `get_engine()`, `get_session_factory()` | Uma metadata e uma infraestrutura de conexão/sessão; sem camada HTTP |
 | Issue #9 | `Page[T]` | `items: list[T]`, `total: int`, `limit: int`, `offset: int` |
 | Issue #9 | `PageParams` | `limit: int = 50`, entre 1 e 200; `offset: int = 0`, não negativo |
 | Issue #9 | `AppError` | `code: str`, `message: str`, `status_code: int`, `details: dict \| None = None`; resposta `{"error":{"code":"NOT_FOUND","message":"Recurso não encontrado","details":{}}}` no exemplo da tarefa |
