@@ -49,6 +49,12 @@ As projeções numéricas serão produzidas por cálculos e modelos verificávei
 
 O MVP não inclui integração bancária real, execução de operações ou recomendações personalizadas de compra e venda. Análises históricas deverão respeitar as datas de publicação e as versões dos dados disponíveis no período simulado.
 
+## Landing page
+
+A página de apresentação está isolada em [`apps/landing/`](apps/landing/README.md), com build estático próprio e exemplos visuais sintéticos. Os links de acesso levam inicialmente ao [repositório oficial](https://github.com/UaiScript/valyra-hackbrasil-2026). Ela não depende da API ou do banco e não ocupa o diretório `apps/web` previsto para a aplicação.
+
+Com Node.js 22.12 ou superior, execute `npm --prefix apps/landing ci --ignore-scripts` e `npm --prefix apps/landing run dev`. As instruções de validação, troca futura do destino, hospedagem e remoção estão no README da landing.
+
 ## Base técnica e estágio do projeto
 
 A arquitetura definida é um **monorepo com frontend React e TypeScript e backend único FastAPI, organizado nos domínios Finance, Alpha e AI**. Estão previstos PostgreSQL para os dados da aplicação e DuckDB/Parquet para séries históricas. A [spec de fundação técnica](docs/spec-tecnica.md) detalha a arquitetura e identifica as propostas técnicas ainda em discussão.
