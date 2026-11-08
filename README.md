@@ -54,3 +54,5 @@ O MVP não inclui integração bancária real, execução de operações ou reco
 A arquitetura definida é um **monorepo com frontend React e TypeScript e backend único FastAPI, organizado nos domínios Finance, Alpha e AI**. Estão previstos PostgreSQL para os dados da aplicação e DuckDB/Parquet para séries históricas. A [spec de fundação técnica](docs/spec-tecnica.md) detalha a arquitetura e identifica as propostas técnicas ainda em discussão.
 
 Este README apresenta a proposta e o escopo do rascunho. O projeto está em desenvolvimento; as funcionalidades descritas representam as entregas planejadas para o MVP.
+
+A persistência inicial do Finance possui modelos SQLAlchemy, migração Alembic, seed e testes em `services/api/`. Comandos, dependências mínimas e limitações de validação estão no [registro da Issue #10](docs/revisao-modelagem.md); ainda não há endpoints ou importador CSV implementados.

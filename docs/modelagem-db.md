@@ -1,10 +1,10 @@
 # Modelagem de dados do Postgres — Design
 
-> **Atualização de 07/11/2026 — dados do Finance (Issue #7).** Dinheiro passa a ser `BIGINT` em centavos de BRL, com sufixo `_cents`, conforme as Issues #7 e #10. Esta revisão é documental: não há ORM, migrações ou seed implementados. Complementos de integridade ainda não registrados nas tarefas estão identificados como **[Proposta]**.
+> **Atualização de 08/11/2026 — Issue #10.** O Finance inicial tem modelos SQLAlchemy, Alembic, migração, seed e testes em `services/api/`, validados em PostgreSQL 18.6. A equipe autorizou os refinamentos de nulabilidade/defaults, exclusões, FK composta, checks e conflitos do seed. Resultados e comandos estão no [registro de implementação](revisao-modelagem.md). Alpha, IA, alertas, parser e HTTP continuam planejados.
 
 | Campo | Valor |
 |---|---|
-| Status | Em revisão pelo time |
+| Status | Finance inicial autorizado para implementação; demais domínios em revisão |
 | Data | 07/11/2026 |
 | Base | Documento de Alinhamento v0.3, [fundação técnica](spec-tecnica.md) e Issues [#7](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/7) / [#10](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/10) |
 | Escopo | Schema do PostgreSQL: dados do app e tabela `signals` |
@@ -14,7 +14,7 @@
 
 O conteúdo foi construído no brainstorming de 07/11 e está aberto à revisão do time. Itens marcados como **[Altera fundação]** mudam algo já definido no spec de fundação técnica; a seção 10 lista esses impactos.
 
-**[Registrado]** indica uma regra explícita das Issues consultadas ou do desenho anterior; não significa implementação ou aprovação de todo o desenho. **[Proposta]** indica um refinamento novo que precisa de alinhamento antes da Issue #10. A seção 4 é a referência do Finance; o [contrato inicial](api-design.md) trata das interfaces e a [preparação da migração](revisao-modelagem.md) reúne dependências, seed e aceite.
+**[Registrado]** indica uma regra explícita das Issues consultadas ou do desenho anterior; não significa implementação de todo o desenho. **[Aprovado para #10]** identifica os refinamentos autorizados para a persistência inicial. **[Proposta]** continua indicando escolhas de comportamento ainda não fechadas, inclusive fora desta implementação. A seção 4 é a referência do Finance; o [contrato](api-design.md) trata das interfaces e o [registro da migração](revisao-modelagem.md) reúne dependências, seed e validação.
 
 ---
 
@@ -256,7 +256,7 @@ erDiagram
 
 ### 3.2 Nomes
 
-Previstos uma vez na `MetaData` do SQLAlchemy; a base declarativa será entregue pela Issue #9:
+Configurados uma vez na `MetaData` de `core.db.Base`, incluída como dependência mínima da Issue #10, compatível com a interface da #9:
 
 - Tabelas em `snake_case` no plural; chaves estrangeiras `<entidade>_id`.
 - Constraints com prefixos fixos: `pk_`, `fk_`, `uq_`, `ix_`, `ck_`.
@@ -292,7 +292,7 @@ Quantidade, indicadores, scores e confiança não são dinheiro. `holdings.avera
 
 - As colunas temporais são as explicitadas em cada tabela e no diagrama. Não se presume `created_at` nas tabelas de relação nem em `import_rejections`.
 - No Finance inicial, `accounts` e `transactions` têm `created_at` e `updated_at`; `users` e `categories` têm somente `created_at`; `import_batches` registra criação e término. Acrescentar outros timestamps exigiria novo alinhamento.
-- **[Proposta]** Onde presentes, `created_at` recebe `CURRENT_TIMESTAMP` e não muda; `updated_at` inicia com o mesmo instante e é atualizado em toda alteração pelo ORM/service, com `CHECK (updated_at >= created_at)`. O default isolado não atualiza registros. Escritas diretas precisam respeitar a mesma regra; trigger de atualização automática não está decidido.
+- **[Aprovado para #10]** Onde presentes no Finance, `created_at` recebe `CURRENT_TIMESTAMP`; `updated_at` inicia com o mesmo instante e tem `onupdate=CURRENT_TIMESTAMP` no SQLAlchemy, com `CHECK (updated_at >= created_at)`. Preservar `created_at` é responsabilidade de quem escreve; não há trigger de imutabilidade. SQL direto fora do SQLAlchemy precisa manter `updated_at` explicitamente; não foi criado trigger de atualização automática.
 - `signals` não tem `updated_at`.
 - Sem soft delete.
 
@@ -314,7 +314,7 @@ Chaves estrangeiras entre módulos são permitidas no banco. Em código, o acess
 
 ### 4.1 Tabelas
 
-As colunas mantêm o desenho existente, com as duas renomeações monetárias registradas. Nas tabelas abaixo, **NN** = `NOT NULL`; **NULL** = opcional; **—** = sem default, informado na escrita. IDs têm default `gen_random_uuid()` conforme a seção 3.1; o seed fornece IDs explícitos. Nulabilidade, defaults adicionais, exclusões e constraints além das explicitamente citadas na Issue #10 são **[Proposta]** para tornar o desenho implementável, sem tratá-los como decisões aprovadas. Valores iniciais escritos pelo service na Issue #14 não aprovam, por si só, defaults no DDL.
+As seis tabelas abaixo estão representadas no ORM e na migração `0001_finance_inicial`; a validação em PostgreSQL está descrita no registro de implementação. **NN** = `NOT NULL`; **NULL** = opcional; **—** = sem default, informado na escrita. IDs têm default `gen_random_uuid()` conforme a seção 3.1; o seed fornece IDs explícitos. Nulabilidade, defaults, índices e constraints documentados foram autorizados para a Issue #10. Valores escritos pelo service futuro da #14 permanecem distintos dos defaults do DDL.
 
 **`users`** (`core`) — uma linha identifica o usuário demo; não representa login ou sessão.
 
@@ -324,7 +324,7 @@ As colunas mantêm o desenho existente, com as duas renomeações monetárias re
 | `name` | VARCHAR NN | — | Nome de exibição |
 | `created_at` | TIMESTAMPTZ NN | `CURRENT_TIMESTAMP` | Criação |
 
-Índices: somente o da PK. **[Proposta] Exclusão:** `RESTRICT` quando houver contas; demais domínios continuam fora desta migração.
+Índices: somente o da PK. **[Aprovado para #10] Exclusão:** `RESTRICT` quando houver contas; demais domínios continuam fora desta migração.
 
 **`accounts`** — uma linha representa uma conta do usuário e seu saldo de referência, não o saldo recalculado do dia.
 
@@ -337,7 +337,7 @@ As colunas mantêm o desenho existente, com as duas renomeações monetárias re
 | `balance_as_of` | DATE NN | — | Data de referência; convenção proposta na seção 4.2 |
 | `created_at`, `updated_at` | TIMESTAMPTZ NN | `CURRENT_TIMESTAMP` | Seção 3.4 |
 
-**[Proposta]** Índice `(user_id)`; check temporal da seção 3.4. FK de usuário com `ON DELETE RESTRICT`; excluir conta com lotes ou transações também é bloqueado. Não há cascata de histórico financeiro nem default implícito de saldo zero.
+**[Aprovado para #10]** Índice `(user_id)`; check temporal da seção 3.4. FK de usuário com `ON DELETE RESTRICT`; excluir conta com lotes ou transações também é bloqueado. Não há cascata de histórico financeiro nem default implícito de saldo zero.
 
 **`import_batches`** — uma linha representa uma tentativa de importar um CSV para uma conta, inclusive reenvios do mesmo arquivo.
 
@@ -352,15 +352,15 @@ As colunas mantêm o desenho existente, com as duas renomeações monetárias re
 | `rows_duplicated` | INT NN | `0` | Registros já existentes, não inseridos |
 | `rows_rejected` | INT NN | `0` | Registros inválidos com detalhe de rejeição |
 | `created_at` | TIMESTAMPTZ NN | `CURRENT_TIMESTAMP` | Início |
-| `completed_at` | TIMESTAMPTZ NULL | `NULL` | Término; semântica proposta abaixo |
+| `completed_at` | TIMESTAMPTZ NULL | `NULL` | Término; semântica abaixo |
 
 **[Registrado, Issue #10]** `CHECK (status IN ('processing','completed','failed'))`.
 
-**[Proposta] Integridade no banco:**
+**[Aprovado para #10] Integridade no banco:**
 
 - Cada contador é `>= 0`; `rows_imported + rows_duplicated + rows_rejected <= rows_total`. Avaliar a soma promovendo os contadores para `BIGINT` para não estourar `INT`.
-- Se `status = 'completed'`, exigir igualdade nessa soma. A Issue #14 registra conclusão mesmo com rejeições de linhas. Se futuramente houver lote `failed` persistido, sua contagem parcial e semântica de término continuam como proposta; a seção 4.5 explica o efeito do rollback.
-- `processing` exige `completed_at IS NULL`; `completed` e `failed` exigem `completed_at IS NOT NULL` e `completed_at >= created_at`. Aqui o campo significa término de qualquer resultado terminal; confirmar essa escolha com o backend.
+- Se `status = 'completed'`, exigir igualdade nessa soma. A Issue #14 registra conclusão mesmo com rejeições de linhas. Para um registro `failed`, os checks permitem contagem parcial; a decisão de persistir essa tentativa continua pendente, conforme a seção 4.5.
+- `processing` exige `completed_at IS NULL`; `completed` e `failed` exigem `completed_at IS NOT NULL` e `completed_at >= created_at`. O campo significa término de qualquer resultado terminal persistido.
 - `UNIQUE (id, account_id)` como alvo da FK composta de `transactions`; índice `(account_id)` para consulta e FK. FK de conta com `ON DELETE RESTRICT`.
 
 Contagem de registros segue o [contrato CSV da Issue #13](api-design.md#entrada-csv-e-domínio--issue-13). A conciliação pelo service e os limites das garantias do banco estão nas seções 4.4 e 4.5. **[Proposta]** Lotes terminais não são reabertos; reenvio cria outro lote conforme o fluxo da Issue #14.
@@ -375,7 +375,7 @@ Contagem de registros segue o [contrato CSV da Issue #13](api-design.md#entrada-
 | `reason` | VARCHAR NN | — | Motivo legível de rejeição |
 | `raw_line` | TEXT NN | — | Texto rejeitado conforme contrato CSV/HTTP |
 
-**[Proposta]** `CHECK (line_number > 0)` e `UNIQUE (import_batch_id, line_number)`; o índice da unicidade cobre a consulta pelo lote. FK com `ON DELETE CASCADE`: detalhes só são removidos junto de um lote cuja exclusão seja permitida (sem transações). Não há timestamp próprio; o contexto temporal vem do lote.
+**[Aprovado para #10]** `CHECK (line_number > 0)` e `UNIQUE (import_batch_id, line_number)`; o índice da unicidade cobre a consulta pelo lote. FK com `ON DELETE CASCADE`: detalhes só são removidos junto de um lote cuja exclusão seja permitida (sem transações). Não há timestamp próprio; o contexto temporal vem do lote.
 
 **`categories`** — uma linha representa uma categoria global fixa do seed; o usuário não cria categorias.
 
@@ -387,7 +387,7 @@ Contagem de registros segue o [contrato CSV da Issue #13](api-design.md#entrada-
 | `kind` | VARCHAR NN | — | `expense` \| `income` |
 | `created_at` | TIMESTAMPTZ NN | `CURRENT_TIMESTAMP` | Criação |
 
-**[Registrado, Issue #10]** `CHECK (kind IN ('expense','income'))`; as 12 categorias estão na [preparação do seed](revisao-modelagem.md#seed-previsto-na-issue-10). PK e unicidade de `slug` bastam como índices. **[Proposta] Exclusão:** `RESTRICT` nas referências atual e prevista, preservando classificação e sugestão original.
+**[Registrado, Issue #10]** `CHECK (kind IN ('expense','income'))`; as 12 categorias estão no [seed](revisao-modelagem.md#seed-da-issue-10). PK e unicidade de `slug` bastam como índices. **[Aprovado para #10] Exclusão:** `RESTRICT` nas referências atual e prevista, preservando classificação e sugestão original.
 
 **`transactions`** — uma linha representa uma movimentação importada, com sinal, conta, lote de origem e classificação.
 
@@ -411,7 +411,9 @@ Contagem de registros segue o [contrato CSV da Issue #13](api-design.md#entrada-
 
 **[Registrado, Issue #10]** `UNIQUE (account_id, row_hash)`, `CHECK (amount_cents <> 0)`, `CHECK (category_source IN ('rule','model','user'))`; índices `(account_id, date)` e `(category_id)`.
 
-**[Proposta]** FK composta `(import_batch_id, account_id) REFERENCES import_batches(id, account_id)` para impedir que uma transação use lote de outra conta. Ela substitui a FK simples de lote; mantém-se a FK de conta. Todas essas FKs usam `ON DELETE RESTRICT`, sem alteração de identidade da conta/lote. Índices adicionais `(import_batch_id, account_id)` e `(predicted_category_id)` cobrem referências e consultas. Checks dos scores: `category_confidence IS NULL OR category_confidence BETWEEN 0 AND 1` e equivalente para `anomaly_score`; check temporal conforme seção 3.4.
+**[Aprovado para #10]** FK composta `(import_batch_id, account_id) REFERENCES import_batches(id, account_id)` para impedir que uma transação use lote de outra conta. Ela substitui a FK simples de lote; mantém-se a FK de conta. Todas essas FKs usam `ON DELETE RESTRICT`, sem alteração de identidade da conta/lote. Índices adicionais `(import_batch_id, account_id)` e `(predicted_category_id)` cobrem referências e consultas. Checks dos scores: `category_confidence IS NULL OR category_confidence BETWEEN 0 AND 1` e equivalente para `anomaly_score`; check temporal conforme seção 3.4.
+
+`balance_cents` e `amount_cents` usam um tipo SQLAlchemy com armazenamento `BIGINT` e bind estrito: floats, strings, decimais e booleanos são rejeitados antes da escrita, inclusive em inserts em lote. Não foi definido teto monetário de negócio; a faixa física continua sendo a de `BIGINT`.
 
 **[Proposta] Exclusão de transação:** não oferecer remoção física no fluxo inicial, pois ela quebraria a conciliação histórica de `rows_imported` e permitiria reimportação do hash removido. FKs não impedem apagar a própria linha; a política deve ser respeitada pelo service/permissões futuros. Uma função de exclusão exigiria alinhar os contadores e a auditoria.
 
@@ -444,7 +446,7 @@ O modelo representa movimentações efetivadas de extrato, sem estado de agendam
 
 | Camada prevista | Responsabilidade | Fonte principal |
 |---|---|---|
-| Banco / ORM | `NOT NULL`, PKs/FKs, `UNIQUE (account_id, row_hash)` e checks de linha aplicáveis. Checks de scores, contadores, timestamps e FK composta continuam propostas explicitadas na seção 4.1 | Seção 4.1 e Issue #10 |
+| Banco / ORM | `NOT NULL`, PKs/FKs, `UNIQUE (account_id, row_hash)`, checks de linha e FK composta autorizados e presentes no ORM/migração; bind estrito de dinheiro no SQLAlchemy | Seção 4.1 e Issue #10 |
 | Importador / domínio | Ler e validar CSV, converter dinheiro sem `float`, normalizar cópia da descrição, calcular hash e categorizar por regras/fallback; sem banco ou HTTP | [Contrato CSV/domínio](api-design.md#entrada-csv-e-domínio--issue-13), Issue #13 |
 | Router / schemas HTTP | Limitar leitura do upload, validar parâmetros e inteiro estrito no PATCH; traduzir `CsvFormatError` para `AppError` | [Operações e erros HTTP](api-design.md#operações-http--issues-14-e-15), Issues #9/#14/#15 |
 | Service | Validar propriedade da conta pelo demo via `get_account_for_user`; controlar a transação de importação, resolver categorias do seed, conciliar contadores e tratar conflitos/erros | Seção 4.5, Issue #14 |
@@ -461,7 +463,7 @@ A FK garante existência da conta, não que ela pertença ao usuário demo da re
 | Erro que impede iniciar | Arquivo acima do limite, erro de formato de arquivo ou conta inválida não garantem criação de lote; a ordem completa de validações não foi fixada |
 | Falha técnica com rollback | Desfaz as escritas da mesma transação, incluindo o lote recém-criado, rejeições e transações; o lote pode não existir para consulta posterior |
 
-O enum `failed` no modelo não garante que toda tentativa fracassada produza uma linha persistida. **[Pendente]** Persistir falhas em outra transação ou mecanismo exige decisão própria; esta revisão não escolhe essa solução. As regras propostas de contadores e `completed_at` para `failed` só se aplicam quando houver registro persistido, sem comprometer a atomicidade da importação definida na Issue #14.
+O enum `failed` no modelo não garante que toda tentativa fracassada produza uma linha persistida. **[Pendente]** Persistir falhas em outra transação ou mecanismo exige decisão própria; esta implementação não escolhe essa solução. Os checks de contadores e `completed_at` para `failed` só se aplicam quando houver registro persistido, sem comprometer a atomicidade da importação definida na Issue #14.
 
 ---
 
@@ -672,7 +674,7 @@ Regras:
 
 ### 8.1 Migrações
 
-As regras desta seção descrevem o fluxo planejado, não ferramentas já presentes. A Issue #10 cobre somente as seis tabelas iniciais do Finance/core; triggers, views e papéis de Alpha não fazem parte dela. Dependências, seed e critérios de aceite estão em [revisao-modelagem.md](revisao-modelagem.md).
+O Alembic e a revisão inicial do Finance estão em `services/api/alembic/`. A Issue #10 cobre somente as seis tabelas iniciais do Finance/core; triggers, views e papéis de Alpha permanecem planejados. Comandos, seed e resultados de validação estão em [revisao-modelagem.md](revisao-modelagem.md).
 
 - Histórico único em `services/api/alembic/`; todo PR que altera models traz sua migração.
 - `--autogenerate` é rascunho e sempre revisado à mão.
@@ -684,9 +686,9 @@ As regras desta seção descrevem o fluxo planejado, não ferramentas já presen
   - `alembic check` (falha se model mudou sem migração);
   - falha se houver mais de uma cabeça.
 
-### 8.2 Seed planejado (`make seed`, ainda inexistente)
+### 8.2 Seed inicial e extensão planejada
 
-Para a Issue #10, a especificação exata e única do seed inicial está em [preparação da migração e seed](revisao-modelagem.md#seed-previsto-na-issue-10). A tabela abaixo descreve a visão futura do produto, sem ampliar o seed inicial:
+O seed inicial da Issue #10 está em `valyra.seed`, executável por `python -m valyra.seed`; especificação e controle transacional estão no [registro do seed](revisao-modelagem.md#seed-da-issue-10). A tabela abaixo descreve a extensão futura, sem ampliar o seed inicial:
 
 | Dado | Observação |
 |---|---|

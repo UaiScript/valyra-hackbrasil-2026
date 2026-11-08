@@ -28,3 +28,42 @@ jobs:
               -v ON_ERROR_STOP=1 -c "SELECT 1;"
           '
 
+  api-persistence:
+    name: Finance / PostgreSQL 18
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: valyra
+          POSTGRES_PASSWORD: valyra
+          POSTGRES_DB: valyra_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U valyra -d valyra_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # A conexão de aplicação é somente consultada para comparar a identidade.
+      DATABASE_URL: postgresql+psycopg://valyra:valyra@localhost:5432/postgres
+      TEST_DATABASE_URL: postgresql+psycopg://valyra:valyra@localhost:5432/valyra_test
+      DEMO_USER_ID: 00000000-0000-0000-0000-000000000001
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - name: Preparar persistência
+        run: |
+          python3 -m venv .tools/uv
+          .tools/uv/bin/pip install uv==0.13.7
+          .tools/uv/bin/uv sync --project services/api --locked --python 3.12
+      - name: Validar código e banco dedicado
+        run: |
+          .tools/uv/bin/uv run --locked --directory services/api ruff check .
+          .tools/uv/bin/uv run --locked --directory services/api ruff format --check .
+          .tools/uv/bin/uv run --locked --directory services/api lint-imports
+          .tools/uv/bin/uv run --locked --directory services/api pytest
+

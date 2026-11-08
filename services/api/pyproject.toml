@@ -1,0 +1,45 @@
+[project]
+name = "valyra-api"
+version = "0.1.0"
+description = "Persistência do Finance do Valyra"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.14,<2",
+    "psycopg[binary]>=3.2,<4",
+    "pydantic-settings>=2.7,<3",
+    "sqlalchemy>=2.0.36,<2.1",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3,<10", "ruff>=0.9,<1", "import-linter>=2.1,<3"]
+
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/valyra"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = ["postgres: requer TEST_DATABASE_URL apontando para PostgreSQL dedicado"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+known-third-party = ["alembic", "sqlalchemy"]
+
+[tool.importlinter]
+root_package = "valyra"
+
+[[tool.importlinter.contracts]]
+name = "Core não depende de Finance"
+type = "forbidden"
+source_modules = ["valyra.core"]
+forbidden_modules = ["valyra.finance"]
