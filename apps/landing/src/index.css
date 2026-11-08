@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --valyra-bg: #070c14;
+    --valyra-surface: #0d1626;
+    --valyra-surface-hover: #122038;
+    --valyra-blue: #2563eb;
+    --valyra-cyan: #38bdf8;
+    --valyra-emerald: #10b981;
+    --valyra-border: rgba(255, 255, 255, 0.09);
+    --valyra-text: #f1f5f9;
+    --valyra-text-muted: #8b9bb4;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: var(--valyra-text);
+    background-color: var(--valyra-bg);
+  }
+
+  body {
+    background-color: #070c14;
+    color: #f1f5f9;
+    min-width: 320px;
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-display {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+
+  .font-mono-tabular {
+    font-family: 'Segoe UI', monospace, sans-serif;
+    font-feature-settings: "tnum" 1, "cv05" 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Malha sutil de coordenadas matemáticas de fundo para estética de terminal */
+  .bg-terminal-grid {
+    background-size: 40px 40px;
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  }
+
+  /* Gradiente radial de iluminação sutil no centro */
+  .bg-glow-radial {
+    background: radial-gradient(circle at 50% 20%, rgba(37, 99, 235, 0.12) 0%, rgba(7, 12, 20, 0) 65%);
+  }
+}
+
+/* Keyboard navigation and small screens must remain usable without hiding overflow. */
+@layer base {
+  :focus-visible { outline: 2px solid #38bdf8; outline-offset: 4px; }
+  section, [id] { scroll-margin-top: 8rem; }
+  .min-h-screen a, button { touch-action: manipulation; }
+}
+.demo-notice { margin: 0; padding: 1rem 1.5rem; text-align: center; color: #bae6fd; background: #102038; font-size: .8rem; line-height: 1.6; }
+.skip-link { position: fixed; left: 1rem; top: -10rem; z-index: 100; background: #102a56; color: white; padding: .75rem; }
+.skip-link:focus { top: 1rem; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+}
