@@ -18,7 +18,7 @@ Cada decisão está marcada com a origem, para o time debater só o que é novo:
 
 A seção 11 lista todas as propostas em um só lugar.
 
-**Atualização documental de 07/11/2026 (dados da Issue #7).** O Finance adota dinheiro em centavos conforme as Issues #7/#10; veja [modelagem](modelagem-db.md), [contrato inicial de dados](api-design.md) e [preparação da migração/seed](revisao-modelagem.md). Este spec descreve arquitetura e propostas, não comprova implementação. No checkout revisado há PostgreSQL/Compose e CI, mas ainda não há backend, ORM, Alembic, seed, Makefile ou contrato gerado. As decisões/propostas de frontend deste documento foram preservadas; a referência da Issue #7 à base antiga de frontend está desatualizada e não foi aplicada.
+**Atualização de 08/11/2026 (Issues #7/#10).** O Finance usa centavos; veja [modelagem](modelagem-db.md), [contrato de dados](api-design.md) e [registro da migração/seed](revisao-modelagem.md). A persistência mínima foi implementada em `services/api/`: configuração, Base/engine/sessão, seis modelos, Alembic, seed e testes. A validação local em PostgreSQL 18.6 foi concluída, conforme o registro. HTTP, parser, Alpha, IA, alertas, Makefile e contrato gerado continuam planejados; as representações seguintes descrevem também essa arquitetura futura. Frontend e sua stack foram preservados, sem recuperar a base antiga citada na Issue #7.
 
 ---
 
@@ -167,12 +167,14 @@ services/api/
 
 ### 3.2 Regras de dependência [Proposta]
 
-Previstas para verificação no CI com `import-linter`:
+Regras de arquitetura, com implementação gradual da verificação por `import-linter`:
 
 1. Dentro de um módulo: `router → service → domain | repository`. Nunca no sentido inverso.
 2. `domain.py` não importa banco, HTTP nem LLM.
 3. Um módulo só usa outro pelo `service` (ex.: `ai` chama `alpha.service`). Nunca pelo `repository` ou `models` do outro.
 4. `core` não importa nenhum módulo de domínio.
+
+Na etapa #10, a fronteira `core` → `finance` já tem contrato verificado; as demais regras aguardam os componentes correspondentes. O job de CI de persistência executará lint e testes com PostgreSQL 18, sem substituir o job existente de Compose.
 
 ### 3.3 Convenções [Proposta, exceto onde indicado]
 
