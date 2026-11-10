@@ -10,17 +10,11 @@ from sqlalchemy import func, select
 from valyra.core.db import User
 from valyra.core.deps import get_current_user_id
 from valyra.finance.models import Account, ImportBatch, ImportRejection, Transaction
-from valyra.seed import DEMO_ACCOUNT_ID, run
+from valyra.seed import DEMO_ACCOUNT_ID
 
 RAIZ_REPO = Path(__file__).resolve().parents[4]
 CAB = b"date,description,amount\n"
 URL = f"/api/v1/finance/accounts/{DEMO_ACCOUNT_ID}/import-batches"
-
-
-@pytest.fixture
-def seed(db_session):
-    run(db_session)
-    db_session.commit()
 
 
 def enviar(client, conteudo: bytes, nome="extrato.csv", url=URL):
