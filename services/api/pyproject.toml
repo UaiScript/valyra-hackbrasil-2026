@@ -10,6 +10,7 @@ dependencies = [
     "psycopg[binary]>=3.2,<4",
     "pydantic-settings>=2.7,<3",
     "sqlalchemy>=2.0.36,<2.1",
+    "python-multipart>=0.0.20,<1",
 ]
 
 [dependency-groups]
@@ -52,3 +53,12 @@ name = "Domínio Finance sem banco, HTTP ou IA"
 type = "forbidden"
 source_modules = ["valyra.finance.domain"]
 forbidden_modules = ["sqlalchemy", "fastapi", "httpx", "requests", "openai", "google"]
+
+[[tool.importlinter.contracts]]
+name = "Camadas do Finance"
+type = "layers"
+layers = [
+    "valyra.finance.router",
+    "valyra.finance.service",
+    "valyra.finance.domain | valyra.finance.repository",
+]
