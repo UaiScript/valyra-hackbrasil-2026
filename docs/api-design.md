@@ -1,5 +1,7 @@
 # Contrato de dados — Finance
 
+> **Issue #14 (10/11/2026):** importação de CSV e consulta de lotes implementadas em `services/api/src/valyra/finance/` (router, service, repository, schemas), com OpenAPI regenerado. Consultas da #15 continuam planejadas. Estado atual em [arquitetura](architecture.md).
+
 > **Integração #11/#12 (08/11/2026):** persistência/seed #17, domínio CSV #19 e core HTTP mínimo (/health, erros, paginação, OpenAPI) estão implementados nesta branch. Endpoints Finance #14/#15, projeções e módulos analíticos continuam planejados. A [arquitetura atual](architecture.md) e o [registro de integração](integracao-11-12.md) atualizam o estado; notas históricas anteriores abaixo descrevem suas respectivas etapas.
 
 > **Atualização de 07/11/2026 — Issues #7/#10.** Contratos registrados nas Issues [#9](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/9), [#10](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/10), [#13](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/13), [#14](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/14) e [#15](https://github.com/UaiScript/valyra-hackbrasil-2026/issues/15). Persistência e seed foram implementados na etapa #10; endpoints, schemas HTTP e domínio CSV abaixo continuam previstos. O [registro de implementação](revisao-modelagem.md) informa a validação disponível.
@@ -128,9 +130,9 @@ Todas as listagens usam `Page[T]`/`PageParams` da Issue #9: `items`, `total`, `l
 | `TransactionOut` | `id: UUID`, `date: date`, `description: str`, `amount_cents: int`, `category: {id: UUID, slug: str, name: str}`, `category_source: rule \| model \| user`, `category_confidence` (nulo na importação), `predicted_category_id: UUID` |
 | `ImportRejectionOut` | `line_number: int`, `reason: str`, `raw_line: str`; sem ID interno no exemplo testado |
 | `ImportBatchOut` | Confirmados: `id: UUID`, `status: processing \| completed \| failed`, `rows_total: int`, `rows_imported: int`, `rows_duplicated: int`, `rows_rejected: int`, `rejections: list[ImportRejectionOut]`; `alerts_created` excluído |
-| `ImportBatchSummaryOut` | Resumo sem `rejections`; a relação completa de campos depende da lacuna abaixo |
+| `ImportBatchSummaryOut` | Resumo sem `rejections`; implementado na #14 com `id`, `status` e os quatro contadores, sujeito à lacuna abaixo |
 
-**Lacuna da fonte:** a Issue #14 remete à seção 3.1 de um spec de API que não estava disponível no checkout antes desta revisão. A lista completa de campos de lote, a presença/nulabilidade de seus timestamps no HTTP e o schema completo do resumo não são recuperáveis dessa referência. Não se presume expor `account_id`, `file_name`, timestamps ou todas as colunas do ORM. Para `category_confidence` preenchida, o intervalo de domínio está na modelagem; a representação JSON ainda não está explicitada nas tarefas.
+**Lacuna da fonte:** a Issue #14 remete à seção 3.1 de um spec de API que não estava disponível no checkout antes desta revisão. A lista completa de campos de lote, a presença/nulabilidade de seus timestamps no HTTP e o schema completo do resumo não são recuperáveis dessa referência. Não se presume expor `account_id`, `file_name`, timestamps ou todas as colunas do ORM. **[Implementado, #14]** Os schemas de lote expõem somente os campos confirmados; ampliar exige alinhar com o frontend e regenerar o contrato. Para `category_confidence` preenchida, o intervalo de domínio está na modelagem; a representação JSON ainda não está explicitada nas tarefas.
 
 `TransactionOut` não expõe `account_id`, `import_batch_id`, `row_hash`, `created_at`, `updated_at`, `is_recurring`, `recurrence_key` ou `anomaly_score`; `is_anomaly` também não integra o schema, conforme o teste da Issue #15. Não há operação de correção de categoria ou resumo/projeção de saldo nas tarefas consultadas.
 
@@ -169,7 +171,7 @@ Envelope da Issue #9: `{"error":{"code":"...","message":"...","details":{}}}`. M
 | 404 | `IMPORT_BATCH_NOT_FOUND` | Consulta de lote ausente (#14) |
 | 422 | `VALIDATION_ERROR` | Validação HTTP/Pydantic: paginação inválida e `balance_cents` não inteiro (#9/#15); `details.errors` contém os erros |
 
-Rejeições de linha são dados de uma importação concluída, sem promover cada rejeição a erro HTTP. Falhas técnicas e persistência de tentativas estão na [modelagem, seção 4.5](modelagem-db.md#45-transação-e-falhas-da-importação).
+Rejeições de linha são dados de uma importação concluída, sem promover cada rejeição a erro HTTP. **[Lacuna do contrato gerado]** O OpenAPI ainda não declara as respostas 404/413 nem o envelope de erro; o 422 aparece com o schema padrão do FastAPI, diferente do envelope real. Falhas técnicas e persistência de tentativas estão na [modelagem, seção 4.5](modelagem-db.md#45-transação-e-falhas-da-importação).
 
 ## Caminho dos dados
 
