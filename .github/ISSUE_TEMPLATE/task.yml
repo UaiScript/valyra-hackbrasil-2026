@@ -1,0 +1,45 @@
+name: Tarefa
+description: Planejar uma entrega com contexto e critérios de aceite.
+title: "[Tarefa] "
+body:
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Camada
+      options:
+        - api
+        - web
+        - pipelines
+        - infra
+        - docs
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Prioridade
+      options:
+        - P0
+        - P1
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Descrição
+      description: Qual problema será resolvido e qual é o escopo da entrega?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Critérios de aceite
+      description: Liste resultados observáveis que permitam verificar a conclusão.
+      placeholder: "- [ ] Resultado verificável"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto e links
+      description: Specs, dependências, Issues relacionadas e decisões necessárias.

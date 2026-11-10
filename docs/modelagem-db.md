@@ -1,5 +1,7 @@
 # Modelagem de dados do Postgres — Design
 
+> **Integração #11/#12 (08/11/2026):** persistência/seed #17, domínio CSV #19 e core HTTP mínimo (/health, erros, paginação, OpenAPI) estão implementados nesta branch. Endpoints Finance #14/#15, projeções e módulos analíticos continuam planejados. A [arquitetura atual](architecture.md) e o [registro de integração](integracao-11-12.md) atualizam o estado; notas históricas anteriores abaixo descrevem suas respectivas etapas.
+
 > **Atualização de 08/11/2026 — Issue #10.** O Finance inicial tem modelos SQLAlchemy, Alembic, migração, seed e testes em `services/api/`, validados em PostgreSQL 18.6. A equipe autorizou os refinamentos de nulabilidade/defaults, exclusões, FK composta, checks e conflitos do seed. Resultados e comandos estão no [registro de implementação](revisao-modelagem.md). Alpha, IA, alertas, parser e HTTP continuam planejados.
 
 | Campo | Valor |
