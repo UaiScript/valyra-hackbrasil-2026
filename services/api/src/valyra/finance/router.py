@@ -1,5 +1,6 @@
 """Rotas HTTP do Finance; o nome de cada rota é o operationId do contrato."""
 
+from datetime import date
 from typing import Annotated
 from uuid import UUID
 
@@ -12,7 +13,16 @@ from valyra.core.errors import AppError
 from valyra.core.pagination import Page, PageParams
 from valyra.finance import service
 from valyra.finance.domain import MAX_FILE_BYTES
-from valyra.finance.schemas import ImportBatchOut, ImportBatchSummaryOut, ImportRejectionOut
+from valyra.finance.schemas import (
+    AccountOut,
+    AccountUpdate,
+    CategoryOut,
+    ImportBatchOut,
+    ImportBatchSummaryOut,
+    ImportRejectionOut,
+    TransactionCategoryOut,
+    TransactionOut,
+)
 
 router = APIRouter(prefix="/api/v1/finance", tags=["finance"])
 
@@ -66,3 +76,73 @@ def list_import_batches(
 @router.get("/import-batches/{id}", name="finance_get_import_batch", response_model=ImportBatchOut)
 def get_import_batch(id: UUID, session: SessionDep, user_id: UserIdDep) -> ImportBatchOut:
     return _batch_out(session, user_id, id)
+
+
+@router.get("/accounts", name="finance_list_accounts", response_model=Page[AccountOut])
+def list_accounts(
+    page: Annotated[PageParams, Depends()], session: SessionDep, user_id: UserIdDep
+) -> Page[AccountOut]:
+    items, total = service.list_accounts(session, user_id, page.limit, page.offset)
+    return Page[AccountOut](
+        items=[AccountOut.model_validate(a) for a in items],
+        total=total,
+        limit=page.limit,
+        offset=page.offset,
+    )
+
+
+@router.patch("/accounts/{id}", name="finance_update_account", response_model=AccountOut)
+def update_account(
+    id: UUID, body: AccountUpdate, session: SessionDep, user_id: UserIdDep
+) -> AccountOut:
+    account = service.update_account(session, user_id, id, body.model_dump(exclude_unset=True))
+    return AccountOut.model_validate(account)
+
+
+@router.get("/transactions", name="finance_list_transactions", response_model=Page[TransactionOut])
+def list_transactions(
+    page: Annotated[PageParams, Depends()],
+    session: SessionDep,
+    user_id: UserIdDep,
+    account_id: UUID | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    category_id: UUID | None = None,
+) -> Page[TransactionOut]:
+    rows, total = service.list_transactions(
+        session,
+        user_id,
+        account_id=account_id,
+        date_from=date_from,
+        date_to=date_to,
+        category_id=category_id,
+        limit=page.limit,
+        offset=page.offset,
+    )
+    items = [
+        TransactionOut(
+            id=t.id,
+            date=t.date,
+            description=t.description,
+            amount_cents=t.amount_cents,
+            category=TransactionCategoryOut.model_validate(category),
+            category_source=t.category_source,
+            category_confidence=t.category_confidence,
+            predicted_category_id=t.predicted_category_id,
+        )
+        for t, category in rows
+    ]
+    return Page[TransactionOut](items=items, total=total, limit=page.limit, offset=page.offset)
+
+
+@router.get("/categories", name="finance_list_categories", response_model=Page[CategoryOut])
+def list_categories(
+    page: Annotated[PageParams, Depends()], session: SessionDep
+) -> Page[CategoryOut]:
+    items, total = service.list_categories(session, page.limit, page.offset)
+    return Page[CategoryOut](
+        items=[CategoryOut.model_validate(c) for c in items],
+        total=total,
+        limit=page.limit,
+        offset=page.offset,
+    )
