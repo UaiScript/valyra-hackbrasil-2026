@@ -1,5 +1,7 @@
 # Contrato de dados — Finance
 
+> **Issue #15 (10/11/2026):** consultas de contas (com PATCH), transações e categorias implementadas; o contrato soma 7 operações Finance e `system_health`. Decisões de consulta que a especificação deixava abertas estão marcadas como provisórias em [api-design](api-design.md#operações-http--issues-14-e-15).
+
 > **Issue #14 (10/11/2026):** importação de CSV e consulta de lotes implementadas em `services/api/src/valyra/finance/` (router, service, repository, schemas), com OpenAPI regenerado. Consultas da #15 continuam planejadas. Estado atual em [arquitetura](architecture.md).
 
 > **Integração #11/#12 (08/11/2026):** persistência/seed #17, domínio CSV #19 e core HTTP mínimo (/health, erros, paginação, OpenAPI) estão implementados nesta branch. Endpoints Finance #14/#15, projeções e módulos analíticos continuam planejados. A [arquitetura atual](architecture.md) e o [registro de integração](integracao-11-12.md) atualizam o estado; notas históricas anteriores abaixo descrevem suas respectivas etapas.
@@ -133,6 +135,8 @@ Todas as listagens usam `Page[T]`/`PageParams` da Issue #9: `items`, `total`, `l
 | `ImportBatchSummaryOut` | Resumo sem `rejections`; implementado na #14 com `id`, `status` e os quatro contadores, sujeito à lacuna abaixo |
 
 **Lacuna da fonte:** a Issue #14 remete à seção 3.1 de um spec de API que não estava disponível no checkout antes desta revisão. A lista completa de campos de lote, a presença/nulabilidade de seus timestamps no HTTP e o schema completo do resumo não são recuperáveis dessa referência. Não se presume expor `account_id`, `file_name`, timestamps ou todas as colunas do ORM. **[Implementado, #14]** Os schemas de lote expõem somente os campos confirmados; ampliar exige alinhar com o frontend e regenerar o contrato. Para `category_confidence` preenchida, o intervalo de domínio está na modelagem; a representação JSON ainda não está explicitada nas tarefas.
+
+**[Provisório, implementado na #15 — confirmar com o time]** Lacunas acima resolvidas pela implementação, sem decisão formal: resposta do PATCH é `AccountOut`; `null` explícito no `AccountUpdate` e campos desconhecidos geram 422 `VALIDATION_ERROR`; `balance_cents` fora da faixa BIGINT gera 422; `balance_as_of` só aceita texto `AAAA-MM-DD`; filtros de data são inclusivos e intervalo invertido devolve lista vazia; transações empatadas na data ordenam por `created_at` e `id` decrescentes; filtro `account_id` de outro usuário responde 404 `ACCOUNT_NOT_FOUND`; `category_confidence` preenchida sai como string decimal (sempre nula na importação por regras).
 
 `TransactionOut` não expõe `account_id`, `import_batch_id`, `row_hash`, `created_at`, `updated_at`, `is_recurring`, `recurrence_key` ou `anomaly_score`; `is_anomaly` também não integra o schema, conforme o teste da Issue #15. Não há operação de correção de categoria ou resumo/projeção de saldo nas tarefas consultadas.
 

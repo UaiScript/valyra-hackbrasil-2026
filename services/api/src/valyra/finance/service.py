@@ -1,5 +1,7 @@
-"""Casos de uso do Finance: importação de CSV e consulta de lotes (Issue #14)."""
+"""Casos de uso do Finance: importação de CSV (#14) e consultas (#15)."""
 
+from datetime import date
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func
@@ -8,7 +10,7 @@ from sqlalchemy.orm import Session
 from valyra.core.errors import AppError
 from valyra.finance import repository
 from valyra.finance.domain import CsvFormatError, categorize, compute_row_hashes, parse_csv
-from valyra.finance.models import Account, ImportBatch, ImportRejection
+from valyra.finance.models import Account, Category, ImportBatch, ImportRejection, Transaction
 
 _CSV_ERROR_MESSAGES = {
     "CSV_ENCODING": "O arquivo precisa estar em UTF-8",
@@ -101,3 +103,54 @@ def list_import_batches(
     session: Session, user_id: UUID, limit: int, offset: int
 ) -> tuple[list[ImportBatch], int]:
     return repository.list_batches(session, user_id, limit, offset)
+
+
+def list_accounts(
+    session: Session, user_id: UUID, limit: int, offset: int
+) -> tuple[list[Account], int]:
+    return repository.list_accounts(session, user_id, limit, offset)
+
+
+def update_account(
+    session: Session, user_id: UUID, account_id: UUID, changes: dict[str, Any]
+) -> Account:
+    """Aplica só os campos enviados; o saldo é referência informada, não saldo calculado."""
+    try:
+        account = get_account_for_user(session, user_id, account_id)
+        for field, value in changes.items():
+            setattr(account, field, value)
+        session.commit()
+        return account
+    except BaseException:
+        session.rollback()
+        raise
+
+
+def list_transactions(
+    session: Session,
+    user_id: UUID,
+    *,
+    account_id: UUID | None,
+    date_from: date | None,
+    date_to: date | None,
+    category_id: UUID | None,
+    limit: int,
+    offset: int,
+) -> tuple[list[tuple[Transaction, Category]], int]:
+    if account_id is not None:
+        # Filtrar por conta alheia responde como conta inexistente, igual às demais rotas.
+        get_account_for_user(session, user_id, account_id)
+    return repository.list_transactions(
+        session,
+        user_id,
+        account_id=account_id,
+        date_from=date_from,
+        date_to=date_to,
+        category_id=category_id,
+        limit=limit,
+        offset=offset,
+    )
+
+
+def list_categories(session: Session, limit: int, offset: int) -> tuple[list[Category], int]:
+    return repository.list_categories(session, limit, offset)

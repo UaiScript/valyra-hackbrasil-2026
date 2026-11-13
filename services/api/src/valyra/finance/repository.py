@@ -1,8 +1,9 @@
 """Acesso a dados do Finance; não faz commit, quem controla a transação é o service."""
 
+from datetime import date
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -74,3 +75,56 @@ def list_batches(
         .offset(offset)
     )
     return list(items), total or 0
+
+
+def _page(session: Session, query: Select, limit: int, offset: int) -> tuple[list, int]:
+    total = session.scalar(select(func.count()).select_from(query.order_by(None).subquery()))
+    return list(session.execute(query.limit(limit).offset(offset)).all()), total or 0
+
+
+def list_accounts(
+    session: Session, user_id: UUID, limit: int, offset: int
+) -> tuple[list[Account], int]:
+    query = select(Account).where(Account.user_id == user_id).order_by(Account.name, Account.id)
+    rows, total = _page(session, query, limit, offset)
+    return [row[0] for row in rows], total
+
+
+def list_categories(session: Session, limit: int, offset: int) -> tuple[list[Category], int]:
+    query = select(Category).order_by(Category.kind, Category.name, Category.id)
+    rows, total = _page(session, query, limit, offset)
+    return [row[0] for row in rows], total
+
+
+def list_transactions(
+    session: Session,
+    user_id: UUID,
+    *,
+    account_id: UUID | None,
+    date_from: date | None,
+    date_to: date | None,
+    category_id: UUID | None,
+    limit: int,
+    offset: int,
+) -> tuple[list[tuple[Transaction, Category]], int]:
+    query = (
+        select(Transaction, Category)
+        .join(Account, Account.id == Transaction.account_id)
+        .join(Category, Category.id == Transaction.category_id)
+        .where(Account.user_id == user_id)
+    )
+    if account_id is not None:
+        query = query.where(Transaction.account_id == account_id)
+    # Limites inclusivos; intervalo invertido simplesmente não encontra linhas.
+    if date_from is not None:
+        query = query.where(Transaction.date >= date_from)
+    if date_to is not None:
+        query = query.where(Transaction.date <= date_to)
+    if category_id is not None:
+        query = query.where(Transaction.category_id == category_id)
+    # created_at e id desempatam transações do mesmo dia, mantendo a paginação estável.
+    query = query.order_by(
+        Transaction.date.desc(), Transaction.created_at.desc(), Transaction.id.desc()
+    )
+    rows, total = _page(session, query, limit, offset)
+    return [(row[0], row[1]) for row in rows], total

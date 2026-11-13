@@ -69,6 +69,10 @@ def test_operation_ids_e_contrato_minimo(app):
         "finance_create_import_batch",
         "finance_list_import_batches",
         "finance_get_import_batch",
+        "finance_list_accounts",
+        "finance_update_account",
+        "finance_list_transactions",
+        "finance_list_categories",
     }
 
 

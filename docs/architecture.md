@@ -5,8 +5,8 @@ Visão operacional da branch integrada. Histórico e propostas permanecem nos tr
 ```text
 apps/landing — React/TypeScript, estática → repositório oficial (futura aplicação configurável)
 apps/web — aplicação React planejada
-                         | /api/v1/finance (importação de CSV; consultas #15 planejadas)
-services/api — FastAPI único: /health, importação Finance e OpenAPI
+                         | /api/v1/finance (importação de CSV e consultas)
+services/api — FastAPI único: /health, Finance (8 operações no total) e OpenAPI
 core · finance (router → service → domínio CSV | repository → ORM)
         | PostgreSQL 18
         + pipelines → DuckDB/Parquet/fontes públicas (planejado)
@@ -19,9 +19,10 @@ core · finance (router → service → domínio CSV | repository → ORM)
 - Persistência Finance do PR #17: User (core), Account, ImportBatch, ImportRejection, Category, Transaction, uma Base, migração 0001_finance_inicial e seed idempotente. Dados existentes são preservados e conflitos do seed revertem suas inserções.
 - Domínio CSV do PR #19: UTF-8/BOM/CRLF, Decimal/centavos/BIGINT, rejeições, linhas físicas e registros multilinha, SHA-256 por ocorrência e categorias por regras/sinal. Biblioteca padrão, sem I/O externo, banco, HTTP ou IA.
 - Importação Finance da Issue #14: `POST /api/v1/finance/accounts/{account_id}/import-batches` (multipart `file`, até 1 MiB) e consulta de lotes em `GET /api/v1/finance/import-batches` e `/import-batches/{id}`. O service grava lote, rejeições e transações em uma única transação, com `ON CONFLICT (account_id, row_hash) DO NOTHING`; falha técnica desfaz tudo. Contas de outro usuário respondem como inexistentes. Exemplo sintético em `datasets/samples/transactions_demo.csv`.
+- Consultas Finance da Issue #15: `GET /api/v1/finance/accounts`, `PATCH /api/v1/finance/accounts/{id}` (nome, saldo de referência em centavos e data, todos omissíveis), `GET /api/v1/finance/transactions` (filtros `account_id`, `date_from`, `date_to`, `category_id`; data decrescente) e `GET /api/v1/finance/categories` (por `kind` e `name`). Todas paginadas e restritas ao usuário demo. Campos ainda não calculados (`is_recurring`, anomalia) não são expostos.
 - Landing do PR #18: pacote independente apps/landing com build e testes próprios; números sintéticos identificados. CTA aponta ao GitHub. O destino futuro HTTPS é configurado no build, não pelo visitante.
 - CI: PostgreSQL/Compose, API consolidada e workflow independente da landing. Claude preparado; configuração externa e primeiro review são verificação separada. Resultados desta integração no PR e em [integração](integracao-11-12.md).
-- Não implementados: aplicação apps/web, consultas de contas/transações/categorias (#15), correção de categoria, resumo, projeções, categorização ML, sinais, replay, pipelines, DuckDB, alertas e IA.
+- Não implementados no Finance: correção de categoria (`PATCH /transactions/{id}`), resumo, projeção de saldo, detecção de recorrência e de gastos atípicos. Fora do Finance: aplicação apps/web, projeções, categorização ML, sinais, replay, pipelines, DuckDB, alertas e IA.
 
 ## Fronteiras
 
