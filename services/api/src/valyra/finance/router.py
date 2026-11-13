@@ -1,6 +1,5 @@
 """Rotas HTTP do Finance; o nome de cada rota é o operationId do contrato."""
 
-from datetime import date
 from typing import Annotated
 from uuid import UUID
 
@@ -20,6 +19,7 @@ from valyra.finance.schemas import (
     ImportBatchOut,
     ImportBatchSummaryOut,
     ImportRejectionOut,
+    IsoDate,
     TransactionCategoryOut,
     TransactionOut,
 )
@@ -105,8 +105,8 @@ def list_transactions(
     session: SessionDep,
     user_id: UserIdDep,
     account_id: UUID | None = None,
-    date_from: date | None = None,
-    date_to: date | None = None,
+    date_from: IsoDate | None = None,
+    date_to: IsoDate | None = None,
     category_id: UUID | None = None,
 ) -> Page[TransactionOut]:
     rows, total = service.list_transactions(

@@ -1,5 +1,6 @@
 """Schemas HTTP do Finance; expõem só os campos confirmados no contrato (api-design.md)."""
 
+import re
 from datetime import date
 from decimal import Decimal
 from typing import Annotated, Any, Literal
@@ -18,6 +19,7 @@ from pydantic import (
 # Faixa de BIGINT: fora dela o banco recusaria o valor; aqui vira 422 em vez de erro técnico.
 BIGINT_MIN = -(2**63)
 BIGINT_MAX = 2**63 - 1
+_ISO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 
 class ImportRejectionOut(BaseModel):
@@ -62,10 +64,20 @@ def _within_bigint(value: int) -> int:
 
 
 def _iso_date_text(value: Any) -> Any:
-    # Sem isto o modo lax do Pydantic aceitaria timestamps numéricos como data.
-    if not isinstance(value, str):
+    # Sem isto o modo lax do Pydantic aceitaria timestamps numéricos e datetimes como data.
+    if not isinstance(value, str) or not _ISO_DATE.fullmatch(value):
         raise ValueError("Data deve ser texto no formato AAAA-MM-DD")
     return value
+
+
+def _without_nul(value: str) -> str:
+    # O PostgreSQL rejeita NUL em texto; validar aqui devolve 422 em vez de erro 500.
+    if "\x00" in value:
+        raise ValueError("Nome não pode conter o caractere NUL")
+    return value
+
+
+IsoDate = Annotated[date, BeforeValidator(_iso_date_text)]
 
 
 class AccountUpdate(BaseModel):
@@ -75,11 +87,11 @@ class AccountUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Default não é validado pelo Pydantic: omitir é permitido, enviar null não.
-    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] = Field(
-        default=None
-    )
+    name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1), AfterValidator(_without_nul)
+    ] = Field(default=None)
     balance_cents: Annotated[StrictInt, AfterValidator(_within_bigint)] = Field(default=None)
-    balance_as_of: Annotated[date, BeforeValidator(_iso_date_text)] = Field(default=None)
+    balance_as_of: IsoDate = Field(default=None)
 
 
 class CategoryOut(BaseModel):

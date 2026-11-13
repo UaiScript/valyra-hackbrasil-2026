@@ -87,8 +87,13 @@ def test_atualiza_conta_de_outro_usuario_retorna_404(client, conta_alheia, db_se
         {"balance_cents": None},
         {"name": None},
         {"name": ""},
+        {"name": "Conta\u0000principal"},
+        {"name": "\u0000"},
         {"balance_as_of": None},
         {"balance_as_of": "07/11/2026"},
+        {"balance_as_of": "0"},
+        {"balance_as_of": "1762473600"},
+        {"balance_as_of": "2026-11-07T00:00:00Z"},
         {"balance_as_of": 1762473600},
         {"user_id": str(uuid4())},
     ],
@@ -96,6 +101,12 @@ def test_atualiza_conta_de_outro_usuario_retorna_404(client, conta_alheia, db_se
 def test_atualizacao_invalida_retorna_422(client, seed, corpo):
     r = client.patch(CONTA_URL, json=corpo)
     assert r.status_code == 422 and r.json()["error"]["code"] == "VALIDATION_ERROR"
+    conta = client.get("/api/v1/finance/accounts").json()["items"][0]
+    assert (conta["name"], conta["balance_cents"], conta["balance_as_of"]) == (
+        "Conta principal",
+        500000,
+        "2026-11-01",
+    )
 
 
 def test_saldo_nao_inteiro_retorna_422(client, seed):
@@ -193,8 +204,10 @@ def test_limit_acima_de_200_retorna_422(client, seed):
     assert client.get("/api/v1/finance/transactions?limit=201").status_code == 422
 
 
-def test_data_de_filtro_invalida_retorna_422(client, seed):
-    r = client.get("/api/v1/finance/transactions", params={"date_from": "01/11/2026"})
+@pytest.mark.parametrize("param", ["date_from", "date_to"])
+@pytest.mark.parametrize("valor", ["01/11/2026", "0", "1762473600", "2026-11-07T00:00:00Z"])
+def test_data_de_filtro_invalida_retorna_422(client, seed, param, valor):
+    r = client.get("/api/v1/finance/transactions", params={param: valor})
     assert r.status_code == 422 and r.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
