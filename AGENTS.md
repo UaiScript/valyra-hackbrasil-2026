@@ -32,11 +32,12 @@ Make aceita UV=/caminho/uv e ENV_FILE=/caminho/configuração. Usa .env existent
 
 ## Mapa de pastas
 
-- services/api/: [contexto de backend](services/api/AGENTS.md), core HTTP mínimo, Finance ORM/domínio, Alembic e testes.
+- services/api/: [contexto de backend](services/api/AGENTS.md), core HTTP, Finance (ORM, domínio CSV e importação HTTP), Alembic e testes.
 - apps/landing/: [página estática isolada](apps/landing/README.md), apontando inicialmente ao repositório oficial.
 - packages/contracts/: OpenAPI gerado; infra/postgres/init/: criação idempotente do banco de testes.
 - docs/: arquitetura, glossário, ADRs e specs. .github/: CI, templates e revisão.
-- apps/web, pipelines, experiments e datasets/samples são caminhos planejados, não funcionalidades implementadas.
+- datasets/samples/: dados sintéticos de demonstração (CSV de transações), nunca dados reais.
+- apps/web, pipelines e experiments são caminhos planejados, não funcionalidades implementadas.
 
 ## Onde buscar contexto
 

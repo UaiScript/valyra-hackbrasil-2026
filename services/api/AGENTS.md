@@ -1,6 +1,6 @@
 # Contexto de backend
 
-Leia o [contexto raiz](../../AGENTS.md). Esta pasta contém core HTTP mínimo (/health), seis modelos, Alembic, seed, domínio CSV e testes. Finance HTTP (#14/#15), projeções, Alpha, alertas e IA continuam planejados.
+Leia o [contexto raiz](../../AGENTS.md). Esta pasta contém core HTTP (/health), seis modelos, Alembic, seed, domínio CSV, importação Finance via HTTP (#14) e testes. Consultas Finance (#15), projeções, Alpha, alertas e IA continuam planejados.
 
 ## Estrutura e dependências
 
@@ -26,6 +26,7 @@ Fontes: [contrato Finance](../../docs/api-design.md), [modelagem](../../docs/mod
 - Listagens usam `Page[T]` (`items`, `total`, `limit`, `offset`); `limit` padrão 50, entre 1 e 200; `offset` não negativo. Sessão de banco de `get_session()` não é sessão de usuário; `get_current_user_id()` retorna o demo configurado.
 - CSV: UTF-8/BOM, contrato de cabeçalho/data/precisão/limites e hash conforme api-design. Preserve descrição original; normalização é cópia para regras/hash.
 - Preserve categoria prevista ao corrigir categoria exibida. Respeite transação única da importação; rollback não garante lote `failed` persistido.
+- O service controla commit/rollback do caso de uso; repository nunca faz commit. Rotas usam `def` síncrono porque a sessão SQLAlchemy é bloqueante. Erros de arquivo CSV viram `AppError` 422 no service.
 - Preserve as pendências da modelagem e os refinamentos já implementados/autorizados na #10. Domínio valida BIGINT; limite seguro JSON no frontend e contratos incompletos continuam pendentes.
 
 ## Migrações e testes
@@ -45,8 +46,8 @@ Fontes: [contrato Finance](../../docs/api-design.md), [modelagem](../../docs/mod
 4. Adicionar teste de comportamento, incluindo erro relevante.
 5. Executar `make openapi`, revisar o contrato gerado e avisar os consumidores.
 
-Comandos disponíveis na raiz: `make dev`, `make lint`, `make migrate`, `make seed`, `make test`, `make openapi`. A configuração oficial é services/api/pyproject.toml com uv.lock. make test-domain roda os 168 casos puros sem conexão PostgreSQL; pytest completo usa banco exclusivo para persistência/health. A dependência de fixtures de banco é explícita, não autouse.
+Comandos disponíveis na raiz: `make dev`, `make lint`, `make migrate`, `make seed`, `make test`, `make openapi`. A configuração oficial é services/api/pyproject.toml com uv.lock. make test-domain roda os 168 casos puros sem conexão PostgreSQL; pytest completo usa banco exclusivo para persistência, health e importação HTTP (fixtures `client` e `db_session` em `tests/conftest.py`). A dependência de fixtures de banco é explícita, não autouse.
 
-No CSV, line_number é a primeira linha física; raw_line preserva quebras internas. Registros malformados e estouro de csv.field_size_limit são wrong_column_count; o limite do processo (normalmente 131072 caracteres) não é alterado. O enquadramento lógico impede importar fragmentos após erro. Arquivo acima de 1 MiB é responsabilidade do router futuro.
+No CSV, line_number é a primeira linha física; raw_line preserva quebras internas. Registros malformados e estouro de csv.field_size_limit são wrong_column_count; o limite do processo (normalmente 131072 caracteres) não é alterado. O enquadramento lógico impede importar fragmentos após erro. O router de importação lê no máximo `MAX_FILE_BYTES + 1` bytes e responde 413 acima de 1 MiB; o servidor ainda recebe o corpo inteiro antes, então um limite de requisição precisa vir do servidor/proxy.
 
 O exportador gera JSON com indentação 2, chaves ordenadas e LF explícito em todas as plataformas; regenere, não normalize o contrato à mão.

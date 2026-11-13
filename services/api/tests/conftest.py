@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 from alembic import command
 from alembic.config import Config
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
@@ -16,8 +17,9 @@ from sqlalchemy.orm import Session
 
 from tests.db.safety import assert_safe_database, database_identity
 from valyra.core.config import Settings
-from valyra.core.db import Base, User
+from valyra.core.db import Base, User, get_session
 from valyra.finance.models import Account, Category, ImportBatch, Transaction
+from valyra.main import create_app
 
 API_ROOT = Path(__file__).resolve().parents[1]
 
@@ -150,3 +152,18 @@ def insert_transaction(db_session, reference_rows):
         return transaction
 
     return insert
+
+
+@pytest.fixture
+def app(monkeypatch):
+    # A composição só usa CORS. URL sem credenciais não será aberta pelos testes unitários.
+    settings = Settings(database_url="postgresql+psycopg://127.0.0.1/unused", _env_file=None)
+    monkeypatch.setattr("valyra.main.get_settings", lambda: settings)
+    return create_app()
+
+
+@pytest.fixture
+def client(app, db_session):
+    app.dependency_overrides[get_session] = lambda: db_session
+    with TestClient(app) as client:
+        yield client

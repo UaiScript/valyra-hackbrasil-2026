@@ -57,12 +57,19 @@ def test_paginacao(client_com_rota_de_erro, query, expected):
 
 def test_operation_ids_e_contrato_minimo(app):
     spec = app.openapi()
-    assert set(spec["paths"]) == {"/health"}
+    operation_ids = set()
     for methods in spec["paths"].values():
         for operation in methods.values():
             assert re.fullmatch(
                 r"(system|finance|alpha|alerts|ai)_[a-z_]+", operation["operationId"]
             )
+            operation_ids.add(operation["operationId"])
+    assert operation_ids == {
+        "system_health",
+        "finance_create_import_batch",
+        "finance_list_import_batches",
+        "finance_get_import_batch",
+    }
 
 
 def test_cors_somente_origem_configurada(app):

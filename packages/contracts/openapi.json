@@ -1,6 +1,33 @@
 {
   "components": {
     "schemas": {
+      "Body_finance_create_import_batch": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_finance_create_import_batch",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
       "HealthResponse": {
         "properties": {
           "postgres": {
@@ -26,6 +53,196 @@
         ],
         "title": "HealthResponse",
         "type": "object"
+      },
+      "ImportBatchOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "rejections": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRejectionOut"
+            },
+            "title": "Rejections",
+            "type": "array"
+          },
+          "rows_duplicated": {
+            "title": "Rows Duplicated",
+            "type": "integer"
+          },
+          "rows_imported": {
+            "title": "Rows Imported",
+            "type": "integer"
+          },
+          "rows_rejected": {
+            "title": "Rows Rejected",
+            "type": "integer"
+          },
+          "rows_total": {
+            "title": "Rows Total",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "processing",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "rows_total",
+          "rows_imported",
+          "rows_duplicated",
+          "rows_rejected",
+          "rejections"
+        ],
+        "title": "ImportBatchOut",
+        "type": "object"
+      },
+      "ImportBatchSummaryOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "rows_duplicated": {
+            "title": "Rows Duplicated",
+            "type": "integer"
+          },
+          "rows_imported": {
+            "title": "Rows Imported",
+            "type": "integer"
+          },
+          "rows_rejected": {
+            "title": "Rows Rejected",
+            "type": "integer"
+          },
+          "rows_total": {
+            "title": "Rows Total",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "processing",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "rows_total",
+          "rows_imported",
+          "rows_duplicated",
+          "rows_rejected"
+        ],
+        "title": "ImportBatchSummaryOut",
+        "type": "object"
+      },
+      "ImportRejectionOut": {
+        "properties": {
+          "line_number": {
+            "title": "Line Number",
+            "type": "integer"
+          },
+          "raw_line": {
+            "title": "Raw Line",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_number",
+          "reason",
+          "raw_line"
+        ],
+        "title": "ImportRejectionOut",
+        "type": "object"
+      },
+      "Page_ImportBatchSummaryOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ImportBatchSummaryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[ImportBatchSummaryOut]",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
       }
     }
   },
@@ -35,6 +252,158 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/finance/accounts/{account_id}/import-batches": {
+      "post": {
+        "operationId": "finance_create_import_batch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_finance_create_import_batch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportBatchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Finance Create Import Batch",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/import-batches": {
+      "get": {
+        "operationId": "finance_list_import_batches",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ImportBatchSummaryOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Finance List Import Batches",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/import-batches/{id}": {
+      "get": {
+        "operationId": "finance_get_import_batch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportBatchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Finance Get Import Batch",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "operationId": "system_health",

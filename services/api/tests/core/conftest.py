@@ -6,26 +6,8 @@ import pytest
 from fastapi import Depends
 from fastapi.testclient import TestClient
 
-from valyra.core.config import Settings
-from valyra.core.db import get_session
 from valyra.core.errors import AppError
 from valyra.core.pagination import PageParams
-from valyra.main import create_app
-
-
-@pytest.fixture
-def app(monkeypatch):
-    # A composição só usa CORS. URL sem credenciais não será aberta pelos testes unitários.
-    settings = Settings(database_url="postgresql+psycopg://127.0.0.1/unused", _env_file=None)
-    monkeypatch.setattr("valyra.main.get_settings", lambda: settings)
-    return create_app()
-
-
-@pytest.fixture
-def client(app, db_session):
-    app.dependency_overrides[get_session] = lambda: db_session
-    with TestClient(app) as client:
-        yield client
 
 
 @pytest.fixture
