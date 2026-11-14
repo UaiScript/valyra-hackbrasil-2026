@@ -42,7 +42,7 @@ Make aceita UV=/caminho/uv e ENV_FILE=/caminho/configuração. Usa .env existent
 ## Onde buscar contexto
 
 - Quando a tarefa envolver arquitetura/estado real → leia [docs/architecture.md](docs/architecture.md).
-- Quando envolver decisões → leia [ADR-0001](docs/adr/0001-monolito-modular.md), [ADR-0008](docs/adr/0008-review-por-agente.md), [ADR-0009](docs/adr/0009-dinheiro-em-centavos.md) e [template](docs/adr/0000-template.md).
+- Quando envolver decisões → leia [ADR-0001](docs/adr/0001-monolito-modular.md), [ADR-0008](docs/adr/0008-review-por-agente.md), [ADR-0009](docs/adr/0009-dinheiro-em-centavos.md), [ADR-0010](docs/adr/0010-calculos-finance.md) e [template](docs/adr/0000-template.md).
 - Quando envolver termos → leia [docs/glossary.md](docs/glossary.md).
 - Quando envolver schema, CSV ou HTTP → leia [docs/modelagem-db.md](docs/modelagem-db.md), [docs/api-design.md](docs/api-design.md), [docs/revisao-modelagem.md](docs/revisao-modelagem.md).
 - Quando envolver fundação e propostas → leia [docs/spec-tecnica.md](docs/spec-tecnica.md).

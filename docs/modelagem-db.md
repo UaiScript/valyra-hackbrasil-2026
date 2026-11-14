@@ -427,16 +427,16 @@ Contagem de registros segue o [contrato CSV da Issue #13](api-design.md#entrada-
 
 **[Registrado no desenho anterior]** O saldo é derivado da referência da conta e das transações posteriores; não existe coluna de saldo diário. O desenho não definia se a referência era de abertura ou fechamento nem o limite superior da soma.
 
-**[Proposta de convenção]** `balance_cents` é o saldo de **fechamento** de `balance_as_of`, já incluindo todas as movimentações dessa data. Para uma data de consulta `D >= balance_as_of`:
+**[Convenção da [ADR-0010](adr/0010-calculos-finance.md), proposta]** `balance_cents` é o saldo de **fechamento** de `balance_as_of`, já incluindo todas as movimentações dessa data. Para uma data de consulta `D >= balance_as_of`:
 
 ```text
 saldo_realizado_cents(D) = balance_cents
   + soma(amount_cents onde balance_as_of < date <= D)
 ```
 
-Para hoje, propõe-se obter `D` pelo calendário `America/Sao_Paulo`; timestamps continuam em UTC. Transações da data de referência ou anteriores não entram novamente. Consulta anterior à referência não pode ser reconstruída por essa fórmula e deve ser tratada como indisponível.
+Hoje vem de `core/clock.get_today()`: `DEMO_TODAY` quando definida, senão o calendário `America/Sao_Paulo`; timestamps continuam em UTC. Transações da data de referência ou anteriores não entram novamente. Consulta anterior à referência não pode ser reconstruída por essa fórmula e deve ser tratada como indisponível.
 
-Exemplo: referência `500000` em `2026-11-01`; movimentação `-12990` em `2026-11-02`; realizado em `2026-11-07` = `487010` (R$ 4.870,10). Uma linha de `-20000` em `2026-11-10` não participa desse realizado. Confirmar a convenção antes de implementar cálculos ou importar extratos que tragam saldo de abertura.
+Exemplo: referência `500000` em `2026-11-01`; movimentação `-12990` em `2026-11-02`; realizado em `2026-11-07` = `487010` (R$ 4.870,10). Uma linha de `-20000` em `2026-11-10` não participa desse realizado. Extratos que tragam saldo de abertura exigem conversão antes de gravar a referência.
 
 O modelo representa movimentações efetivadas de extrato, sem estado de agendamento/liquidação. A data futura fica excluída do realizado na data de consulta; contas previstas e projeções não devem ser gravadas como movimentações realizadas. `date <= D` só é suficiente sob essa premissa de origem; suportar agendamentos exigiria outro alinhamento.
 
@@ -446,7 +446,7 @@ O modelo representa movimentações efetivadas de extrato, sem estado de agendam
 - **Limitação:** o índice é local ao arquivo. Se um CSV tem duas movimentações idênticas e outro contém apenas uma delas, não há como identificar universalmente qual é a mesma movimentação. Arquivos parcialmente sobrepostos podem confundir movimentações distintas com duplicatas; o hash não garante conciliação universal nem substitui um identificador bancário estável.
 - **[Registrado] Correção pelo usuário:** altera `category_id` e grava `category_source = 'user'`; `predicted_category_id` não muda. **[Proposta]** Preservar também a confiança original; a escrita deve atualizar `updated_at`. Essa imutabilidade depende do service futuro; a FK sozinha não a garante.
 - **[Registrado, Issues #13/#14] Classificação e fallback:** regras por sinal, slugs de fallback e valores iniciais da transação estão no [contrato do domínio](api-design.md#entrada-csv-e-domínio--issue-13). Ausência de score não equivale a zero. **[Proposta]** O service deve validar também a compatibilidade do `kind` das categorias resolvidas com o sinal, incluindo a prevista; um `CHECK` simples não consulta outra tabela.
-- **[Registrado no desenho]** Dashboard, recorrências, gastos atípicos e projeção são cálculos futuros em `finance/domain.py`, sem tabelas próprias. Não há código desses cálculos. A projeção deve identificar valores previstos separadamente do realizado; precisão de estimativas e limiar de anomalia continuam pendentes.
+- **[Registrado no desenho]** Dashboard, recorrências, gastos atípicos e projeção são cálculos futuros em `finance/domain.py`, sem tabelas próprias. Não há código desses cálculos. A projeção deve identificar valores previstos separadamente do realizado; regras de recorrência, score e limiar de anomalia, arredondamento da projeção e gatilho de pressão de caixa estão na [ADR-0010](adr/0010-calculos-finance.md).
 
 ### 4.4 Responsabilidade das validações
 
