@@ -8,6 +8,7 @@ from valyra.core.errors import register_error_handlers
 from valyra.core.health import router as health_router
 from valyra.core.openapi import operation_id
 from valyra.finance.router import router as finance_router
+from valyra.auth.router import router as email_router
 
 
 def create_app() -> FastAPI:
@@ -22,4 +23,5 @@ def create_app() -> FastAPI:
     register_error_handlers(app)
     app.include_router(health_router)
     app.include_router(finance_router)
+    app.include_router(email_router)
     return app
