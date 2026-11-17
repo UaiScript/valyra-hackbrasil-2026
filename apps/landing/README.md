@@ -1,6 +1,6 @@
 # Landing page do Valyra
 
-Página estática de apresentação, adaptada do arquivo `valyra-intelligence.zip` fornecido pela equipe. Mantém o tema escuro, gráficos SVG, controles demonstrativos e idiomas PT/EN. A comunicação foi alinhada à proposta e ao estágio registrados no README principal.
+Página estática de apresentação, adaptada do arquivo `valyra-intelligence.zip` fornecido pela equipe. A identidade visual utiliza os estilos compartilhados de `packages/ui/src/styles/` e ajustes específicos em `src/styles/landing.css`, com uma apresentação editorial, uma prévia interativa do produto, os três módulos, o fluxo conceitual da plataforma e seções de transparência. Mantém os idiomas PT/EN e não depende da API ou da aplicação principal.
 
 `apps/landing` é um pacote independente. O futuro frontend da aplicação continua previsto em `apps/web`. Não existe integração com a API, PostgreSQL, feeds financeiros ou provedor de IA nesta landing. Os dados e os números exibidos são **sintéticos**, sem previsões ou resultados reais.
 
@@ -44,7 +44,7 @@ Remove-Item Env:PLAYWRIGHT_CHANNEL
 
 A suíte cobre desktop e celulares de 390 e 320 pixels: destino efetivo dos links, descarte de destino antigo no armazenamento, idioma persistente, funcionamento sem armazenamento, controles dos exemplos, ausência de requisições a terceiros, política de conteúdo e navegação por teclado. Há também testes de configuração para URLs inválidas e credenciais embutidas. Resultados e capturas ficam ignorados em `test-results/`.
 
-O workflow separado [landing.yml](../../.github/workflows/landing.yml) executa instalação pelo lockfile, auditoria, testes de configuração, build e testes de navegador. Usa permissões somente de leitura e ações fixadas por SHA. Não publica o site nem modifica o CI do Finance. O resultado remoto deve ser acompanhado nos checks da branch/PR.
+O workflow separado [landing.yml](../../.github/workflows/landing.yml) executa instalação pelo lockfile, testes de configuração, build e testes de navegador. A auditoria de dependências roda em um job independente. Usa permissões somente de leitura e ações fixadas por SHA. Não publica o site nem modifica o CI do Finance. O resultado remoto deve ser acompanhado nos checks da branch/PR.
 
 Validação local em **08/11/2026**: instalação pelo lockfile com scripts desabilitados, TypeScript/build aprovados, **10 testes de configuração e 18 testes de navegador aprovados**, sem testes ignorados. `npm audit` retornou zero vulnerabilidades conhecidas. Os builds também foram servidos em subpastas locais: destino padrão e modo futuro `application`, rótulos PT/EN e link alternativo sem JavaScript funcionaram; um destino com protocolo executável foi rejeitado pelo build. O endereço da aplicação usado nesse ensaio foi fictício, sem acesso externo. Os resultados remotos devem ser consultados nos checks do PR. Esta entrega não configura deploy público.
 
@@ -76,12 +76,13 @@ apps/landing/
 ├── config/destination.mjs   # validação do destino durante o build
 ├── public/                 # favicon local
 ├── src/
-│   ├── components/         # seções independentes da página
+│   ├── components/         # seções independentes, incluindo HowItWorks
 │   ├── content/            # textos PT/EN e rótulos do destino
 │   ├── data/demo.ts        # séries e cenários sintéticos
 │   ├── types/             # contratos da apresentação
-│   ├── App.tsx            # composição e preferência de idioma
-│   └── index.css
+│   ├── styles/             # landing.css; base compartilhada em packages/ui
+│   ├── App.tsx             # composição e preferência de idioma
+│   └── index.css           # importa a base visual centralizada
 ├── tests/                  # configuração e navegação real em navegador
 ├── package-lock.json       # dependências reproduzíveis
 └── vite.config.mjs
@@ -99,4 +100,4 @@ Publique apenas o conteúdo de `dist/` em um host estático HTTPS; nunca o diret
 
 No host de produção, configure também os headers HTTP `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` e uma CSP com `frame-ancestors 'none'` (essa diretiva requer header HTTP). Se a hospedagem não permitir headers personalizados, a CSP no HTML continua restringindo scripts e conexões, mas não impede incorporação da página em frames.
 
-Para remover a landing, remova somente `apps/landing/`, `.github/workflows/landing.yml` e a seção **Landing page** do README principal. Caso tenha sido hospedada, desative essa publicação separadamente. Não há pacote compartilhado, serviço Compose, migração ou alteração de backend para reverter.
+Para remover a landing, remova somente `apps/landing/`, `.github/workflows/landing.yml` e a seção **Landing page** do README principal. Caso tenha sido hospedada, desative essa publicação separadamente. Preserve `packages/ui/`, que contém estilos compartilhados usados por outras aplicações. Não há serviço Compose, migração ou alteração de backend para reverter.

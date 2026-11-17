@@ -72,7 +72,7 @@ export const pt: TranslationDictionary = {
         "number": "01",
         "title": "Valyra Finance",
         "subtitle": "Planejar o orçamento",
-        "description": "Organizar transações de demonstração e projetar despesas e saldo com premissas visíveis. A persistência inicial está em revisão no PR #17, com modelos, migração e seed.",
+        "description": "Organizar transações de demonstração e projetar despesas e saldo com premissas visíveis. A persistência e as integrações necessárias seguem em desenvolvimento.",
         "tag": "FINANCE",
         "bullets": [
           "Transações e categorias sintéticas",

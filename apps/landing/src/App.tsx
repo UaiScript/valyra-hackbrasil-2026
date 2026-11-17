@@ -3,9 +3,15 @@ import { useEffect, useState } from 'react';
 import type { Language } from './types/content';
 import { CONTENT } from './content';
 import {
-  TerminalTopNavigation, TerminalHeroWithCockpit, DemoMetrics,
-  RefinedBentoGrid, AlternativeAlphaSuite, InteractiveStressLab,
-  ProjectPrinciples, SystemRedirectBanner, TerminalFooter,
+  TerminalTopNavigation,
+  TerminalHeroWithCockpit,
+  RefinedBentoGrid,
+  HowItWorks,
+  AlternativeAlphaSuite,
+  InteractiveStressLab,
+  ProjectPrinciples,
+  SystemRedirectBanner,
+  TerminalFooter,
 } from './components';
 
 function initialLanguage(): Language {
@@ -15,20 +21,26 @@ function initialLanguage(): Language {
 
 export default function App() {
   const [lang, setLang] = useState<Language>(initialLanguage);
+
   useEffect(() => {
     document.documentElement.lang = lang === 'pt' ? 'pt-BR' : 'en';
     try { localStorage.setItem('valyra_lang', lang); } catch { /* Storage is optional. */ }
   }, [lang]);
+
   const systemUrl = __DESTINATION__.url;
+
   return (
-    <div id="top" className="min-h-screen bg-[#070c14] text-slate-100 flex flex-col antialiased selection:bg-[#2563EB]/30 selection:text-[#38BDF8]">
+    <div id="top" className="site-shell">
       <a className="skip-link" href="#main">{lang === 'pt' ? 'Pular para o conteúdo' : 'Skip to content'}</a>
       <TerminalTopNavigation lang={lang} onToggleLang={setLang} systemUrl={systemUrl} />
-      <main id="main" className="flex-1">
-        <p className="demo-notice" role="note">{CONTENT[lang].demoNotice}</p>
+      <main id="main">
+        <p className="demo-notice" role="note">
+          <span className="demo-notice__dot" aria-hidden="true" />
+          {CONTENT[lang].demoNotice}
+        </p>
         <TerminalHeroWithCockpit lang={lang} systemUrl={systemUrl} />
-        <DemoMetrics lang={lang} />
         <RefinedBentoGrid lang={lang} />
+        <HowItWorks lang={lang} />
         <AlternativeAlphaSuite lang={lang} systemUrl={systemUrl} />
         <InteractiveStressLab lang={lang} systemUrl={systemUrl} />
         <ProjectPrinciples lang={lang} />
