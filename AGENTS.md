@@ -34,6 +34,7 @@ Make aceita UV=/caminho/uv e ENV_FILE=/caminho/configuração. Usa .env existent
 
 - services/api/: [contexto de backend](services/api/AGENTS.md), core HTTP, Finance (ORM, domínio CSV, importação e consultas HTTP), Alembic e testes.
 - apps/landing/: [página estática isolada](apps/landing/README.md), apontando inicialmente ao repositório oficial.
+- packages/ui/: estilos CSS compartilhados e [guia de uso](packages/ui/README.md).
 - packages/contracts/: OpenAPI gerado; infra/postgres/init/: criação idempotente do banco de testes.
 - docs/: arquitetura, glossário, ADRs e specs. .github/: CI, templates e revisão.
 - datasets/samples/: dados sintéticos de demonstração (CSV de transações), nunca dados reais.

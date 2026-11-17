@@ -1,0 +1,5 @@
+/* A ordem garante tokens e temas disponíveis antes dos padrões visuais. */
+@import "./tokens.css";
+@import "./themes.css";
+@import "./typography.css";
+@import "./globals.css";
