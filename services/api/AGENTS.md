@@ -22,7 +22,7 @@ Fontes: [contrato Finance](../../docs/api-design.md), [modelagem](../../docs/mod
 - Dinheiro Finance: `BIGINT` em centavos e inteiro JSON estrito, nomes `balance_cents`/`amount_cents`, sem conversão por `float`. UUIDs são strings no JSON.
 - `DATE`/`YYYY-MM-DD` para datas de negócio; instantes timezone-aware normalizados para UTC. Sinal de transação: entrada positiva, saída negativa, zero proibido.
 - Configuração por ambiente; usuário demo configurável, sem login. Validar propriedade da conta no service; existência de FK não comprova essa propriedade.
-- Erros no envelope `{"error":{"code":"...","message":"...","details":{}}}`. Use os códigos registrados no contrato; não invente schema HTTP a partir de todas as colunas do banco.
+- Erros no envelope `{"error":{"code":"...","message":"...","details":{}}}`. Use os códigos registrados no contrato; não invente schema HTTP a partir de todas as colunas do banco. No OpenAPI, o router Finance declara 422 com `error_responses(422)` e cada rota acrescenta seus outros 4xx com `error_responses(...)` (core/errors.py); `tests/core/test_openapi_errors.py` exige a tabela por operação.
 - Listagens usam `Page[T]` (`items`, `total`, `limit`, `offset`); `limit` padrão 50, entre 1 e 200; `offset` não negativo. Sessão de banco de `get_session()` não é sessão de usuário; `get_current_user_id()` retorna o demo configurado.
 - CSV: UTF-8/BOM, contrato de cabeçalho/data/precisão/limites e hash conforme api-design. Preserve descrição original; normalização é cópia para regras/hash.
 - Preserve categoria prevista ao corrigir categoria exibida. Respeite transação única da importação; rollback não garante lote `failed` persistido.

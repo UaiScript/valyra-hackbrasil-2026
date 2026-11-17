@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from valyra.core.db import get_session
 from valyra.core.deps import get_current_user_id
-from valyra.core.errors import AppError
+from valyra.core.errors import AppError, error_responses
 from valyra.core.pagination import Page, PageParams
 from valyra.finance import service
 from valyra.finance.domain import MAX_FILE_BYTES
@@ -24,7 +24,8 @@ from valyra.finance.schemas import (
     TransactionOut,
 )
 
-router = APIRouter(prefix="/api/v1/finance", tags=["finance"])
+# Toda rota Finance recebe parâmetros validados; o 422 no envelope vale para todas.
+router = APIRouter(prefix="/api/v1/finance", tags=["finance"], responses=error_responses(422))
 
 SessionDep = Annotated[Session, Depends(get_session)]
 UserIdDep = Annotated[UUID, Depends(get_current_user_id)]
@@ -44,6 +45,7 @@ def _batch_out(session: Session, user_id: UUID, batch_id: UUID) -> ImportBatchOu
     name="finance_create_import_batch",
     status_code=201,
     response_model=ImportBatchOut,
+    responses=error_responses(404, 413),
 )
 def create_import_batch(
     account_id: UUID, file: Annotated[UploadFile, File()], session: SessionDep, user_id: UserIdDep
@@ -73,7 +75,12 @@ def list_import_batches(
     )
 
 
-@router.get("/import-batches/{id}", name="finance_get_import_batch", response_model=ImportBatchOut)
+@router.get(
+    "/import-batches/{id}",
+    name="finance_get_import_batch",
+    response_model=ImportBatchOut,
+    responses=error_responses(404),
+)
 def get_import_batch(id: UUID, session: SessionDep, user_id: UserIdDep) -> ImportBatchOut:
     return _batch_out(session, user_id, id)
 
@@ -91,7 +98,12 @@ def list_accounts(
     )
 
 
-@router.patch("/accounts/{id}", name="finance_update_account", response_model=AccountOut)
+@router.patch(
+    "/accounts/{id}",
+    name="finance_update_account",
+    response_model=AccountOut,
+    responses=error_responses(404),
+)
 def update_account(
     id: UUID, body: AccountUpdate, session: SessionDep, user_id: UserIdDep
 ) -> AccountOut:
@@ -99,7 +111,13 @@ def update_account(
     return AccountOut.model_validate(account)
 
 
-@router.get("/transactions", name="finance_list_transactions", response_model=Page[TransactionOut])
+# 404 quando o filtro account_id aponta conta inexistente ou de outro usuário.
+@router.get(
+    "/transactions",
+    name="finance_list_transactions",
+    response_model=Page[TransactionOut],
+    responses=error_responses(404),
+)
 def list_transactions(
     page: Annotated[PageParams, Depends()],
     session: SessionDep,

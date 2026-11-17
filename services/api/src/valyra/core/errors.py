@@ -1,9 +1,40 @@
 """Envelope HTTP definido na Issue #9, sem criar códigos do domínio Finance."""
 
+from typing import Any
+
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+
+class ErrorBody(BaseModel):
+    code: str
+    message: str
+    details: dict[str, Any]
+
+
+class ErrorResponse(BaseModel):
+    """Forma única de toda resposta de erro; declarada no OpenAPI por error_responses()."""
+
+    error: ErrorBody
+
+
+_DESCRIPTIONS = {
+    404: "Recurso não encontrado",
+    413: "Arquivo acima do limite",
+    422: "Entrada inválida",
+}
+
+
+def error_responses(*status_codes: int) -> dict[int | str, dict[str, Any]]:
+    # Declarar o 422 explicitamente impede o FastAPI de injetar HTTPValidationError,
+    # schema que não corresponde ao envelope devolvido pelo handler de validação.
+    return {
+        status: {"model": ErrorResponse, "description": _DESCRIPTIONS[status]}
+        for status in status_codes
+    }
 
 
 class AppError(Exception):
