@@ -128,3 +128,17 @@ def list_transactions(
     )
     rows, total = _page(session, query, limit, offset)
     return [(row[0], row[1]) for row in rows], total
+
+
+def get_transaction(session: Session, user_id: UUID, transaction_id: UUID) -> Transaction | None:
+    # Propriedade vem da conta; a trava evita duas correções concorrentes sobrescreverem às cegas.
+    return session.scalar(
+        select(Transaction)
+        .join(Account, Account.id == Transaction.account_id)
+        .where(Transaction.id == transaction_id, Account.user_id == user_id)
+        .with_for_update(of=Transaction)
+    )
+
+
+def get_category(session: Session, category_id: UUID) -> Category | None:
+    return session.get(Category, category_id)

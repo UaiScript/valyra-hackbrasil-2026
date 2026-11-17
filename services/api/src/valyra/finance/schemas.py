@@ -94,6 +94,15 @@ class AccountUpdate(BaseModel):
     balance_as_of: IsoDate = Field(default=None)
 
 
+class TransactionUpdate(BaseModel):
+    """Correção de categoria; category_id é obrigatório e null é recusado."""
+
+    # Campo desconhecido gera 422, como no AccountUpdate.
+    model_config = ConfigDict(extra="forbid")
+
+    category_id: UUID
+
+
 class CategoryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

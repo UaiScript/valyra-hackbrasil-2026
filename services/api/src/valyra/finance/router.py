@@ -12,6 +12,7 @@ from valyra.core.errors import AppError, error_responses
 from valyra.core.pagination import Page, PageParams
 from valyra.finance import service
 from valyra.finance.domain import MAX_FILE_BYTES
+from valyra.finance.models import Category, Transaction
 from valyra.finance.schemas import (
     AccountOut,
     AccountUpdate,
@@ -22,6 +23,7 @@ from valyra.finance.schemas import (
     IsoDate,
     TransactionCategoryOut,
     TransactionOut,
+    TransactionUpdate,
 )
 
 # Toda rota Finance recebe parâmetros validados; o 422 no envelope vale para todas.
@@ -36,6 +38,19 @@ def _batch_out(session: Session, user_id: UUID, batch_id: UUID) -> ImportBatchOu
     return ImportBatchOut(
         **ImportBatchSummaryOut.model_validate(batch).model_dump(),
         rejections=[ImportRejectionOut.model_validate(r) for r in rejections],
+    )
+
+
+def _transaction_out(t: Transaction, category: Category) -> TransactionOut:
+    return TransactionOut(
+        id=t.id,
+        date=t.date,
+        description=t.description,
+        amount_cents=t.amount_cents,
+        category=TransactionCategoryOut.model_validate(category),
+        category_source=t.category_source,
+        category_confidence=t.category_confidence,
+        predicted_category_id=t.predicted_category_id,
     )
 
 
@@ -137,20 +152,23 @@ def list_transactions(
         limit=page.limit,
         offset=page.offset,
     )
-    items = [
-        TransactionOut(
-            id=t.id,
-            date=t.date,
-            description=t.description,
-            amount_cents=t.amount_cents,
-            category=TransactionCategoryOut.model_validate(category),
-            category_source=t.category_source,
-            category_confidence=t.category_confidence,
-            predicted_category_id=t.predicted_category_id,
-        )
-        for t, category in rows
-    ]
+    items = [_transaction_out(t, category) for t, category in rows]
     return Page[TransactionOut](items=items, total=total, limit=page.limit, offset=page.offset)
+
+
+@router.patch(
+    "/transactions/{id}",
+    name="finance_update_transaction",
+    response_model=TransactionOut,
+    responses=error_responses(404),
+)
+def update_transaction(
+    id: UUID, body: TransactionUpdate, session: SessionDep, user_id: UserIdDep
+) -> TransactionOut:
+    transaction, category = service.update_transaction_category(
+        session, user_id, id, body.category_id
+    )
+    return _transaction_out(transaction, category)
 
 
 @router.get("/categories", name="finance_list_categories", response_model=Page[CategoryOut])

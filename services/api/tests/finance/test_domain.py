@@ -22,6 +22,7 @@ from valyra.finance.domain import (
     ParseResult,
     RejectedRow,
     categorize,
+    category_kind_matches,
     compute_row_hashes,
     normalize_description,
     parse_csv,
@@ -626,3 +627,17 @@ def test_multilinha_malformada_preserva_todo_texto_e_recupera_no_registro_seguin
     assert result.rows == [ParsedRow(5, date(2026, 11, 5), "Valida", -200)]
     assert result.rejected == [RejectedRow(2, "wrong_column_count", raw)]
     assert result.total == 2
+
+
+@pytest.mark.parametrize(
+    "kind,valor,esperado",
+    [
+        ("expense", -1, True),
+        ("expense", 1, False),
+        ("income", 1, True),
+        ("income", -1, False),
+        ("desconhecido", -1, False),
+    ],
+)
+def test_category_kind_matches(kind, valor, esperado):
+    assert category_kind_matches(kind, valor) is esperado
