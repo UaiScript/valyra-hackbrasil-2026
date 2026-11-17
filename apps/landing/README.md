@@ -1,6 +1,6 @@
 # Landing page do Valyra
 
-Página estática de apresentação, adaptada do arquivo `valyra-intelligence.zip` fornecido pela equipe. Mantém o tema escuro, gráficos SVG, controles demonstrativos e idiomas PT/EN. A comunicação foi alinhada à proposta e ao estágio registrados no README principal.
+Página estática de apresentação, adaptada do arquivo `valyra-intelligence.zip` fornecido pela equipe. A identidade visual utiliza os tokens centralizados em `src/styles/`, com uma apresentação editorial, uma prévia interativa do produto, os três módulos, o fluxo conceitual da plataforma e seções de transparência. Mantém os idiomas PT/EN e não depende da API ou da aplicação principal.
 
 `apps/landing` é um pacote independente. O futuro frontend da aplicação continua previsto em `apps/web`. Não existe integração com a API, PostgreSQL, feeds financeiros ou provedor de IA nesta landing. Os dados e os números exibidos são **sintéticos**, sem previsões ou resultados reais.
 
@@ -76,12 +76,13 @@ apps/landing/
 ├── config/destination.mjs   # validação do destino durante o build
 ├── public/                 # favicon local
 ├── src/
-│   ├── components/         # seções independentes da página
+│   ├── components/         # seções independentes, incluindo HowItWorks
 │   ├── content/            # textos PT/EN e rótulos do destino
 │   ├── data/demo.ts        # séries e cenários sintéticos
 │   ├── types/             # contratos da apresentação
-│   ├── App.tsx            # composição e preferência de idioma
-│   └── index.css
+│   ├── styles/             # tokens, temas, tipografia, globais e landing
+│   ├── App.tsx             # composição e preferência de idioma
+│   └── index.css           # importa a base visual centralizada
 ├── tests/                  # configuração e navegação real em navegador
 ├── package-lock.json       # dependências reproduzíveis
 └── vite.config.mjs
