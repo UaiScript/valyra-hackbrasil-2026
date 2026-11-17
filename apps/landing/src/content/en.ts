@@ -72,7 +72,7 @@ export const en: TranslationDictionary = {
         "number": "01",
         "title": "Valyra Finance",
         "subtitle": "Plan a budget",
-        "description": "Organize demo transactions and project expenses and balances with explicit assumptions. Initial persistence is under review in PR #17, with models, a migration and a seed.",
+        "description": "Organize demo transactions and project expenses and balances with explicit assumptions. Persistence and the required integrations are still under development.",
         "tag": "FINANCE",
         "bullets": [
           "Synthetic transactions and categories",

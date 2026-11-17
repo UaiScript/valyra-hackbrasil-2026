@@ -1,5 +1,15 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
+
+async function selectLanguage(page: Page, language: 'PT' | 'EN') {
+  const desktopSwitch = page.locator('.site-header__actions .language-switch');
+  if (await desktopSwitch.isVisible()) {
+    await desktopSwitch.getByRole('button', { name: language, exact: true }).click();
+  } else {
+    await page.getByRole('button', { name: /Abrir menu|Open menu/ }).click();
+    await page.locator('#mobile-navigation').getByRole('button', { name: language, exact: true }).click();
+  }
+}
 const repository = 'https://github.com/UaiScript/valyra-hackbrasil-2026';
 
 test('loads without runtime errors or third-party requests, with honest demo content', async ({ page }) => {
@@ -31,13 +41,13 @@ test('every access link leads to the official repository, even with stale stored
 
 test('language switch persists and updates document language', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'EN', exact: true }).click();
+  await selectLanguage(page, 'EN');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Financial intelligence');
   await expect(page.locator('header [data-primary-cta]')).toHaveText('View repository');
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await page.getByRole('button', { name: 'PT', exact: true }).click();
+  await selectLanguage(page, 'PT');
   await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
 });
 
@@ -49,7 +59,7 @@ test('the page works when browser storage is disabled', async ({ page }) => {
   page.on('pageerror', e => errors.push(e.message));
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await page.getByRole('button', { name: 'EN', exact: true }).click();
+  await selectLanguage(page, 'EN');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   expect(errors).toEqual([]);
 });
@@ -63,6 +73,21 @@ test('timeframe, research example and scenario controls change their visible dat
   await expect(page.locator('#alternative-alpha').getByText('+3.92%', { exact: true }).last()).toBeVisible();
   await page.getByRole('button', { name: /Liquidez ilustrativa/ }).click();
   await expect(page.locator('#simulador').getByText('+5.12%', { exact: true })).toBeVisible();
+});
+
+
+test('presents the product sections and mobile navigation', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: /Valyra Finance/ })).toBeVisible();
+  await expect(page.locator('#como-funciona')).toBeVisible();
+  await expect(page.locator('#transparencia')).toContainText(/origem|sources/i);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const menuButton = page.getByRole('button', { name: /Abrir menu|Open menu/ });
+  await menuButton.click();
+  await expect(page.locator('#mobile-navigation')).toHaveAttribute('data-open', 'true');
+  await page.locator('#mobile-navigation').getByRole('link', { name: /Como funciona|How it works/ }).click();
+  await expect(page).toHaveURL(/#como-funciona|#how-it-works/);
+  await expect(page.locator('#mobile-navigation')).toHaveAttribute('data-open', 'false');
 });
 
 test('layout stays within the viewport and internal links have real targets', async ({ page }, testInfo) => {

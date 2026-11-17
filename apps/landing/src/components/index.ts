@@ -1,7 +1,7 @@
 export { TerminalTopNavigation } from './Navigation';
 export { TerminalHeroWithCockpit } from './Hero';
-export { DemoMetrics } from './DemoMetrics';
 export { RefinedBentoGrid } from './Modules';
+export { HowItWorks } from './HowItWorks';
 export { AlternativeAlphaSuite } from './AlternativeAlpha';
 export { InteractiveStressLab } from './Scenarios';
 export { ProjectPrinciples } from './ProjectPrinciples';
