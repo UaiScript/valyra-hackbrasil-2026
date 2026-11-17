@@ -1,6 +1,10 @@
 # Landing page do Valyra
 
+<<<<<<< HEAD
 Página estática de apresentação, adaptada do arquivo `valyra-intelligence.zip` fornecido pela equipe. A identidade visual utiliza os estilos compartilhados de `packages/ui/src/styles/` e ajustes específicos em `src/styles/landing.css`, com uma apresentação editorial, uma prévia interativa do produto, os três módulos, o fluxo conceitual da plataforma e seções de transparência. Mantém os idiomas PT/EN e não depende da API ou da aplicação principal.
+=======
+Página estática de apresentação, adaptada do arquivo `valyra-intelligence.zip` fornecido pela equipe. A identidade visual utiliza os tokens centralizados em `src/styles/`, com uma apresentação editorial, uma prévia interativa do produto, os três módulos, o fluxo conceitual da plataforma e seções de transparência. Mantém os idiomas PT/EN e não depende da API ou da aplicação principal.
+>>>>>>> a0f5d08 (feat(landing): redesign Valyra landing page)
 
 `apps/landing` é um pacote independente. O futuro frontend da aplicação continua previsto em `apps/web`. Não existe integração com a API, PostgreSQL, feeds financeiros ou provedor de IA nesta landing. Os dados e os números exibidos são **sintéticos**, sem previsões ou resultados reais.
 
@@ -80,7 +84,11 @@ apps/landing/
 │   ├── content/            # textos PT/EN e rótulos do destino
 │   ├── data/demo.ts        # séries e cenários sintéticos
 │   ├── types/             # contratos da apresentação
+<<<<<<< HEAD
 │   ├── styles/             # landing.css; base compartilhada em packages/ui
+=======
+│   ├── styles/             # tokens, temas, tipografia, globais e landing
+>>>>>>> a0f5d08 (feat(landing): redesign Valyra landing page)
 │   ├── App.tsx             # composição e preferência de idioma
 │   └── index.css           # importa a base visual centralizada
 ├── tests/                  # configuração e navegação real em navegador
