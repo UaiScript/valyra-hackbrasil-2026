@@ -1,0 +1,139 @@
+/*
+ * Semantic tokens. Use these in components instead of primitive palette values.
+ * Default is light. Switch by setting data-theme="dark" on <html> or <body>.
+ */
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  --color-bg: var(--valyra-neutral-50);
+  --color-bg-subtle: var(--valyra-neutral-100);
+  --color-surface: var(--valyra-neutral-0);
+  --color-surface-raised: var(--valyra-neutral-0);
+  --color-surface-inverse: var(--valyra-neutral-900);
+
+  --color-text: var(--valyra-neutral-900);
+  --color-text-muted: var(--valyra-neutral-600);
+  --color-text-subtle: var(--valyra-neutral-500);
+  --color-text-inverse: var(--valyra-neutral-0);
+
+  --color-border: var(--valyra-neutral-200);
+  --color-border-strong: var(--valyra-neutral-300);
+  --color-divider: var(--valyra-neutral-100);
+
+  --color-primary: var(--valyra-brand-600);
+  --color-primary-hover: var(--valyra-brand-700);
+  --color-primary-active: var(--valyra-brand-800);
+  --color-primary-soft: var(--valyra-brand-50);
+  --color-primary-contrast: var(--valyra-neutral-0);
+
+  --color-secondary: var(--valyra-neutral-100);
+  --color-secondary-hover: var(--valyra-neutral-200);
+  --color-secondary-contrast: var(--valyra-neutral-800);
+
+  --color-success: var(--valyra-success-600);
+  --color-success-soft: var(--valyra-success-50);
+  --color-success-text: var(--valyra-success-700);
+  --color-warning: var(--valyra-warning-600);
+  --color-warning-soft: var(--valyra-warning-50);
+  --color-warning-text: var(--valyra-warning-700);
+  --color-danger: var(--valyra-danger-600);
+  --color-danger-soft: var(--valyra-danger-50);
+  --color-danger-text: var(--valyra-danger-700);
+  --color-info: var(--valyra-info-600);
+  --color-info-soft: var(--valyra-info-50);
+  --color-info-text: var(--valyra-info-700);
+
+  --color-overlay: rgb(2 6 23 / 0.56);
+  --shadow-card: var(--shadow-sm);
+  --shadow-popover: var(--shadow-lg);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg: #0b1220;
+  --color-bg-subtle: #111c2e;
+  --color-surface: #142033;
+  --color-surface-raised: #19283d;
+  --color-surface-inverse: var(--valyra-neutral-0);
+
+  --color-text: #f1f5f9;
+  --color-text-muted: #cbd5e1;
+  --color-text-subtle: #94a3b8;
+  --color-text-inverse: #0f172a;
+
+  --color-border: #26364b;
+  --color-border-strong: #3b4d63;
+  --color-divider: #1e2c40;
+
+  --color-primary: #34d399;
+  --color-primary-hover: #6ee7b7;
+  --color-primary-active: #a7f3d0;
+  --color-primary-soft: #123b32;
+  --color-primary-contrast: #052e24;
+
+  --color-secondary: #243449;
+  --color-secondary-hover: #30445c;
+  --color-secondary-contrast: #e2e8f0;
+
+  --color-success: #34d399;
+  --color-success-soft: #123b32;
+  --color-success-text: #a7f3d0;
+  --color-warning: #fbbf24;
+  --color-warning-soft: #422f12;
+  --color-warning-text: #fde68a;
+  --color-danger: #f87171;
+  --color-danger-soft: #451d25;
+  --color-danger-text: #fecaca;
+  --color-info: #60a5fa;
+  --color-info-soft: #172f50;
+  --color-info-text: #bfdbfe;
+
+  --color-overlay: rgb(0 0 0 / 0.72);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.24), 0 8px 24px rgb(0 0 0 / 0.12);
+  --shadow-popover: 0 16px 40px rgb(0 0 0 / 0.35);
+}
+
+/* Optional OS preference until the application chooses a theme explicitly. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --color-bg: #0b1220;
+    --color-bg-subtle: #111c2e;
+    --color-surface: #142033;
+    --color-surface-raised: #19283d;
+    --color-surface-inverse: var(--valyra-neutral-0);
+    --color-text: #f1f5f9;
+    --color-text-muted: #cbd5e1;
+    --color-text-subtle: #94a3b8;
+    --color-text-inverse: #0f172a;
+    --color-border: #26364b;
+    --color-border-strong: #3b4d63;
+    --color-divider: #1e2c40;
+    --color-primary: #34d399;
+    --color-primary-hover: #6ee7b7;
+    --color-primary-active: #a7f3d0;
+    --color-primary-soft: #123b32;
+    --color-primary-contrast: #052e24;
+    --color-secondary: #243449;
+    --color-secondary-hover: #30445c;
+    --color-secondary-contrast: #e2e8f0;
+    --color-success: #34d399;
+    --color-success-soft: #123b32;
+    --color-success-text: #a7f3d0;
+    --color-warning: #fbbf24;
+    --color-warning-soft: #422f12;
+    --color-warning-text: #fde68a;
+    --color-danger: #f87171;
+    --color-danger-soft: #451d25;
+    --color-danger-text: #fecaca;
+    --color-info: #60a5fa;
+    --color-info-soft: #172f50;
+    --color-info-text: #bfdbfe;
+    --color-overlay: rgb(0 0 0 / 0.72);
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.24), 0 8px 24px rgb(0 0 0 / 0.12);
+    --shadow-popover: 0 16px 40px rgb(0 0 0 / 0.35);
+  }
+}
