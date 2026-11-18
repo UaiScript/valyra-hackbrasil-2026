@@ -2,7 +2,7 @@ UV ?= uv
 ENV_FILE ?= $(abspath $(if $(wildcard .env),.env,.env.example))
 RUN = "$(UV)" run --locked --env-file "$(ENV_FILE)" --directory services/api
 
-.PHONY: sync dev test test-domain lint migrate seed openapi
+.PHONY: sync dev test test-domain test-ai lint migrate seed openapi
 sync:
 	"$(UV)" sync --project services/api --locked
 dev:
@@ -12,6 +12,8 @@ test:
 	$(RUN) pytest
 test-domain:
 	$(RUN) pytest tests/finance/test_domain.py
+test-ai:
+	$(RUN) pytest tests/ai
 lint:
 	$(RUN) ruff check .
 	$(RUN) ruff format --check .

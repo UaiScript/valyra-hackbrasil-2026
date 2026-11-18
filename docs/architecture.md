@@ -6,11 +6,13 @@ Visão operacional da branch integrada. Histórico e propostas permanecem nos tr
 apps/landing — React/TypeScript, estática → repositório oficial (futura aplicação configurável)
 apps/web — aplicação React planejada
                          | /api/v1/finance (importação de CSV e consultas)
-services/api — FastAPI único: /health, Finance (8 operações no total) e OpenAPI
+services/api — FastAPI único: /health, Finance, IA (10 operações no total) e OpenAPI
 core · finance (router → service → domínio CSV | repository → ORM)
         | PostgreSQL 18
         + pipelines → DuckDB/Parquet/fontes públicas (planejado)
-        + alpha · alerts · ai / provedor LLM (planejado)
+        + ai / router → service → cliente Gemini/OpenAI | domínio → schemas
+                + Finance via service público (referência e movimentações)
+        + alpha · alerts (planejado)
 ```
 
 ## Estado efetivo
@@ -23,7 +25,9 @@ core · finance (router → service → domínio CSV | repository → ORM)
 - Correção de categoria da Issue #42: `PATCH /api/v1/finance/transactions/{id}` com `{category_id}`; grava `category_source = user` e preserva a sugestão original (`predicted_category_id`, `category_confidence`). Transação de outro usuário responde 404 como inexistente; tipo da categoria precisa corresponder ao sinal.
 - Landing do PR #18: pacote independente apps/landing com build e testes próprios; números sintéticos identificados. CTA aponta ao GitHub. O destino futuro HTTPS é configurado no build, não pelo visitante.
 - CI: PostgreSQL/Compose, API consolidada e workflow independente da landing. Claude preparado; configuração externa e primeiro review são verificação separada. Resultados desta integração no PR e em [integração](integracao-11-12.md).
-- Não implementados no Finance: resumo, projeção de saldo, detecção de recorrência e de gastos atípicos. Fora do Finance: aplicação apps/web, projeções, categorização ML, sinais, replay, pipelines, DuckDB, alertas e IA.
+- IA: cliente Gemini com saída estruturada e parsing estrito, timeout e tentativas limitadas; testes com HTTP simulado. Fallback GPT-4o-mini ativo quando `OPENAI_API_KEY` estiver configurada; controle de gasto pelo hard spend limit do painel da OpenAI ([ADR-0002](adr/0002-provedor-llm.md)). Contratos tipados e resolução de citações da [ADR-0011](adr/0011-contrato-evidencias-ia.md): o LLM devolve IDs e o servidor recupera dados originais. O domínio revalida metadados e confere os literais numéricos contra as citações ([regras e limites](ai-validation.md)); não certifica semântica ou causalidade. O [serviço](ai-service.md) autoriza via Finance público, monta saldo de referência e até vinte movimentações, executa o cliente e valida a resposta. Contexto/cliente substituíveis nos testes; dados ausentes geram limitações e contexto vazio não chama provedor. A rota HTTP está descrita abaixo; persistência de conversas permanece pendente. Configuração no [guia](ai-client.md).
+- HTTP IA: `POST /api/v1/ai/explain`, operação `ai_explain`, recebe somente pergunta/conta, usa a identidade demo e devolve explicação validada com evidências originais. Erros conhecidos usam o envelope existente, declarado no OpenAPI. Jornada sintética com SDK/transporte simulado e integração Finance real com PostgreSQL dedicado; smoke com provedor real depende de chave local. Contrato e roteiro em [ai-http.md](ai-http.md).
+- Não implementados no Finance: resumo, projeção de saldo, detecção de recorrência e de gastos atípicos. Fora do Finance: aplicação apps/web, projeções, categorização ML, sinais, replay, pipelines, DuckDB, alertas e integração de resumo/projeções/Alpha ao serviço IA.
 
 ## Fronteiras
 
@@ -31,7 +35,7 @@ Um backend modular, conforme [ADR-0001](adr/0001-monolito-modular.md). Router �
 
 Dinheiro Finance usa centavos inteiros ([ADR-0009](adr/0009-dinheiro-em-centavos.md)); datas de negócio são DATE e instantes UTC. Conta tem saldo de referência (fechamento), não cálculo realizado diário; convenções de cálculo na [ADR-0010](adr/0010-calculos-finance.md). Valores BIGINT além da precisão segura do JavaScript exigem alinhamento antes do frontend consumir esses extremos.
 
-No desenho futuro, pipelines escrevem sinais append-only e API apenas lê; observação/publicação/ingestão são tempos distintos. as_of seleciona somente revisões publicadas no corte. LLM explica evidências, nunca calcula ou inventa números. Esses mecanismos ainda não existem no código.
+No desenho futuro, pipelines escrevem sinais append-only e API apenas lê; observação/publicação/ingestão são tempos distintos. as_of seleciona somente revisões publicadas no corte. LLM explica evidências, nunca calcula ou inventa números. O contexto IA já recusa metadados fora do corte. O domínio IA também confere literais numéricos e referências contra um snapshot revalidado. O serviço IA já autoriza a conta via Finance e usa corte corrente do servidor; consulta/seleção de revisões Alpha continua pendente do respectivo serviço.
 
 ## Frontend e remoção
 
@@ -44,4 +48,4 @@ A landing não ocupa apps/web nem depende da API. Execução, configuração e r
 - [Contrato Finance/API](api-design.md), incluindo operações HTTP futuras.
 - [Registro da migração/seed](revisao-modelagem.md).
 
-Hospedagem, LLM, licença de cotações, precisão Alpha/IA e persistência de falhas de importação continuam pendências registradas. Não inferir aprovação de todo o desenho a partir das ADRs específicas.
+Hospedagem, configuração do limite externo para fallback LLM, licença de cotações e precisão monetária Alpha e persistência de falhas de importação continuam pendências registradas. Não inferir aprovação de todo o desenho a partir das ADRs específicas.

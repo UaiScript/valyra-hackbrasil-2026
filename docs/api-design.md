@@ -184,6 +184,27 @@ Envelope da Issue #9: `{"error":{"code":"...","message":"...","details":{}}}`. M
 
 Rejeições de linha são dados de uma importação concluída, sem promover cada rejeição a erro HTTP. **[Implementado, #41]** O OpenAPI declara o envelope como `ErrorResponse` em cada operação Finance (404/413 conforme a tabela; 422 em todas), sem o `HTTPValidationError` padrão do FastAPI. Falhas técnicas e persistência de tentativas estão na [modelagem, seção 4.5](modelagem-db.md#45-transação-e-falhas-da-importação).
 
+## Explicação IA
+
+`POST /api/v1/ai/explain` (`ai_explain`) recebe `ExplainRequest` (pergunta e conta)
+e retorna `ExplainResponse` com evidências originais validadas. Usuário, contexto
+e corte são definidos pelo servidor. Não calcula resumo/projeção nem implementa
+replay ou persistência de conversas. Contrato completo, códigos de erro e roteiro
+de verificação em [HTTP IA](ai-http.md).
+
+| HTTP | Código | Situação |
+| --- | --- | --- |
+| 404 | `ACCOUNT_NOT_FOUND` | Conta inexistente ou alheia |
+| 422 | `VALIDATION_ERROR` | Corpo inválido ou campo extra |
+| 500 | `AI_CONFIGURATION_ERROR` | Configuração recusada pelo provedor |
+| 500 | `AI_CONTEXT_INVALID` | Contexto ou prompt inválido no servidor |
+| 502 | `AI_INVALID_RESPONSE` | Saída incompatível ou rejeitada pelo domínio |
+| 503 | `AI_UNAVAILABLE` | Provedor sem chave, cota/crédito ou indisponível |
+
+Todas essas respostas desta operação usam `ErrorResponse` no OpenAPI. Sem
+evidências elegíveis, o serviço responde `200` com insuficiência, incerteza alta e
+limitações, sem chamar o provedor nem tratar ausência como saldo zero.
+
 ## Caminho dos dados
 
 | Origem | Transformação registrada | Persistência | Saída HTTP prevista |

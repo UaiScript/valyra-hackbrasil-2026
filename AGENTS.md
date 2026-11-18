@@ -9,7 +9,7 @@ Inteligência financeira para planejar o orçamento e compreender o contexto dos
 - Sem data leakage: respeite published_at/as_of e as revisões conhecidas no corte; observação, publicação e ingestão são instantes distintos.
 - O LLM explica evidências; nunca gera números, probabilidades ou causalidade sem suporte verificável.
 - Somente dados sintéticos ou públicos com uso permitido; não versione .env, tokens, dados pessoais ou dumps.
-- Dinheiro Finance usa centavos inteiros no banco, API e frontend, sufixo *_cents e conversão sem float. Precisão de Alpha/IA continua pendente.
+- Dinheiro Finance usa centavos inteiros no banco, API e frontend, sufixo *_cents e conversão sem float. IA usa centavos Finance e inteiros seguros no JSON conforme ADR-0011; dinheiro Alpha/frações de centavo continuam pendentes.
 - Não edite código gerado em packages/contracts/ ou apps/web/src/lib/api/; regenere pelo exportador correspondente.
 - Sem ADR aceita para uma nova decisão arquitetural, pergunte ao humano. Solicitações explícitas já autorizadas orientam a tarefa; propostas não viram decisões aceitas automaticamente.
 - Preserve branches, alterações locais, stashes e dados; commit/push/merge/publicação exigem autorização. Nunca apague volumes para validar uma entrega.
@@ -23,16 +23,16 @@ Na raiz, com GNU Make, uv e Docker Compose; instalação e Windows em [CONTRIBUT
 
 | Área | Comandos disponíveis |
 | --- | --- |
-| Backend | make sync; make dev; make test; make test-domain; make lint; make migrate; make seed; make openapi |
+| Backend | make sync; make dev; make test; make test-domain; make test-ai; make lint; make migrate; make seed; make openapi |
 | Landing | npm --prefix apps/landing ci --ignore-scripts; npm --prefix apps/landing run dev; npm --prefix apps/landing run check; npm --prefix apps/landing run build; npm --prefix apps/landing test |
 | Aplicação web futura | npm run dev/check/format:check são comandos da base histórica, indisponíveis neste checkout |
 | Documentação | python infra/check_docs.py |
 
-Make aceita UV=/caminho/uv e ENV_FILE=/caminho/configuração. Usa .env existente ou .env.example, sem sobrescrever configuração. Suíte de banco exige TEST_DATABASE_URL no processo e banco dedicado. make test-domain não conecta ao banco.
+Make aceita UV=/caminho/uv e ENV_FILE=/caminho/configuração. Usa .env existente ou .env.example, sem sobrescrever configuração. Suíte de banco exige TEST_DATABASE_URL no processo e banco dedicado. make test-domain e make test-ai não conectam ao banco; test-ai usa HTTP simulado, sem provedor real.
 
 ## Mapa de pastas
 
-- services/api/: [contexto de backend](services/api/AGENTS.md), core HTTP, Finance (ORM, domínio CSV, importação e consultas HTTP), Alembic e testes.
+- services/api/: [contexto de backend](services/api/AGENTS.md), core HTTP, Finance (ORM, domínio CSV, importação e consultas HTTP), Alembic, IA (cliente, contratos, domínio, serviço e HTTP) e testes.
 - apps/landing/: [página estática isolada](apps/landing/README.md), apontando inicialmente ao repositório oficial.
 - packages/ui/: estilos CSS compartilhados e [guia de uso](packages/ui/README.md).
 - packages/contracts/: OpenAPI gerado; infra/postgres/init/: criação idempotente do banco de testes.
@@ -43,10 +43,12 @@ Make aceita UV=/caminho/uv e ENV_FILE=/caminho/configuração. Usa .env existent
 ## Onde buscar contexto
 
 - Quando a tarefa envolver arquitetura/estado real → leia [docs/architecture.md](docs/architecture.md).
-- Quando envolver decisões → leia [ADR-0001](docs/adr/0001-monolito-modular.md), [ADR-0008](docs/adr/0008-review-por-agente.md), [ADR-0009](docs/adr/0009-dinheiro-em-centavos.md), [ADR-0010](docs/adr/0010-calculos-finance.md) e [template](docs/adr/0000-template.md).
+- Quando envolver decisões → leia [ADR-0001](docs/adr/0001-monolito-modular.md), [ADR-0002](docs/adr/0002-provedor-llm.md), [ADR-0008](docs/adr/0008-review-por-agente.md), [ADR-0009](docs/adr/0009-dinheiro-em-centavos.md), [ADR-0010](docs/adr/0010-calculos-finance.md), [ADR-0011](docs/adr/0011-contrato-evidencias-ia.md) e [template](docs/adr/0000-template.md).
 - Quando envolver termos → leia [docs/glossary.md](docs/glossary.md).
 - Quando envolver schema, CSV ou HTTP → leia [docs/modelagem-db.md](docs/modelagem-db.md), [docs/api-design.md](docs/api-design.md), [docs/revisao-modelagem.md](docs/revisao-modelagem.md).
 - Quando envolver fundação e propostas → leia [docs/spec-tecnica.md](docs/spec-tecnica.md).
+- Quando envolver cliente LLM/configuração → leia [docs/ai-client.md](docs/ai-client.md); fallback GPT-4o-mini ativo com OPENAI_API_KEY, controle de gasto pelo painel da OpenAI; contexto tipado do servidor, LLM cita apenas IDs de evidências; [validação e limites](docs/ai-validation.md).
+- Quando envolver orquestração IA/integração Finance → leia [docs/ai-service.md](docs/ai-service.md) e [contrato HTTP](docs/ai-http.md); autorização antes do contexto/LLM, dados ausentes como limitação; POST /api/v1/ai/explain.
 - Quando envolver CI/revisão/proteções → leia [docs/github-setup.md](docs/github-setup.md).
 - Para localizar referências → leia [docs/README.md](docs/README.md). Use caminhos comuns, sem imports @.
 

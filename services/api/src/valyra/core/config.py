@@ -4,6 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from uuid import UUID
 
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
@@ -18,6 +19,29 @@ class Settings(BaseSettings):
     database_url: str
     cors_origin: str = "http://127.0.0.1:5173"
     demo_user_id: UUID = UUID("00000000-0000-0000-0000-000000000001")
+
+    # Chaves ficam mascaradas no repr para não vazarem em diagnóstico de configuração.
+    gemini_api_key: SecretStr = SecretStr("")
+    openai_api_key: SecretStr = SecretStr("")
+    llm_timeout_seconds: int = Field(default=30, ge=1, le=120)
+    llm_max_attempts: int = Field(default=2, ge=1, le=3)
+    llm_max_output_tokens: int = Field(default=2048, ge=128, le=8192)
+
+    @field_validator("gemini_api_key", "openai_api_key", mode="before")
+    @classmethod
+    def _trim_key(cls, value: str | SecretStr) -> str:
+        raw = value.get_secret_value() if isinstance(value, SecretStr) else value
+        return raw.strip()
+
+    @property
+    def gemini_enabled(self) -> bool:
+        key = self.gemini_api_key.get_secret_value()
+        return bool(key) and key != "sua-chave-aqui"
+
+    @property
+    def openai_fallback_enabled(self) -> bool:
+        # A presença da chave habilita o fallback; o limite financeiro é externo à aplicação.
+        return bool(self.openai_api_key.get_secret_value())
 
 
 @lru_cache

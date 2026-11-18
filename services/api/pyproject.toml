@@ -11,10 +11,14 @@ dependencies = [
     "pydantic-settings>=2.7,<3",
     "sqlalchemy>=2.0.36,<2.1",
     "python-multipart>=0.0.20,<1",
+    "httpx>=0.28,<1",
+    # LLM — ADR-0002: Gemini primário; GPT-4o-mini como fallback com OPENAI_API_KEY.
+    "google-genai>=1.75,<2",
+    "openai>=1.109,<2",
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.3,<10", "httpx>=0.28,<1", "ruff>=0.9,<1", "import-linter>=2.1,<3"]
+dev = ["pytest>=8.3,<10", "ruff>=0.9,<1", "import-linter>=2.1,<3"]
 
 [build-system]
 requires = ["hatchling>=1.27,<2"]
@@ -61,4 +65,20 @@ layers = [
     "valyra.finance.router",
     "valyra.finance.service",
     "valyra.finance.domain | valyra.finance.repository",
+]
+
+[[tool.importlinter.contracts]]
+name = "Domínio IA sem I/O ou configurações"
+type = "forbidden"
+source_modules = ["valyra.ai.domain"]
+forbidden_modules = ["sqlalchemy", "fastapi", "httpx", "requests", "openai", "google", "valyra.core", "valyra.ai.llm_client"]
+
+[[tool.importlinter.contracts]]
+name = "Camadas IA"
+type = "layers"
+layers = [
+    "valyra.ai.router",
+    "valyra.ai.service",
+    "valyra.ai.llm_client | valyra.ai.domain",
+    "valyra.ai.schemas",
 ]
