@@ -1,5 +1,7 @@
 # Contrato de dados — Finance
 
+> **Issue #42 (16/11/2026):** correção de categoria por `PATCH /api/v1/finance/transactions/{id}` implementada; o contrato soma 8 operações Finance e `system_health`.
+
 > **Issue #15 (10/11/2026):** consultas de contas (com PATCH), transações e categorias implementadas; o contrato soma 7 operações Finance e `system_health`. Decisões de consulta que a especificação deixava abertas estão marcadas como provisórias em [api-design](api-design.md#operações-http--issues-14-e-15).
 
 > **Issue #14 (10/11/2026):** importação de CSV e consulta de lotes implementadas em `services/api/src/valyra/finance/` (router, service, repository, schemas), com OpenAPI regenerado. Consultas da #15 continuam planejadas. Estado atual em [arquitetura](architecture.md).
@@ -118,6 +120,7 @@ IDs de caminho e filtros de identificação usam UUID. Upload usa `multipart/for
 | `GET /api/v1/finance/accounts` | `finance_list_accounts` | `Page[AccountOut]`, contas do usuário demo |
 | `PATCH /api/v1/finance/accounts/{id}` | `finance_update_account` | `AccountUpdate`; **200**, teste confirma `balance_cents` na resposta; schema completo da resposta não explicitado |
 | `GET /api/v1/finance/transactions` | `finance_list_transactions` | `Page[TransactionOut]`; data decrescente; filtros abaixo |
+| `PATCH /api/v1/finance/transactions/{id}` | `finance_update_transaction` | `TransactionUpdate`; **200**, `TransactionOut` com a categoria corrigida, `category_source = user` e `predicted_category_id`/`category_confidence` inalterados (#42) |
 | `GET /api/v1/finance/categories` | `finance_list_categories` | `Page[CategoryOut]`; ordem por `kind` e `name` |
 
 Todas as listagens usam `Page[T]`/`PageParams` da Issue #9: `items`, `total`, `limit` (default 50, de 1 a 200), `offset` (default 0, não negativo). Filtros registrados para transações: `account_id`, `date_from`, `date_to`, `category_id`. Sem `account_id`, consultar todas as contas do usuário demo. Datas de filtro seguem `YYYY-MM-DD`; inclusão dos limites, tratamento de intervalo invertido e desempate de ordenação não foram explicitados. Não há filtro de lote adicional registrado na Issue #14.
@@ -130,6 +133,7 @@ Todas as listagens usam `Page[T]`/`PageParams` da Issue #9: `items`, `total`, `l
 | `AccountUpdate` | `name: str`, `balance_cents: StrictInt`, `balance_as_of: date`, todos **omitíveis**. `10.5` e `"1000"` para saldo geram 422, sem coerção. Omissão não define aceitação de `null`; isso permanece pendente |
 | `CategoryOut` | `id: UUID`, `slug: str`, `name: str`, `kind: expense \| income` |
 | `TransactionOut` | `id: UUID`, `date: date`, `description: str`, `amount_cents: int`, `category: {id: UUID, slug: str, name: str}`, `category_source: rule \| model \| user`, `category_confidence` (nulo na importação), `predicted_category_id: UUID` |
+| `TransactionUpdate` | `category_id: UUID` obrigatório; `null`, ausência ou campo extra geram 422 `VALIDATION_ERROR` (#42) |
 | `ImportRejectionOut` | `line_number: int`, `reason: str`, `raw_line: str`; sem ID interno no exemplo testado |
 | `ImportBatchOut` | Confirmados: `id: UUID`, `status: processing \| completed \| failed`, `rows_total: int`, `rows_imported: int`, `rows_duplicated: int`, `rows_rejected: int`, `rejections: list[ImportRejectionOut]`; `alerts_created` excluído |
 | `ImportBatchSummaryOut` | Resumo sem `rejections`; implementado na #14 com `id`, `status` e os quatro contadores, sujeito à lacuna abaixo |
@@ -173,6 +177,9 @@ Envelope da Issue #9: `{"error":{"code":"...","message":"...","details":{}}}`. M
 | 422 | `CSV_TOO_MANY_ROWS` | Mais de 5000 registros de dados (#13/#14) |
 | 404 | `ACCOUNT_NOT_FOUND` | Conta inexistente ou fora do usuário demo via `get_account_for_user` (#14); PATCH ausente tem 404 testado na #15 |
 | 404 | `IMPORT_BATCH_NOT_FOUND` | Consulta de lote ausente (#14) |
+| 404 | `TRANSACTION_NOT_FOUND` | Correção de transação inexistente ou de conta de outro usuário (#42) |
+| 404 | `CATEGORY_NOT_FOUND` | Correção para categoria inexistente (#42) |
+| 422 | `CATEGORY_KIND_MISMATCH` | Categoria `expense` em entrada ou `income` em saída (#42) |
 | 422 | `VALIDATION_ERROR` | Validação HTTP/Pydantic: paginação inválida e `balance_cents` não inteiro (#9/#15); `details.errors` contém os erros |
 
 Rejeições de linha são dados de uma importação concluída, sem promover cada rejeição a erro HTTP. **[Implementado, #41]** O OpenAPI declara o envelope como `ErrorResponse` em cada operação Finance (404/413 conforme a tabela; 422 em todas), sem o `HTTPValidationError` padrão do FastAPI. Falhas técnicas e persistência de tentativas estão na [modelagem, seção 4.5](modelagem-db.md#45-transação-e-falhas-da-importação).
@@ -190,6 +197,7 @@ Rejeições de linha são dados de uma importação concluída, sem promover cad
 | Registro CSV inválido | Motivo, linha física e texto original (#13/#14) | `import_rejections`, ligado ao lote | `ImportRejectionOut` em `ImportBatchOut.rejections`; ausente no resumo |
 | `ParseResult.total`, válidas e inseridas | Contar rejeições, inseridas e duplicadas (#14) | Quatro contadores do lote | Contadores confirmados em `ImportBatchOut` |
 | Criação/conclusão do lote | Preencher estado e término (#14) | `status`, `created_at`, `completed_at` | `status` confirmado; timestamps HTTP aguardam contrato completo |
+| `TransactionUpdate` | Service valida propriedade, existência e tipo × sinal (#42) | Altera só `category_id` e `category_source = 'user'`; `updated_at` pelo ORM | `category` corrigida; `predicted_category_id` e `category_confidence` preservados |
 | Seed ou `AccountUpdate` | Seed idempotente (#10); PATCH valida inteiro estrito (#15) | `accounts.balance_cents`, `balance_as_of` | Referência em `AccountOut`; não representa saldo realizado calculado |
 | Metadados de recorrência/anomalia | Inicialização da importação (#14); cálculos posteriores fora destas tarefas | `is_recurring = false`, `anomaly_score = NULL`; `recurrence_key` permanece opcional no desenho | Campos não expostos em `TransactionOut` |
 

@@ -1,4 +1,4 @@
-"""Casos de uso do Finance: importação de CSV (#14) e consultas (#15)."""
+"""Casos de uso do Finance: importação de CSV (#14), consultas (#15) e correção (#42)."""
 
 from datetime import date
 from typing import Any
@@ -9,7 +9,13 @@ from sqlalchemy.orm import Session
 
 from valyra.core.errors import AppError
 from valyra.finance import repository
-from valyra.finance.domain import CsvFormatError, categorize, compute_row_hashes, parse_csv
+from valyra.finance.domain import (
+    CsvFormatError,
+    categorize,
+    category_kind_matches,
+    compute_row_hashes,
+    parse_csv,
+)
 from valyra.finance.models import Account, Category, ImportBatch, ImportRejection, Transaction
 
 _CSV_ERROR_MESSAGES = {
@@ -121,6 +127,35 @@ def update_account(
             setattr(account, field, value)
         session.commit()
         return account
+    except BaseException:
+        session.rollback()
+        raise
+
+
+def update_transaction_category(
+    session: Session, user_id: UUID, transaction_id: UUID, category_id: UUID
+) -> tuple[Transaction, Category]:
+    """Correção pelo usuário: muda a categoria exibida e mantém a sugestão original."""
+    try:
+        transaction = repository.get_transaction(session, user_id, transaction_id)
+        if transaction is None:
+            # Transação de outro usuário responde igual a inexistente, sem revelar que existe.
+            raise AppError("TRANSACTION_NOT_FOUND", "Transação não encontrada", 404)
+        category = repository.get_category(session, category_id)
+        if category is None:
+            raise AppError("CATEGORY_NOT_FOUND", "Categoria não encontrada", 404)
+        if not category_kind_matches(category.kind, transaction.amount_cents):
+            raise AppError(
+                "CATEGORY_KIND_MISMATCH",
+                "O tipo da categoria não corresponde ao sinal da transação",
+                422,
+            )
+        # predicted_category_id e category_confidence registram a sugestão original e
+        # não mudam: comparar sugestão e correção é o que permite avaliar a categorização.
+        transaction.category_id = category.id
+        transaction.category_source = "user"
+        session.commit()
+        return transaction, category
     except BaseException:
         session.rollback()
         raise

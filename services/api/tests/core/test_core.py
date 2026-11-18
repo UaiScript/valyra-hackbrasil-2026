@@ -72,6 +72,7 @@ def test_operation_ids_e_contrato_minimo(app):
         "finance_list_accounts",
         "finance_update_account",
         "finance_list_transactions",
+        "finance_update_transaction",
         "finance_list_categories",
     }
 

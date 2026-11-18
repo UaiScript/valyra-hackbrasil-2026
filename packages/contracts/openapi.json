@@ -491,6 +491,22 @@
         ],
         "title": "TransactionOut",
         "type": "object"
+      },
+      "TransactionUpdate": {
+        "additionalProperties": false,
+        "description": "Corre\u00e7\u00e3o de categoria; category_id \u00e9 obrigat\u00f3rio e null \u00e9 recusado.",
+        "properties": {
+          "category_id": {
+            "format": "uuid",
+            "title": "Category Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category_id"
+        ],
+        "title": "TransactionUpdate",
+        "type": "object"
       }
     }
   },
@@ -986,6 +1002,69 @@
           }
         },
         "summary": "Finance List Transactions",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/transactions/{id}": {
+      "patch": {
+        "operationId": "finance_update_transaction",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso n\u00e3o encontrado"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Finance Update Transaction",
         "tags": [
           "finance"
         ]

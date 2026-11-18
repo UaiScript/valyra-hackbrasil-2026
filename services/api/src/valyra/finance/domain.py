@@ -243,3 +243,13 @@ def categorize(description: str, amount_cents: int) -> str:
         if any(re.search(rf"\b{re.escape(keyword)}\b", normalized) for keyword in keywords):
             return slug
     return "outros" if amount_cents < 0 else "outras-receitas"
+
+
+def category_kind_matches(kind: str, amount_cents: int) -> bool:
+    """Despesa só cabe em saída (negativa) e receita só em entrada (positiva)."""
+    # Mesma convenção de sinal da importação: corrigir não pode criar receita negativa.
+    if kind == "expense":
+        return amount_cents < 0
+    if kind == "income":
+        return amount_cents > 0
+    return False
