@@ -11,6 +11,8 @@ dependencies = [
     "pydantic-settings>=2.7,<3",
     "sqlalchemy>=2.0.36,<2.1",
     "python-multipart>=0.0.20,<1",
+    # zoneinfo no Windows não tem a base IANA do sistema; core/clock usa America/Sao_Paulo.
+    "tzdata>=2024.1; sys_platform == 'win32'",
 ]
 
 [dependency-groups]
@@ -55,10 +57,18 @@ source_modules = ["valyra.finance.domain"]
 forbidden_modules = ["sqlalchemy", "fastapi", "httpx", "requests", "openai", "google"]
 
 [[tool.importlinter.contracts]]
+name = "Analytics Finance sem banco, HTTP, IA ou configuração"
+type = "forbidden"
+source_modules = ["valyra.finance.analytics"]
+forbidden_modules = [
+    "sqlalchemy", "fastapi", "httpx", "requests", "openai", "google", "valyra.core",
+]
+
+[[tool.importlinter.contracts]]
 name = "Camadas do Finance"
 type = "layers"
 layers = [
     "valyra.finance.router",
     "valyra.finance.service",
-    "valyra.finance.domain | valyra.finance.repository",
+    "valyra.finance.domain | valyra.finance.analytics | valyra.finance.repository",
 ]

@@ -130,3 +130,26 @@ class TransactionOut(BaseModel):
     category_source: Literal["rule", "model", "user"]
     category_confidence: Decimal | None
     predicted_category_id: UUID
+
+
+class CategoryTotalOut(BaseModel):
+    category: CategoryOut
+    # Com sinal, como amount_cents: categoria de saída soma valores negativos.
+    total_cents: int
+    count: int
+
+
+class SummaryOut(BaseModel):
+    """Resumo da Issue #43: saldo realizado de hoje e movimentações realizadas do mês."""
+
+    # null quando o resumo soma todas as contas do usuário.
+    account_id: UUID | None
+    month: str
+    today: date
+    # null quando alguma referência de saldo é posterior a hoje (ADR-0010, seção 1).
+    realized_balance_cents: int | None
+    income_cents: int
+    # Soma das saídas, com sinal negativo; net_cents = income_cents + expenses_cents.
+    expenses_cents: int
+    net_cents: int
+    categories: list[CategoryTotalOut]

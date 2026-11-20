@@ -11,7 +11,7 @@ dev:
 test:
 	$(RUN) pytest
 test-domain:
-	$(RUN) pytest tests/finance/test_domain.py
+	$(RUN) pytest tests/finance/test_domain.py tests/finance/test_analytics.py tests/core/test_clock.py
 lint:
 	$(RUN) ruff check .
 	$(RUN) ruff format --check .

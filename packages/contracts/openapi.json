@@ -100,6 +100,28 @@
         "title": "CategoryOut",
         "type": "object"
       },
+      "CategoryTotalOut": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/CategoryOut"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "total_cents": {
+            "title": "Total Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "category",
+          "total_cents",
+          "count"
+        ],
+        "title": "CategoryTotalOut",
+        "type": "object"
+      },
       "ErrorBody": {
         "properties": {
           "code": {
@@ -404,6 +426,74 @@
           "offset"
         ],
         "title": "Page[TransactionOut]",
+        "type": "object"
+      },
+      "SummaryOut": {
+        "description": "Resumo da Issue #43: saldo realizado de hoje e movimenta\u00e7\u00f5es realizadas do m\u00eas.",
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryTotalOut"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "expenses_cents": {
+            "title": "Expenses Cents",
+            "type": "integer"
+          },
+          "income_cents": {
+            "title": "Income Cents",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "net_cents": {
+            "title": "Net Cents",
+            "type": "integer"
+          },
+          "realized_balance_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realized Balance Cents"
+          },
+          "today": {
+            "format": "date",
+            "title": "Today",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "month",
+          "today",
+          "realized_balance_cents",
+          "income_cents",
+          "expenses_cents",
+          "net_cents",
+          "categories"
+        ],
+        "title": "SummaryOut",
         "type": "object"
       },
       "TransactionCategoryOut": {
@@ -868,6 +958,85 @@
           }
         },
         "summary": "Finance Get Import Batch",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/summary": {
+      "get": {
+        "operationId": "finance_get_summary",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "AAAA-MM; padr\u00e3o: m\u00eas de hoje",
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^([1-9][0-9]{3})-(0[1-9]|1[0-2])$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "AAAA-MM; padr\u00e3o: m\u00eas de hoje",
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso n\u00e3o encontrado"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Finance Get Summary",
         "tags": [
           "finance"
         ]
