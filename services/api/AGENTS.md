@@ -1,6 +1,6 @@
 # Contexto de backend
 
-Leia o [contexto raiz](../../AGENTS.md). Esta pasta contém core HTTP (/health), seis modelos, Alembic, seed, domínio CSV, importação, consultas e correção de categoria Finance via HTTP (#14/#15/#42) e testes. Resumo, projeções, Alpha, alertas e IA continuam planejados.
+Leia o [contexto raiz](../../AGENTS.md). Esta pasta contém core HTTP (/health), seis modelos, Alembic, seed, domínio CSV, importação, consultas, correção de categoria e resumo mensal Finance via HTTP (#14/#15/#42/#43) e testes. Projeções, Alpha, alertas e IA continuam planejados.
 
 ## Estrutura e dependências
 
@@ -9,7 +9,7 @@ O backend é um único FastAPI, com `core` compartilhado e módulos por domínio
 Cada módulo separa `router.py` (HTTP), `schemas.py` (entrada/saída Pydantic), `service.py` (casos de uso), `domain.py` (regras puras), `repository.py` (I/O) e `models.py` (ORM), criando apenas o que o incremento utilizar.
 
 - Dependência: `router → service → domain | repository`. Não importar no sentido inverso.
-- `domain.py` não importa banco, HTTP, LLM ou configurações de infraestrutura.
+- `domain.py` não importa banco, HTTP, LLM ou configurações de infraestrutura. `finance/analytics.py` segue a mesma regra e também não lê o relógio: "hoje" vem de `core/clock.get_today()` no service e chega como parâmetro.
 - Entre domínios, use o `service` público, nunca `repository` ou `models` do outro módulo para executar casos de uso.
 - `core` não importa domínios. FKs entre módulos são permitidas no banco; não autorizam acesso cruzado indiscriminado no código.
 - API lê sinais; pipelines serão os escritores. Papéis/triggers da modelagem são desenho, não garantia já implementada.
@@ -47,7 +47,7 @@ Fontes: [contrato Finance](../../docs/api-design.md), [modelagem](../../docs/mod
 4. Adicionar teste de comportamento, incluindo erro relevante.
 5. Executar `make openapi`, revisar o contrato gerado e avisar os consumidores.
 
-Comandos disponíveis na raiz: `make dev`, `make lint`, `make migrate`, `make seed`, `make test`, `make openapi`. A configuração oficial é services/api/pyproject.toml com uv.lock. make test-domain roda os 173 casos puros sem conexão PostgreSQL; pytest completo usa banco exclusivo para persistência, health e Finance HTTP (fixtures `client` e `db_session` em `tests/conftest.py`; `seed` e `importar` em `tests/finance/conftest.py`). A dependência de fixtures de banco é explícita, não autouse.
+Comandos disponíveis na raiz: `make dev`, `make lint`, `make migrate`, `make seed`, `make test`, `make openapi`. A configuração oficial é services/api/pyproject.toml com uv.lock. make test-domain roda os 199 casos puros (domínio CSV, analytics e clock) sem conexão PostgreSQL; pytest completo usa banco exclusivo para persistência, health e Finance HTTP (fixtures `client` e `db_session` em `tests/conftest.py`; `seed` e `importar` em `tests/finance/conftest.py`). A dependência de fixtures de banco é explícita, não autouse.
 
 No CSV, line_number é a primeira linha física; raw_line preserva quebras internas. Registros malformados e estouro de csv.field_size_limit são wrong_column_count; o limite do processo (normalmente 131072 caracteres) não é alterado. O enquadramento lógico impede importar fragmentos após erro. O router de importação lê no máximo `MAX_FILE_BYTES + 1` bytes e responde 413 acima de 1 MiB; o servidor ainda recebe o corpo inteiro antes, então um limite de requisição precisa vir do servidor/proxy.
 

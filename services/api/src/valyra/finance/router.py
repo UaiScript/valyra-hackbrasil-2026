@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from valyra.core.db import get_session
@@ -11,16 +11,19 @@ from valyra.core.deps import get_current_user_id
 from valyra.core.errors import AppError, error_responses
 from valyra.core.pagination import Page, PageParams
 from valyra.finance import service
+from valyra.finance.analytics import MONTH_PATTERN
 from valyra.finance.domain import MAX_FILE_BYTES
 from valyra.finance.models import Category, Transaction
 from valyra.finance.schemas import (
     AccountOut,
     AccountUpdate,
     CategoryOut,
+    CategoryTotalOut,
     ImportBatchOut,
     ImportBatchSummaryOut,
     ImportRejectionOut,
     IsoDate,
+    SummaryOut,
     TransactionCategoryOut,
     TransactionOut,
     TransactionUpdate,
@@ -181,4 +184,40 @@ def list_categories(
         total=total,
         limit=page.limit,
         offset=page.offset,
+    )
+
+
+# 404 quando account_id aponta conta inexistente ou de outro usuário.
+@router.get(
+    "/summary",
+    name="finance_get_summary",
+    response_model=SummaryOut,
+    responses=error_responses(404),
+)
+def get_summary(
+    session: SessionDep,
+    user_id: UserIdDep,
+    account_id: UUID | None = None,
+    month: Annotated[
+        str | None, Query(pattern=f"^{MONTH_PATTERN}$", description="AAAA-MM; padrão: mês de hoje")
+    ] = None,
+) -> SummaryOut:
+    summary = service.get_summary(session, user_id, account_id, month)
+    totals = summary.month_summary
+    return SummaryOut(
+        account_id=summary.account_id,
+        month=summary.month,
+        today=summary.today,
+        realized_balance_cents=summary.realized_balance_cents,
+        income_cents=totals.income_cents,
+        expenses_cents=totals.expenses_cents,
+        net_cents=totals.net_cents,
+        categories=[
+            CategoryTotalOut(
+                category=CategoryOut.model_validate(summary.categories[total.category_id]),
+                total_cents=total.total_cents,
+                count=total.count,
+            )
+            for total in totals.categories
+        ],
     )

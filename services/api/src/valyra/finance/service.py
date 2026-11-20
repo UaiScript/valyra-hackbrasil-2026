@@ -1,14 +1,22 @@
-"""Casos de uso do Finance: importação de CSV (#14), consultas (#15) e correção (#42)."""
+"""Casos de uso do Finance: importação (#14), consultas (#15), correção (#42) e resumo (#43)."""
 
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, timedelta
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from valyra.core import clock
 from valyra.core.errors import AppError
 from valyra.finance import repository
+from valyra.finance.analytics import (
+    MonthSummary,
+    month_bounds,
+    realized_balance_cents,
+    summarize_month,
+)
 from valyra.finance.domain import (
     CsvFormatError,
     categorize,
@@ -189,3 +197,56 @@ def list_transactions(
 
 def list_categories(session: Session, limit: int, offset: int) -> tuple[list[Category], int]:
     return repository.list_categories(session, limit, offset)
+
+
+@dataclass(frozen=True)
+class Summary:
+    account_id: UUID | None
+    month: str
+    today: date
+    realized_balance_cents: int | None
+    month_summary: MonthSummary
+    categories: dict[UUID, Category]
+
+
+def get_summary(
+    session: Session, user_id: UUID, account_id: UUID | None, month: str | None
+) -> Summary:
+    """Saldo realizado de hoje e totais do mês; sem conta, considera todas as do usuário."""
+    if account_id is not None:
+        accounts = [get_account_for_user(session, user_id, account_id)]
+    else:
+        accounts = repository.list_user_accounts(session, user_id)
+    today = clock.get_today()
+    first, last = month_bounds(month, today)
+
+    # Uma leitura cobre as duas janelas: (referência, hoje] do realizado e o mês até hoje.
+    after = min([first - timedelta(days=1), *(a.balance_as_of for a in accounts)])
+    movements = repository.list_movements(session, [a.id for a in accounts], after, today)
+
+    balances = [
+        realized_balance_cents(
+            account.balance_cents,
+            account.balance_as_of,
+            ((d, amount) for acc_id, d, amount, _ in movements if acc_id == account.id),
+            today,
+        )
+        for account in accounts
+    ]
+    # Uma conta com referência futura torna a soma desconhecida, não menor.
+    realized = None if None in balances else sum(balances)
+
+    month_summary = summarize_month(
+        ((d, amount, category_id) for _, d, amount, category_id in movements), first, last, today
+    )
+    categories = repository.get_categories(
+        session, [total.category_id for total in month_summary.categories]
+    )
+    return Summary(
+        account_id=account_id,
+        month=f"{first.year:04d}-{first.month:02d}",
+        today=today,
+        realized_balance_cents=realized,
+        month_summary=month_summary,
+        categories=categories,
+    )
