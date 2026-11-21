@@ -15,6 +15,7 @@ EXPECTED_4XX = {
     "finance_update_transaction": {"404", "422"},
     "finance_list_categories": {"422"},
     "finance_get_summary": {"404", "422"},
+    "finance_get_projection": {"404", "422"},
 }
 
 

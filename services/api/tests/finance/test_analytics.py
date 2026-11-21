@@ -1,6 +1,6 @@
-"""Saldo, resumo (#43), recorrência (#44) e atípicos (#45), ADR-0010, sem PostgreSQL."""
+"""Saldo, resumo (#43), recorrência (#44), atípicos (#45) e projeção (#46), sem PostgreSQL."""
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -9,13 +9,19 @@ import pytest
 from valyra.finance.analytics import (
     ANOMALY_THRESHOLD,
     CategoryTotal,
+    ProjectedRecurrence,
+    RecurringSeries,
     anomaly_scores,
     detect_recurrences,
     is_anomaly,
     month_bounds,
+    next_occurrence,
+    project_cash,
     realized_balance_cents,
     recurrence_key,
+    recurring_series,
     summarize_month,
+    variable_daily_cents,
 )
 
 MERCADO = UUID("00000000-0000-0000-0000-00000000000a")
@@ -334,3 +340,106 @@ def test_limiar_de_anomalia():
     assert is_anomaly(Decimal("0.8000")) is True
     assert is_anomaly(Decimal("0.7999")) is False
     assert is_anomaly(None) is False
+
+
+# --- projeção de caixa (Issue #46, ADR-0010 seção 5) --------------------------------------
+
+
+def _serie_recorrente(ultima, intervalo=30, valor=-5590, descricao="Netflix.com"):
+    return RecurringSeries("-|netflix.com", descricao, valor, intervalo, ultima)
+
+
+def test_series_a_partir_das_linhas_marcadas():
+    linhas = [
+        (date(2026, 8, 5), -180000, "Aluguel apartamento", "-|aluguel apartamento"),
+        (date(2026, 9, 5), -180000, "Aluguel apartamento", "-|aluguel apartamento"),
+        (date(2026, 10, 5), -180000, "ALUGUEL apartamento", "-|aluguel apartamento"),
+        (date(2026, 10, 6), -999, "Padaria", None),
+    ]
+    # Intervalos 31 e 30: mediana 30,5 → 30. A descrição vem da última ocorrência.
+    assert recurring_series(linhas) == [
+        RecurringSeries(
+            "-|aluguel apartamento", "ALUGUEL apartamento", -180000, 30, date(2026, 10, 5)
+        )
+    ]
+
+
+def test_mediana_par_da_serie_arredonda_para_baixo_com_sinal():
+    datas = [date(2026, 7, 1), date(2026, 7, 31), date(2026, 8, 31), date(2026, 9, 30)]
+    valores = [-1000, -1001, -1001, -1000]  # mediana −1000,5 → −1001 (saída maior)
+    linhas = [(d, v, "X", "-|x") for d, v in zip(datas, valores, strict=True)]
+    (serie,) = recurring_series(linhas)
+    # Intervalos 30, 31, 30 → mediana 30; valor −1001.
+    assert (serie.interval_days, serie.amount_cents) == (30, -1001)
+
+
+def test_proxima_ocorrencia_futura():
+    assert next_occurrence(_serie_recorrente(date(2026, 10, 10)), HOJE) == date(2026, 11, 9)
+
+
+def test_recorrencia_atrasada_pula_para_a_proxima_data_futura():
+    # Última em 01/09: 01/10 e 31/10 já passaram sem acontecer; a próxima é 30/11.
+    assert next_occurrence(_serie_recorrente(date(2026, 9, 1)), HOJE) == date(2026, 11, 30)
+
+
+def test_ocorrencia_prevista_para_hoje_tambem_pula():
+    assert next_occurrence(_serie_recorrente(date(2026, 10, 8)), HOJE) == date(2026, 12, 7)
+
+
+def test_variavel_diaria_ignora_recorrentes_entradas_e_fora_da_janela():
+    inicio = HOJE - timedelta(days=89)
+    movimentos = [
+        (inicio, -4500, False),
+        (HOJE, -4500, False),
+        (inicio - timedelta(days=1), -100000, False),  # antes da janela
+        (HOJE + timedelta(days=1), -100000, False),  # futuro
+        (HOJE, -180000, True),  # recorrente
+        (HOJE, 650000, False),  # entrada
+    ]
+    assert variable_daily_cents(movimentos, HOJE) == -100
+
+
+def test_variavel_diaria_arredonda_a_magnitude_para_cima():
+    assert variable_daily_cents([(HOJE, -9001, False)], HOJE) == -101
+    assert variable_daily_cents([(HOJE, -1, False)], HOJE) == -1
+    assert variable_daily_cents([], HOJE) == 0
+
+
+def test_projecao_soma_recorrencias_e_variavel():
+    serie = _serie_recorrente(date(2026, 10, 10))  # prevista em 09/11
+    projecao = project_cash(10000, HOJE, 3, [serie], -100)
+    assert [d.date for d in projecao.items] == [
+        date(2026, 11, 8),
+        date(2026, 11, 9),
+        date(2026, 11, 10),
+    ]
+    assert [d.balance_cents for d in projecao.items] == [9900, 4210, 4110]
+    assert projecao.items[1].recurrences == (ProjectedRecurrence("Netflix.com", -5590),)
+    assert projecao.items[1].recurring_cents == -5590
+    assert (projecao.min_balance_cents, projecao.min_balance_date) == (4110, date(2026, 11, 10))
+    assert (projecao.start_balance_cents, projecao.variable_daily_cents) == (10000, -100)
+
+
+def test_intervalo_curto_preve_mais_de_uma_ocorrencia_no_horizonte():
+    serie = _serie_recorrente(date(2026, 11, 1), intervalo=25)
+    projecao = project_cash(0, HOJE, 90, [serie], 0)
+    datas = [d.date for d in projecao.items if d.recurrences]
+    assert datas == [date(2026, 11, 26), date(2026, 12, 21), date(2027, 1, 15)]
+
+
+def test_minimo_em_empate_fica_com_o_primeiro_dia():
+    projecao = project_cash(500, HOJE, 5, [], 0)
+    assert (projecao.min_balance_cents, projecao.min_balance_date) == (500, date(2026, 11, 8))
+
+
+def test_entrada_recorrente_eleva_o_saldo():
+    salario = RecurringSeries("+|salario", "Salario", 650000, 30, date(2026, 10, 9))
+    projecao = project_cash(-1000, HOJE, 2, [salario], -100)
+    assert [d.balance_cents for d in projecao.items] == [648900, 648800]
+    assert (projecao.min_balance_cents, projecao.min_balance_date) == (648800, date(2026, 11, 9))
+
+
+@pytest.mark.parametrize("dias", [0, 91])
+def test_horizonte_fora_da_faixa(dias):
+    with pytest.raises(ValueError):
+        project_cash(0, HOJE, dias, [], 0)
