@@ -3,7 +3,7 @@
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -104,6 +104,7 @@ def list_transactions(
     date_from: date | None,
     date_to: date | None,
     category_id: UUID | None,
+    is_recurring: bool | None,
     limit: int,
     offset: int,
 ) -> tuple[list[tuple[Transaction, Category]], int]:
@@ -122,6 +123,8 @@ def list_transactions(
         query = query.where(Transaction.date <= date_to)
     if category_id is not None:
         query = query.where(Transaction.category_id == category_id)
+    if is_recurring is not None:
+        query = query.where(Transaction.is_recurring.is_(is_recurring))
     # created_at e id desempatam transações do mesmo dia, mantendo a paginação estável.
     query = query.order_by(
         Transaction.date.desc(), Transaction.created_at.desc(), Transaction.id.desc()
@@ -176,3 +179,26 @@ def get_categories(session: Session, category_ids: list[UUID]) -> dict[UUID, Cat
         return {}
     categories = session.scalars(select(Category).where(Category.id.in_(category_ids)))
     return {category.id: category for category in categories}
+
+
+def list_recurrence_inputs(
+    session: Session, account_id: UUID
+) -> list[tuple[UUID, date, int, str, bool, str | None]]:
+    """Todas as transações da conta, de qualquer lote, com os flags atuais de recorrência."""
+    rows = session.execute(
+        select(
+            Transaction.id,
+            Transaction.date,
+            Transaction.amount_cents,
+            Transaction.description,
+            Transaction.is_recurring,
+            Transaction.recurrence_key,
+        ).where(Transaction.account_id == account_id)
+    )
+    return [(row[0], row[1], row[2], row[3], row[4], row[5]) for row in rows]
+
+
+def update_recurrence(session: Session, changes: list[dict]) -> None:
+    """UPDATE em lote por chave primária; cada item tem id, is_recurring e recurrence_key."""
+    if changes:
+        session.execute(update(Transaction), changes)

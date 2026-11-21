@@ -563,6 +563,10 @@
             "title": "Id",
             "type": "string"
           },
+          "is_recurring": {
+            "title": "Is Recurring",
+            "type": "boolean"
+          },
           "predicted_category_id": {
             "format": "uuid",
             "title": "Predicted Category Id",
@@ -577,7 +581,8 @@
           "category",
           "category_source",
           "category_confidence",
-          "predicted_category_id"
+          "predicted_category_id",
+          "is_recurring"
         ],
         "title": "TransactionOut",
         "type": "object"
@@ -1112,6 +1117,22 @@
                 }
               ],
               "title": "Category Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "is_recurring",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Recurring"
             }
           },
           {

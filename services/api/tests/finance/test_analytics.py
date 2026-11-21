@@ -1,4 +1,4 @@
-"""Saldo realizado e resumo mensal (Issue #43, ADR-0010 seção 1), sem PostgreSQL."""
+"""Saldo, resumo mensal (#43) e recorrência (#44), ADR-0010, sem PostgreSQL."""
 
 from datetime import date
 from uuid import UUID
@@ -7,8 +7,10 @@ import pytest
 
 from valyra.finance.analytics import (
     CategoryTotal,
+    detect_recurrences,
     month_bounds,
     realized_balance_cents,
+    recurrence_key,
     summarize_month,
 )
 
@@ -142,3 +144,114 @@ def test_valores_continuam_inteiros():
     assert all(
         type(v) is int for v in (resumo.income_cents, resumo.expenses_cents, resumo.net_cents)
     )
+
+
+# --- recorrência (Issue #44, ADR-0010 seção 3) --------------------------------------------
+
+
+def _ids(n: int) -> list[UUID]:
+    return [UUID(int=i + 1) for i in range(n)]
+
+
+def _serie(datas, valores, descricao="netflix.com"):
+    if isinstance(valores, int):
+        valores = [valores] * len(datas)
+    return [
+        (movement_id, d, v, descricao)
+        for movement_id, d, v in zip(_ids(len(datas)), datas, valores, strict=True)
+    ]
+
+
+MENSAL = [date(2026, 8, 10), date(2026, 9, 10), date(2026, 10, 10)]
+
+
+def test_assinatura_mensal_detectada():
+    resultado = detect_recurrences(_serie(MENSAL, -5590))
+    assert resultado == {movement_id: "-|netflix.com" for movement_id in _ids(3)}
+
+
+def test_salario_detectado_com_chave_de_entrada():
+    datas = [date(2026, 8, 5), date(2026, 9, 5), date(2026, 10, 5)]
+    resultado = detect_recurrences(_serie(datas, 650000, "salario acme tecnologia"))
+    assert set(resultado.values()) == {"+|salario acme tecnologia"}
+    assert len(resultado) == 3
+
+
+@pytest.mark.parametrize(
+    "segunda",
+    [date(2026, 9, 4), date(2026, 9, 5)],  # 25 dias depois de 10/08, e 26
+)
+def test_intervalo_minimo_inclusivo(segunda):
+    datas = [date(2026, 8, 10), segunda, segunda.replace(month=10)]
+    assert len(detect_recurrences(_serie(datas, -100))) == 3
+
+
+def test_intervalo_maximo_inclusivo():
+    datas = [date(2026, 8, 1), date(2026, 9, 5), date(2026, 10, 10)]  # 35 e 35 dias
+    assert len(detect_recurrences(_serie(datas, -100))) == 3
+
+
+@pytest.mark.parametrize(
+    "datas",
+    [
+        [date(2026, 8, 10), date(2026, 9, 3), date(2026, 10, 3)],  # 24 dias
+        [date(2026, 8, 1), date(2026, 9, 6), date(2026, 10, 6)],  # 36 dias
+        [date(2026, 8, 10), date(2026, 9, 10), date(2026, 11, 10)],  # mês pulado
+    ],
+)
+def test_intervalo_irregular_nao_detectado(datas):
+    assert detect_recurrences(_serie(datas, -100)) == {}
+
+
+def test_um_intervalo_irregular_derruba_a_serie_inteira():
+    datas = [*MENSAL, date(2026, 10, 20)]
+    assert detect_recurrences(_serie(datas, -100)) == {}
+
+
+def test_duas_ocorrencias_nao_bastam():
+    assert detect_recurrences(_serie(MENSAL[:2], -100)) == {}
+
+
+def test_tres_ocorrencias_em_dois_meses_nao_bastam():
+    # Intervalos de 25 dias cabem na regra, mas 01/01 e 26/01 caem no mesmo mês.
+    datas = [date(2026, 1, 1), date(2026, 1, 26), date(2026, 2, 20)]
+    assert detect_recurrences(_serie(datas, -100)) == {}
+
+
+def test_tolerancia_de_dez_por_cento_inclusiva():
+    # Mediana 1000: 900 e 1100 ficam exatamente no limite.
+    assert len(detect_recurrences(_serie(MENSAL, [-900, -1000, -1100]))) == 3
+
+
+def test_valor_fora_da_tolerancia_nao_detectado():
+    assert detect_recurrences(_serie(MENSAL, [-1000, -1000, -1101])) == {}
+
+
+def test_mediana_par_sem_float():
+    # Mediana (1000 + 1010) / 2 = 1005; 1105,5 seria o limite, então 1105 entra e 1106 não.
+    datas = [*MENSAL, date(2026, 11, 10)]
+    assert len(detect_recurrences(_serie(datas, [-1000, -1010, -905, -1105]))) == 4
+    assert detect_recurrences(_serie(datas, [-1000, -1010, -905, -1106])) == {}
+
+
+def test_sinais_opostos_formam_series_separadas():
+    cobrancas = _serie(MENSAL, -100)
+    estorno = [(UUID(int=99), date(2026, 9, 12), 100, "netflix.com")]
+    resultado = detect_recurrences(cobrancas + estorno)
+    assert UUID(int=99) not in resultado
+    assert len(resultado) == 3
+
+
+def test_descricoes_diferentes_nao_se_misturam_e_ordem_da_entrada_nao_importa():
+    netflix = _serie(MENSAL, -5590)
+    spotify = [
+        (UUID(int=10 + i), d, -2190, "spotify premium") for i, d in enumerate(reversed(MENSAL))
+    ]
+    resultado = detect_recurrences(list(reversed(netflix)) + spotify)
+    assert sorted(set(resultado.values())) == ["-|netflix.com", "-|spotify premium"]
+    assert len(resultado) == 6
+
+
+def test_chave_da_serie():
+    assert recurrence_key("aluguel apartamento", -180000) == "-|aluguel apartamento"
+    assert recurrence_key("pix recebido", 1) == "+|pix recebido"

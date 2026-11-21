@@ -1,4 +1,4 @@
-"""Cálculos puros do Finance: saldo realizado e resumo mensal (Issue #43, ADR-0010).
+"""Cálculos puros do Finance: saldo, resumo mensal (#43) e recorrência (#44), ADR-0010.
 
 Sem banco, HTTP ou relógio: "hoje" chega como parâmetro para os testes fixarem a data.
 Dinheiro em centavos inteiros, com sinal: entrada positiva, saída negativa.
@@ -9,6 +9,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
+from itertools import pairwise
 from uuid import UUID
 
 # Ano de 1000 a 9999: anos com zeros à esquerda não aparecem nos dados e complicariam a validação.
@@ -93,3 +94,63 @@ def summarize_month(
             for cid in ordered
         ),
     )
+
+
+# Recorrência (ADR-0010, seção 3). Mudar estes limiares exige atualizar a ADR e os testes.
+RECURRENCE_MIN_OCCURRENCES = 3
+RECURRENCE_MIN_DAYS = 25
+RECURRENCE_MAX_DAYS = 35
+# ±10%: |v − med| × 10 <= |med|, comparado em inteiros.
+RECURRENCE_TOLERANCE_DIVISOR = 10
+
+
+def recurrence_key(normalized_description: str, amount_cents: int) -> str:
+    """Chave da série dentro da conta: sinal + descrição normalizada, ex. `-|netflix.com`."""
+    # O sinal separa, por exemplo, um estorno de uma cobrança com a mesma descrição.
+    return f"{'+' if amount_cents > 0 else '-'}|{normalized_description}"
+
+
+def _within_tolerance(amounts: list[int]) -> bool:
+    ordered = sorted(amounts)
+    middle = len(ordered) // 2
+    # Mediana em dobro para quantidade par não exigir divisão: 2·med é a soma dos centrais.
+    if len(ordered) % 2:
+        twice_median = 2 * ordered[middle]
+    else:
+        twice_median = ordered[middle - 1] + ordered[middle]
+    return all(
+        abs(2 * amount - twice_median) * RECURRENCE_TOLERANCE_DIVISOR <= abs(twice_median)
+        for amount in amounts
+    )
+
+
+def _is_recurring_series(occurrences: list[tuple[date, UUID, int]]) -> bool:
+    months = {(movement_date.year, movement_date.month) for movement_date, _, _ in occurrences}
+    if len(months) < RECURRENCE_MIN_OCCURRENCES:
+        return False
+    dates = [movement_date for movement_date, _, _ in occurrences]
+    if not all(
+        RECURRENCE_MIN_DAYS <= (later - earlier).days <= RECURRENCE_MAX_DAYS
+        for earlier, later in pairwise(dates)
+    ):
+        return False
+    return _within_tolerance([amount for _, _, amount in occurrences])
+
+
+def detect_recurrences(movements: Iterable[tuple[UUID, date, int, str]]) -> dict[UUID, str]:
+    """Ids recorrentes e a chave da série, a partir de (id, data, valor, descrição normalizada).
+
+    Recebe todas as movimentações de uma conta, de qualquer lote: o resultado depende só do
+    conjunto, então reimportar as mesmas linhas não muda nada.
+    """
+    series: dict[str, list[tuple[date, UUID, int]]] = {}
+    for movement_id, movement_date, amount, description in movements:
+        key = recurrence_key(description, amount)
+        series.setdefault(key, []).append((movement_date, movement_id, amount))
+    recurring: dict[UUID, str] = {}
+    for key, occurrences in series.items():
+        # O id desempata o mesmo dia, para o resultado não depender da ordem de leitura.
+        occurrences.sort(key=lambda item: (item[0], str(item[1])))
+        if _is_recurring_series(occurrences):
+            recurring.update((movement_id, key) for _, movement_id, _ in occurrences)
+    return recurring
