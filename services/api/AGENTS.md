@@ -1,6 +1,6 @@
 # Contexto de backend
 
-Leia o [contexto raiz](../../AGENTS.md). Esta pasta contém core HTTP (/health), seis modelos, Alembic, seed, domínio CSV, importação, consultas, correção de categoria, resumo mensal e recorrência Finance via HTTP (#14/#15/#42/#43/#44) e testes. Projeções, Alpha, alertas e IA continuam planejados.
+Leia o [contexto raiz](../../AGENTS.md). Esta pasta contém core HTTP (/health), seis modelos, Alembic, seed, domínio CSV, importação, consultas, correção de categoria, resumo mensal, recorrência e gastos atípicos Finance via HTTP (#14/#15/#42/#43/#44/#45) e testes. Projeções, Alpha, alertas e IA continuam planejados.
 
 ## Estrutura e dependências
 
@@ -47,7 +47,7 @@ Fontes: [contrato Finance](../../docs/api-design.md), [modelagem](../../docs/mod
 4. Adicionar teste de comportamento, incluindo erro relevante.
 5. Executar `make openapi`, revisar o contrato gerado e avisar os consumidores.
 
-Comandos disponíveis na raiz: `make dev`, `make lint`, `make migrate`, `make seed`, `make test`, `make openapi`. A configuração oficial é services/api/pyproject.toml com uv.lock. make test-domain roda os 216 casos puros (domínio CSV, analytics e clock) sem conexão PostgreSQL; pytest completo usa banco exclusivo para persistência, health e Finance HTTP (fixtures `client` e `db_session` em `tests/conftest.py`; `seed` e `importar` em `tests/finance/conftest.py`). A dependência de fixtures de banco é explícita, não autouse.
+Comandos disponíveis na raiz: `make dev`, `make lint`, `make migrate`, `make seed`, `make test`, `make openapi`. A configuração oficial é services/api/pyproject.toml com uv.lock. make test-domain roda os 229 casos puros (domínio CSV, analytics e clock) sem conexão PostgreSQL; pytest completo usa banco exclusivo para persistência, health e Finance HTTP (fixtures `client` e `db_session` em `tests/conftest.py`; `seed` e `importar` em `tests/finance/conftest.py`). A dependência de fixtures de banco é explícita, não autouse.
 
 No CSV, line_number é a primeira linha física; raw_line preserva quebras internas. Registros malformados e estouro de csv.field_size_limit são wrong_column_count; o limite do processo (normalmente 131072 caracteres) não é alterado. O enquadramento lógico impede importar fragmentos após erro. O router de importação lê no máximo `MAX_FILE_BYTES + 1` bytes e responde 413 acima de 1 MiB; o servidor ainda recebe o corpo inteiro antes, então um limite de requisição precisa vir do servidor/proxy.
 

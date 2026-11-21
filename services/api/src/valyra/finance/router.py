@@ -12,6 +12,9 @@ from valyra.core.errors import AppError, error_responses
 from valyra.core.pagination import Page, PageParams
 from valyra.finance import service
 from valyra.finance.analytics import MONTH_PATTERN
+
+# Alias: o filtro da rota também se chama is_anomaly.
+from valyra.finance.analytics import is_anomaly as anomaly_flag
 from valyra.finance.domain import MAX_FILE_BYTES
 from valyra.finance.models import Category, Transaction
 from valyra.finance.schemas import (
@@ -55,6 +58,8 @@ def _transaction_out(t: Transaction, category: Category) -> TransactionOut:
         category_confidence=t.category_confidence,
         predicted_category_id=t.predicted_category_id,
         is_recurring=t.is_recurring,
+        anomaly_score=t.anomaly_score,
+        is_anomaly=anomaly_flag(t.anomaly_score),
     )
 
 
@@ -146,6 +151,7 @@ def list_transactions(
     date_to: IsoDate | None = None,
     category_id: UUID | None = None,
     is_recurring: bool | None = None,
+    is_anomaly: bool | None = None,
 ) -> Page[TransactionOut]:
     rows, total = service.list_transactions(
         session,
@@ -155,6 +161,7 @@ def list_transactions(
         date_to=date_to,
         category_id=category_id,
         is_recurring=is_recurring,
+        is_anomaly=is_anomaly,
         limit=page.limit,
         offset=page.offset,
     )

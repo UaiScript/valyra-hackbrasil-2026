@@ -108,7 +108,7 @@ A ocorrência começa em **1**, por combinação de data, valor e descrição no
 | `assinaturas` | `netflix`, `spotify`, `prime`, `disney` |
 | `salario` | `salario`, `folha` |
 
-Sem correspondência: saída usa `outros`; entrada usa `outras-receitas`. A Issue #14 fixa, para toda transação importada, `category_id = predicted_category_id`, `category_source = 'rule'`, `category_confidence = NULL`, `is_recurring = false` e `anomaly_score = NULL`. **[Implementado, #44]** Ao fim da mesma transação de importação, a recorrência é recalculada sobre todas as transações da conta (ADR-0010, seção 3), então linhas recém-inseridas podem sair já marcadas.
+Sem correspondência: saída usa `outros`; entrada usa `outras-receitas`. A Issue #14 fixa, para toda transação importada, `category_id = predicted_category_id`, `category_source = 'rule'`, `category_confidence = NULL`, `is_recurring = false` e `anomaly_score = NULL`. **[Implementado, #44]** Ao fim da mesma transação de importação, a recorrência é recalculada sobre todas as transações da conta (ADR-0010, seção 3), então linhas recém-inseridas podem sair já marcadas. **[Implementado, #45]** O mesmo recálculo preenche `anomaly_score` (ADR-0010, seção 4).
 
 ## Operações HTTP — Issues #14, #15, #42 e #43
 
@@ -126,7 +126,7 @@ IDs de caminho e filtros de identificação usam UUID. Upload usa `multipart/for
 | `GET /api/v1/finance/categories` | `finance_list_categories` | `Page[CategoryOut]`; ordem por `kind` e `name` |
 | `GET /api/v1/finance/summary` | `finance_get_summary` | Query `account_id` e `month` (`AAAA-MM`), ambos opcionais; **200**, `SummaryOut` (#43) |
 
-Todas as listagens usam `Page[T]`/`PageParams` da Issue #9: `items`, `total`, `limit` (default 50, de 1 a 200), `offset` (default 0, não negativo). Filtros registrados para transações: `account_id`, `date_from`, `date_to`, `category_id` e `is_recurring` (booleano, #44; ausente não filtra). Sem `account_id`, consultar todas as contas do usuário demo. Datas de filtro seguem `YYYY-MM-DD`; inclusão dos limites, tratamento de intervalo invertido e desempate de ordenação não foram explicitados. Não há filtro de lote adicional registrado na Issue #14.
+Todas as listagens usam `Page[T]`/`PageParams` da Issue #9: `items`, `total`, `limit` (default 50, de 1 a 200), `offset` (default 0, não negativo). Filtros registrados para transações: `account_id`, `date_from`, `date_to`, `category_id`, `is_recurring` (booleano, #44) e `is_anomaly` (booleano, #45); filtro ausente não filtra. Sem `account_id`, consultar todas as contas do usuário demo. Datas de filtro seguem `YYYY-MM-DD`; inclusão dos limites, tratamento de intervalo invertido e desempate de ordenação não foram explicitados. Não há filtro de lote adicional registrado na Issue #14.
 
 ### Schemas públicos confirmados
 
@@ -135,7 +135,7 @@ Todas as listagens usam `Page[T]`/`PageParams` da Issue #9: `items`, `total`, `l
 | `AccountOut` | `id: UUID`, `name: str`, `balance_cents: int`, `balance_as_of: date` |
 | `AccountUpdate` | `name: str`, `balance_cents: StrictInt`, `balance_as_of: date`, todos **omitíveis**. `10.5` e `"1000"` para saldo geram 422, sem coerção. Omissão não define aceitação de `null`; isso permanece pendente |
 | `CategoryOut` | `id: UUID`, `slug: str`, `name: str`, `kind: expense \| income` |
-| `TransactionOut` | `id: UUID`, `date: date`, `description: str`, `amount_cents: int`, `category: {id: UUID, slug: str, name: str}`, `category_source: rule \| model \| user`, `category_confidence` (nulo na importação), `predicted_category_id: UUID`, `is_recurring: bool` (#44) |
+| `TransactionOut` | `id: UUID`, `date: date`, `description: str`, `amount_cents: int`, `category: {id: UUID, slug: str, name: str}`, `category_source: rule \| model \| user`, `category_confidence` (nulo na importação), `predicted_category_id: UUID`, `is_recurring: bool` (#44), `anomaly_score: string decimal | null` e `is_anomaly: bool` (#45) |
 | `TransactionUpdate` | `category_id: UUID` obrigatório; `null`, ausência ou campo extra geram 422 `VALIDATION_ERROR` (#42) |
 | `ImportRejectionOut` | `line_number: int`, `reason: str`, `raw_line: str`; sem ID interno no exemplo testado |
 | `ImportBatchOut` | Confirmados: `id: UUID`, `status: processing \| completed \| failed`, `rows_total: int`, `rows_imported: int`, `rows_duplicated: int`, `rows_rejected: int`, `rejections: list[ImportRejectionOut]`; `alerts_created` excluído |
@@ -147,7 +147,7 @@ Todas as listagens usam `Page[T]`/`PageParams` da Issue #9: `items`, `total`, `l
 
 **[Provisório, implementado na #15 — confirmar com o time]** Lacunas acima resolvidas pela implementação, sem decisão formal: resposta do PATCH é `AccountOut`; `null` explícito no `AccountUpdate` e campos desconhecidos geram 422 `VALIDATION_ERROR`; `balance_cents` fora da faixa BIGINT gera 422; `balance_as_of` só aceita texto `AAAA-MM-DD`; filtros de data são inclusivos e intervalo invertido devolve lista vazia; transações empatadas na data ordenam por `created_at` e `id` decrescentes; filtro `account_id` de outro usuário responde 404 `ACCOUNT_NOT_FOUND`; `category_confidence` preenchida sai como string decimal (sempre nula na importação por regras).
 
-`TransactionOut` não expõe `account_id`, `import_batch_id`, `row_hash`, `created_at`, `updated_at`, `recurrence_key` ou `anomaly_score`; `is_anomaly` também não integra o schema. `is_recurring` passou a ser exposto na #44. A correção de categoria foi implementada na #42, o resumo na #43 e a recorrência na #44; a projeção de saldo continua planejada (#46).
+`TransactionOut` não expõe `account_id`, `import_batch_id`, `row_hash`, `created_at`, `updated_at` ou `recurrence_key`. `is_recurring` passou a ser exposto na #44; `anomaly_score` e `is_anomaly`, na #45. A correção de categoria foi implementada na #42, o resumo na #43, a recorrência na #44 e os gastos atípicos na #45; a projeção de saldo continua planejada (#46).
 
 **[Implementado, #43] Resumo.** Regras da [ADR-0010](adr/0010-calculos-finance.md), seções 1 e 2:
 
@@ -164,6 +164,16 @@ Todas as listagens usam `Page[T]`/`PageParams` da Issue #9: `items`, `total`, `l
 - Recorrente com pelo menos 3 ocorrências em meses distintos, todos os intervalos consecutivos entre 25 e 35 dias inclusive e todo valor dentro de ±10% da mediana, comparado em inteiros.
 - O recálculo roda ao fim de cada importação, na mesma transação, sobre todos os lotes da conta. Só as linhas cujo flag muda são gravadas: reimportar o mesmo CSV não altera flags nem `updated_at`. Uma ocorrência nova fora da regra pode desmarcar uma série.
 - Correção de categoria não afeta a recorrência, que não depende da categoria.
+
+**[Implementado, #45] Gasto atípico.** Regras da [ADR-0010](adr/0010-calculos-finance.md), seção 4, em `finance/analytics.py`:
+
+- Só saídas, agrupadas por conta e categoria atual. Entradas e grupos com menos de 5 saídas ficam com `anomaly_score: null`, que não equivale a zero.
+- Com `x` = magnitude, `med` e `MAD` do grupo (a própria transação incluída): `z = 0,6745 × max(0, x − med) / MAD` e `score = min(1, z / 4,375)`. Unilateral: saída abaixo da mediana recebe `0.0000`.
+- **MAD = 0:** `z = max(0, x − med) / (1,2533 × MeanAD)`. **[Interpretação da #45]** A ADR diz "desvio absoluto médio"; a implementação usa a média de `|x − med|` em torno da mediana, como na variante de Iglewicz–Hoaglin. Se `MeanAD = 0` (todos os valores iguais), o score é `0.0000`.
+- Aritmética em `Decimal`, sem `float`; score quantizado em 4 casas com `ROUND_HALF_EVEN`, dentro do check `NUMERIC(5,4)` entre 0 e 1. Sai como string decimal no JSON, igual a `category_confidence`.
+- `is_anomaly = anomaly_score >= 0.8`, derivado e não gravado. Filtro `is_anomaly=false` inclui transações sem score.
+- Recalculado na importação e no PATCH de categoria, na mesma transação: a conta inteira é reprocessada, mas só mudam os grupos de origem e de destino, e só as linhas alteradas são gravadas. A resposta do PATCH já traz o score novo.
+- O score é heurístico, não probabilidade; interface e Valyra AI o tratam como indicador, sem atribuir causa.
 
 Exemplo (`DEMO_TODAY=2026-11-07`, referência `500000` em `2026-11-01`, saída `-12990` em `2026-11-02`; UUIDs ilustrativos):
 
@@ -242,6 +252,6 @@ Rejeições de linha são dados de uma importação concluída, sem promover cad
 | `TransactionUpdate` | Service valida propriedade, existência e tipo × sinal (#42) | Altera só `category_id` e `category_source = 'user'`; `updated_at` pelo ORM | `category` corrigida; `predicted_category_id` e `category_confidence` preservados |
 | Seed ou `AccountUpdate` | Seed idempotente (#10); PATCH valida inteiro estrito (#15) | `accounts.balance_cents`, `balance_as_of` | Referência em `AccountOut`; não representa saldo realizado calculado |
 | Recorrência | Recálculo da conta ao fim da importação (#44) | `is_recurring`, `recurrence_key` (`NULL` fora de série) | `is_recurring` em `TransactionOut` e filtro; chave não exposta |
-| Anomalia | Inicialização da importação (#14); cálculo planejado (#45) | `anomaly_score = NULL` | Não exposto em `TransactionOut` |
+| Anomalia | Recálculo da conta na importação e na correção de categoria (#45) | `anomaly_score` (`NULL` sem grupo suficiente) | `anomaly_score`, `is_anomaly` derivado e filtro em `TransactionOut` |
 
 Pendências restantes e suas etapas dependentes têm registro único em [revisao-modelagem.md](revisao-modelagem.md#decisões-pendentes). Preços médios e evidências Alpha/IA continuam nas seções 5.4, 6 e 7 da modelagem. A Issue #9 prevê gerar `packages/contracts/openapi.json` pela API; não editar ou criar esse contrato manualmente.

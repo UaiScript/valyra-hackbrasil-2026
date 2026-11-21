@@ -1,4 +1,4 @@
-"""Cálculos puros do Finance: saldo, resumo mensal (#43) e recorrência (#44), ADR-0010.
+"""Cálculos puros do Finance: saldo, resumo (#43), recorrência (#44) e atípicos (#45), ADR-0010.
 
 Sem banco, HTTP ou relógio: "hoje" chega como parâmetro para os testes fixarem a data.
 Dinheiro em centavos inteiros, com sinal: entrada positiva, saída negativa.
@@ -9,6 +9,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
+from decimal import ROUND_HALF_EVEN, Decimal
 from itertools import pairwise
 from uuid import UUID
 
@@ -154,3 +155,69 @@ def detect_recurrences(movements: Iterable[tuple[UUID, date, int, str]]) -> dict
         if _is_recurring_series(occurrences):
             recurring.update((movement_id, key) for _, movement_id, _ in occurrences)
     return recurring
+
+
+# Gasto atípico (ADR-0010, seção 4). O score é heurístico, não uma probabilidade.
+ANOMALY_MIN_EXPENSES = 5
+# score >= 0,8 equivale a z >= 3,5, o corte de Iglewicz–Hoaglin (4,375 = 3,5 / 0,8).
+ANOMALY_THRESHOLD = Decimal("0.8")
+_MAD_SCALE = Decimal("0.6745")
+_MEAN_AD_SCALE = Decimal("1.2533")
+_SCORE_DIVISOR = Decimal("4.375")
+_SCORE_PLACES = Decimal("0.0001")  # NUMERIC(5,4) no banco
+_ZERO = Decimal(0)
+_ONE = Decimal(1)
+
+
+def _median(values: list[Decimal]) -> Decimal:
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2
+
+
+def _group_scores(magnitudes: list[Decimal]) -> list[Decimal]:
+    median = _median(magnitudes)
+    deviations = [abs(x - median) for x in magnitudes]
+    mad = _median(deviations)
+    mean_ad = sum(deviations, _ZERO) / len(deviations)
+
+    def z(x: Decimal) -> Decimal:
+        # Unilateral: só gastar acima da mediana pontua.
+        excess = max(_ZERO, x - median)
+        if mad > 0:
+            return _MAD_SCALE * excess / mad
+        # Mais da metade igual à mediana: o desvio absoluto médio (em torno da mediana) ainda
+        # enxerga aumentos reais; se também for zero, todos os valores são iguais.
+        if mean_ad == 0:
+            return _ZERO
+        return excess / (_MEAN_AD_SCALE * mean_ad)
+
+    return [
+        min(_ONE, z(x) / _SCORE_DIVISOR).quantize(_SCORE_PLACES, rounding=ROUND_HALF_EVEN)
+        for x in magnitudes
+    ]
+
+
+def anomaly_scores(movements: Iterable[tuple[UUID, int, UUID]]) -> dict[UUID, Decimal]:
+    """Score das saídas por categoria, a partir de (id, valor, categoria) de uma conta.
+
+    Entradas e saídas de categorias com menos de 5 saídas ficam fora: sem score, não zero.
+    """
+    groups: dict[UUID, list[tuple[UUID, int]]] = {}
+    for movement_id, amount, category_id in movements:
+        if amount < 0:
+            groups.setdefault(category_id, []).append((movement_id, amount))
+    scores: dict[UUID, Decimal] = {}
+    for expenses in groups.values():
+        if len(expenses) < ANOMALY_MIN_EXPENSES:
+            continue
+        magnitudes = [Decimal(-amount) for _, amount in expenses]
+        for (movement_id, _), score in zip(expenses, _group_scores(magnitudes), strict=True):
+            scores[movement_id] = score
+    return scores
+
+
+def is_anomaly(score: Decimal | None) -> bool:
+    return score is not None and score >= ANOMALY_THRESHOLD
