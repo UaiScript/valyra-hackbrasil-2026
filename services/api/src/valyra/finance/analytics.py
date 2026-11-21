@@ -1,5 +1,5 @@
 """Cálculos puros do Finance (ADR-0010): saldo e resumo (#43), recorrência (#44), atípicos (#45)
-e projeção de caixa (#46).
+projeção de caixa (#46) e gatilho de pressão de caixa (#47).
 
 Sem banco, HTTP ou relógio: "hoje" chega como parâmetro para os testes fixarem a data.
 Dinheiro em centavos inteiros, com sinal: entrada positiva, saída negativa.
@@ -363,3 +363,11 @@ def project_cash(
         min_balance_cents=lowest.balance_cents,
         min_balance_date=lowest.date,
     )
+
+
+# Pressão de caixa (ADR-0010, seção 6): horizonte fixo de 30 dias e gatilho abaixo de zero.
+CASH_PRESSURE_DAYS = 30
+
+
+def is_cash_pressure(projection: Projection) -> bool:
+    return projection.min_balance_cents < 0

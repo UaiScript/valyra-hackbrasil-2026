@@ -43,8 +43,12 @@ class ImportBatchSummaryOut(BaseModel):
 
 
 class ImportBatchOut(ImportBatchSummaryOut):
-    # alerts_created entra com o módulo de alertas; expor 0 agora afirmaria algo não verificado.
     rejections: list[ImportRejectionOut]
+
+
+class ImportBatchCreatedOut(ImportBatchOut):
+    # Só na criação: o GET do lote não sabe quantos alertas aquela importação gerou.
+    alerts_created: int
 
 
 class AccountOut(BaseModel):

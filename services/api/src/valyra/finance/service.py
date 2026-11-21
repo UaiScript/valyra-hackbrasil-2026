@@ -1,5 +1,5 @@
 """Casos de uso do Finance: importação (#14), consultas (#15), correção (#42), resumo (#43),
-recorrência (#44), gastos atípicos (#45) e projeção de caixa (#46)."""
+recorrência (#44), gastos atípicos (#45), projeção de caixa (#46) e pressão de caixa (#47)."""
 
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -9,15 +9,18 @@ from uuid import UUID
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from valyra.alerts import service as alerts_service
 from valyra.core import clock
 from valyra.core.errors import AppError
 from valyra.finance import repository
 from valyra.finance.analytics import (
     ANOMALY_THRESHOLD,
+    CASH_PRESSURE_DAYS,
     MonthSummary,
     Projection,
     anomaly_scores,
     detect_recurrences,
+    is_cash_pressure,
     month_bounds,
     project_cash,
     realized_balance_cents,
@@ -50,10 +53,17 @@ def get_account_for_user(session: Session, user_id: UUID, account_id: UUID) -> A
     return account
 
 
+@dataclass(frozen=True)
+class ImportResult:
+    batch: ImportBatch
+    alerts_created: int
+
+
 def import_csv(
     session: Session, user_id: UUID, account_id: UUID, file_name: str, content: bytes
-) -> ImportBatch:
-    """Importa em uma única transação: qualquer falha técnica desfaz lote, rejeições e linhas."""
+) -> ImportResult:
+    """Importa em uma única transação: qualquer falha técnica desfaz lote, rejeições, linhas e
+    alerta."""
     try:
         account = get_account_for_user(session, user_id, account_id)
         try:
@@ -101,6 +111,7 @@ def import_csv(
         inserted = repository.insert_transactions(session, values)
         # Na mesma transação da importação: falha no recálculo desfaz também as linhas novas.
         _refresh_signals(session, account.id)
+        alerts_created = _check_cash_pressure(session, user_id, account)
 
         batch.rows_imported = inserted
         batch.rows_duplicated = len(result.rows) - inserted
@@ -109,10 +120,30 @@ def import_csv(
         # clock_timestamp marca o fim real; now() repetiria o início da transação.
         batch.completed_at = func.clock_timestamp()
         session.commit()
-        return batch
+        return ImportResult(batch=batch, alerts_created=alerts_created)
     except BaseException:
         session.rollback()
         raise
+
+
+def _check_cash_pressure(session: Session, user_id: UUID, account: Account) -> int:
+    """Alerta de pressão de caixa (ADR-0010, seção 6); roda antes do commit da importação."""
+    today = clock.get_today()
+    projection = _project(session, account, today, CASH_PRESSURE_DAYS)
+    # Saldo indisponível (referência futura) não gera alerta: não há saldo de partida.
+    if projection is None or not is_cash_pressure(projection):
+        return 0
+    created = alerts_service.create_cash_pressure(
+        session,
+        user_id,
+        account.id,
+        today,
+        start_balance_cents=projection.start_balance_cents,
+        min_balance_cents=projection.min_balance_cents,
+        min_balance_date=projection.min_balance_date,
+        days=projection.days,
+    )
+    return int(created)
 
 
 def _refresh_signals(session: Session, account_id: UUID) -> None:
@@ -307,6 +338,19 @@ def get_projection(
     """Projeção diária de caixa da conta; só leitura, nada é gravado (ADR-0010, seção 5)."""
     account = get_account_for_user(session, user_id, account_id)
     today = clock.get_today()
+    projection = _project(session, account, today, days)
+    if projection is None:
+        # Referência posterior a hoje: o fechamento não permite reconstruir o saldo atual.
+        raise AppError(
+            "BALANCE_UNAVAILABLE",
+            "Saldo de referência posterior a hoje; não é possível projetar",
+            422,
+        )
+    return AccountProjection(account_id=account.id, today=today, projection=projection)
+
+
+def _project(session: Session, account: Account, today: date, days: int) -> Projection | None:
+    """Projeção da conta, ou None quando o saldo de partida é indisponível."""
     rows = repository.list_signal_inputs(session, account.id)
     start = realized_balance_cents(
         account.balance_cents,
@@ -315,12 +359,7 @@ def get_projection(
         today,
     )
     if start is None:
-        # Referência posterior a hoje: o fechamento não permite reconstruir o saldo atual.
-        raise AppError(
-            "BALANCE_UNAVAILABLE",
-            "Saldo de referência posterior a hoje; não é possível projetar",
-            422,
-        )
+        return None
     series = recurring_series(
         (row.date, row.amount_cents, row.description, row.recurrence_key)
         for row in rows
@@ -329,8 +368,4 @@ def get_projection(
     variable = variable_daily_cents(
         ((row.date, row.amount_cents, row.is_recurring) for row in rows), today
     )
-    return AccountProjection(
-        account_id=account.id,
-        today=today,
-        projection=project_cash(start, today, days, series, variable),
-    )
+    return project_cash(start, today, days, series, variable)

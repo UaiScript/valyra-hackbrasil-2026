@@ -4,7 +4,7 @@ import json
 
 ERROR_REF = "#/components/schemas/ErrorResponse"
 
-# Códigos 4xx por operação, levantados dos AppError do router/service Finance.
+# Códigos 4xx por operação, levantados dos AppError dos routers/services Finance e Alerts.
 EXPECTED_4XX = {
     "finance_create_import_batch": {"404", "413", "422"},
     "finance_list_import_batches": {"422"},
@@ -16,6 +16,8 @@ EXPECTED_4XX = {
     "finance_list_categories": {"422"},
     "finance_get_summary": {"404", "422"},
     "finance_get_projection": {"404", "422"},
+    "alerts_list": {"422"},
+    "alerts_update": {"404", "422"},
 }
 
 
@@ -40,11 +42,11 @@ def test_error_response_descreve_envelope(app):
     assert body["properties"]["details"]["type"] == "object"
 
 
-def test_cada_operacao_finance_declara_seus_4xx_com_envelope(app):
+def test_cada_operacao_finance_e_alerts_declara_seus_4xx_com_envelope(app):
     finance = {
         op_id: operation
         for op_id, operation in _operations(app.openapi())
-        if op_id.startswith("finance_")
+        if op_id.startswith(("finance_", "alerts_"))
     }
     # Rota nova sem entrada na tabela quebra o teste até declarar seus erros.
     assert set(finance) == set(EXPECTED_4XX)

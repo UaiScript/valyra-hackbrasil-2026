@@ -1,5 +1,7 @@
 # Modelagem de dados do Postgres — Design
 
+> **Issue #47 (21/11/2026):** tabela `alerts` implementada na migração `0002_alerts`, só com `cash_pressure`. Detalhes e escopo adiado na [seção 6](#6-alertas).
+
 > **Issue #15 (10/11/2026):** consultas de contas (com PATCH), transações e categorias implementadas; o contrato soma 7 operações Finance e `system_health`. Decisões de consulta que a especificação deixava abertas estão marcadas como provisórias em [api-design](api-design.md#operações-http--issues-14-e-15).
 
 > **Issue #14 (10/11/2026):** importação de CSV e consulta de lotes implementadas em `services/api/src/valyra/finance/` (router, service, repository, schemas), com OpenAPI regenerado. Consultas da #15 continuam planejadas. Estado atual em [arquitetura](architecture.md).
@@ -577,6 +579,14 @@ Regras:
 
 Módulo novo `alerts/` **[Altera fundação]**, chamado por `finance` e `alpha` via `service`.
 
+**[Implementado, #47]** A migração `0002_alerts` cria `alerts` só para `cash_pressure`. Por decisão da #47, `market_signal`, `signal_id` e `asset_id` ficam para o Alpha, porque `signals` e `assets` ainda não existem. A migração do Alpha acrescenta as colunas e as FKs e amplia o `CHECK` de `kind`. Checks implementados:
+
+- `kind IN ('cash_pressure')`, `severity IN ('info','warning')` e `status IN ('new','read')`;
+- `(status = 'read') = (read_at IS NOT NULL)` e `read_at >= created_at`;
+- `cash_pressure` exige `account_id`.
+
+Também estão implementados a unicidade `(user_id, dedup_key)` e os índices `(user_id, status, created_at)` e `account_id`. A geração é `alerts.service.create_cash_pressure`, chamada pela importação; a tabela abaixo é o desenho completo.
+
 **`alerts`**
 
 | Coluna | Tipo | Observação |
@@ -612,6 +622,8 @@ Exemplo não monetário de `evidence` (estrutura genérica relacionada a `messag
     "source_url": "https://...", "published_at": "2026-10-10T12:00:00Z" }
 ]
 ```
+
+**[Implementado, #47]** Para `cash_pressure`, `evidence` é um objeto tipado com dinheiro em centavos inteiros: `{"days", "today", "start_balance_cents", "min_balance_cents", "min_balance_date"}`, exposto como `CashPressureEvidenceOut` ([contrato](api-design.md)). A pendência abaixo continua para evidências do Alpha e da IA.
 
 **Pendência de contrato:** o antigo exemplo monetário em `value` textual foi retirado. Dinheiro em respostas da API precisa de inteiro com sufixo `_cents`; o formato tipado de evidências monetárias em alertas/IA ainda exige alinhamento. Esta revisão não acrescenta colunas nem muda silenciosamente a estrutura genérica de `message_evidences`.
 

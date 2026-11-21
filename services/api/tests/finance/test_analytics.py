@@ -1,4 +1,5 @@
-"""Saldo, resumo (#43), recorrência (#44), atípicos (#45) e projeção (#46), sem PostgreSQL."""
+"""Saldo, resumo (#43), recorrência (#44), atípicos (#45), projeção (#46) e pressão de caixa
+(#47), sem PostgreSQL."""
 
 from datetime import date, timedelta
 from decimal import Decimal
@@ -14,6 +15,7 @@ from valyra.finance.analytics import (
     anomaly_scores,
     detect_recurrences,
     is_anomaly,
+    is_cash_pressure,
     month_bounds,
     next_occurrence,
     project_cash,
@@ -443,3 +445,9 @@ def test_entrada_recorrente_eleva_o_saldo():
 def test_horizonte_fora_da_faixa(dias):
     with pytest.raises(ValueError):
         project_cash(0, HOJE, dias, [], 0)
+
+
+@pytest.mark.parametrize("inicio,esperado", [(-1, True), (0, False), (1, False)])
+def test_pressao_de_caixa_somente_abaixo_de_zero(inicio, esperado):
+    # Variável zero: o mínimo é o próprio saldo de partida; zero exato não dispara (< 0).
+    assert is_cash_pressure(project_cash(inicio, HOJE, 30, [], 0)) is esperado
