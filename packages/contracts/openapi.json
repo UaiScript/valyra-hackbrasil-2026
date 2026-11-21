@@ -526,6 +526,17 @@
             "title": "Amount Cents",
             "type": "integer"
           },
+          "anomaly_score": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anomaly Score"
+          },
           "category": {
             "$ref": "#/components/schemas/TransactionCategoryOut"
           },
@@ -563,6 +574,10 @@
             "title": "Id",
             "type": "string"
           },
+          "is_anomaly": {
+            "title": "Is Anomaly",
+            "type": "boolean"
+          },
           "is_recurring": {
             "title": "Is Recurring",
             "type": "boolean"
@@ -582,7 +597,9 @@
           "category_source",
           "category_confidence",
           "predicted_category_id",
-          "is_recurring"
+          "is_recurring",
+          "anomaly_score",
+          "is_anomaly"
         ],
         "title": "TransactionOut",
         "type": "object"
@@ -1133,6 +1150,22 @@
                 }
               ],
               "title": "Is Recurring"
+            }
+          },
+          {
+            "in": "query",
+            "name": "is_anomaly",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Anomaly"
             }
           },
           {

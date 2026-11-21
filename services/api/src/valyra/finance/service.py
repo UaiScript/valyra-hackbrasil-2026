@@ -1,5 +1,5 @@
-"""Casos de uso do Finance: importação (#14), consultas (#15), correção (#42), resumo (#43)
-e recorrência (#44)."""
+"""Casos de uso do Finance: importação (#14), consultas (#15), correção (#42), resumo (#43),
+recorrência (#44) e gastos atípicos (#45)."""
 
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -13,7 +13,9 @@ from valyra.core import clock
 from valyra.core.errors import AppError
 from valyra.finance import repository
 from valyra.finance.analytics import (
+    ANOMALY_THRESHOLD,
     MonthSummary,
+    anomaly_scores,
     detect_recurrences,
     month_bounds,
     realized_balance_cents,
@@ -94,7 +96,7 @@ def import_csv(
             )
         inserted = repository.insert_transactions(session, values)
         # Na mesma transação da importação: falha no recálculo desfaz também as linhas novas.
-        _refresh_recurrence(session, account.id)
+        _refresh_signals(session, account.id)
 
         batch.rows_imported = inserted
         batch.rows_duplicated = len(result.rows) - inserted
@@ -109,21 +111,25 @@ def import_csv(
         raise
 
 
-def _refresh_recurrence(session: Session, account_id: UUID) -> None:
-    """Recalcula a recorrência de toda a conta e grava só as linhas cujo flag mudou."""
-    rows = repository.list_recurrence_inputs(session, account_id)
+def _refresh_signals(session: Session, account_id: UUID) -> None:
+    """Recalcula recorrência e gasto atípico da conta inteira e grava só o que mudou."""
+    rows = repository.list_signal_inputs(session, account_id)
     recurring = detect_recurrences(
-        (row_id, row_date, amount, normalize_description(description))
-        for row_id, row_date, amount, description, _, _ in rows
+        (row.id, row.date, row.amount_cents, normalize_description(row.description)) for row in rows
     )
+    scores = anomaly_scores((row.id, row.amount_cents, row.category_id) for row in rows)
     # Gravar só a diferença mantém updated_at intacto quando reimportar não muda nada; uma
-    # ocorrência nova fora da regra também pode desmarcar uma série antes recorrente.
-    changes = [
-        {"id": row_id, "is_recurring": row_id in recurring, "recurrence_key": recurring.get(row_id)}
-        for row_id, _, _, _, is_recurring, key in rows
-        if (is_recurring, key) != (row_id in recurring, recurring.get(row_id))
-    ]
-    repository.update_recurrence(session, changes)
+    # ocorrência nova também pode desmarcar uma série ou mudar o score do grupo inteiro.
+    changes = []
+    for row in rows:
+        new = {
+            "is_recurring": row.id in recurring,
+            "recurrence_key": recurring.get(row.id),
+            "anomaly_score": scores.get(row.id),
+        }
+        if (row.is_recurring, row.recurrence_key, row.anomaly_score) != tuple(new.values()):
+            changes.append({"id": row.id, **new})
+    repository.update_signals(session, changes)
 
 
 def get_import_batch(
@@ -184,6 +190,10 @@ def update_transaction_category(
         # não mudam: comparar sugestão e correção é o que permite avaliar a categorização.
         transaction.category_id = category.id
         transaction.category_source = "user"
+        # O score depende da categoria: a origem perde e o destino ganha uma saída. Recalcular a
+        # conta inteira equivale a recalcular os dois grupos, pois os demais não mudam.
+        session.flush()
+        _refresh_signals(session, transaction.account_id)
         session.commit()
         return transaction, category
     except BaseException:
@@ -200,6 +210,7 @@ def list_transactions(
     date_to: date | None,
     category_id: UUID | None,
     is_recurring: bool | None,
+    is_anomaly: bool | None,
     limit: int,
     offset: int,
 ) -> tuple[list[tuple[Transaction, Category]], int]:
@@ -214,6 +225,9 @@ def list_transactions(
         date_to=date_to,
         category_id=category_id,
         is_recurring=is_recurring,
+        is_anomaly=is_anomaly,
+        # O limiar é regra do analytics; o repository só o aplica na consulta.
+        anomaly_threshold=ANOMALY_THRESHOLD,
         limit=limit,
         offset=offset,
     )

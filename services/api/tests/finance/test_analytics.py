@@ -1,13 +1,17 @@
-"""Saldo, resumo mensal (#43) e recorrência (#44), ADR-0010, sem PostgreSQL."""
+"""Saldo, resumo (#43), recorrência (#44) e atípicos (#45), ADR-0010, sem PostgreSQL."""
 
 from datetime import date
+from decimal import Decimal
 from uuid import UUID
 
 import pytest
 
 from valyra.finance.analytics import (
+    ANOMALY_THRESHOLD,
     CategoryTotal,
+    anomaly_scores,
     detect_recurrences,
+    is_anomaly,
     month_bounds,
     realized_balance_cents,
     recurrence_key,
@@ -255,3 +259,78 @@ def test_descricoes_diferentes_nao_se_misturam_e_ordem_da_entrada_nao_importa():
 def test_chave_da_serie():
     assert recurrence_key("aluguel apartamento", -180000) == "-|aluguel apartamento"
     assert recurrence_key("pix recebido", 1) == "+|pix recebido"
+
+
+# --- gasto atípico (Issue #45, ADR-0010 seção 4) ------------------------------------------
+
+
+def _scores(magnitudes, categoria=MERCADO):
+    movimentos = [(UUID(int=100 + i), -m, categoria) for i, m in enumerate(magnitudes)]
+    resultado = anomaly_scores(movimentos)
+    return [resultado.get(UUID(int=100 + i)) for i in range(len(magnitudes))]
+
+
+def test_exemplo_com_mad():
+    # Mediana 110, MAD 10: 120 → 0,6745 × 10 / 10 / 4,375 = 0,15417…; 1000 satura em 1.
+    assert _scores([100, 100, 110, 120, 1000]) == [
+        Decimal("0.0000"),
+        Decimal("0.0000"),
+        Decimal("0.0000"),
+        Decimal("0.1542"),
+        Decimal("1.0000"),
+    ]
+
+
+def test_saida_abaixo_da_mediana_tem_score_zero():
+    assert _scores([10, 100, 100, 110, 120])[0] == Decimal("0.0000")
+
+
+def test_mad_zero_usa_desvio_absoluto_medio():
+    # MAD = 0; desvio médio em torno da mediana = 100 / 5 = 20.
+    # z = 100 / (1,2533 × 20) = 3,98947…; score = z / 4,375 = 0,91188… → 0,9119.
+    assert _scores([100, 100, 100, 100, 200]) == [Decimal("0.0000")] * 4 + [Decimal("0.9119")]
+
+
+def test_todos_iguais_tem_score_zero():
+    assert _scores([100] * 5) == [Decimal("0.0000")] * 5
+
+
+def test_grupo_com_menos_de_cinco_saidas_fica_sem_score():
+    assert _scores([100, 100, 100, 5000]) == [None] * 4
+
+
+def test_entradas_ficam_sem_score_e_nao_contam_no_grupo():
+    movimentos = [(UUID(int=1 + i), -100, MERCADO) for i in range(4)]
+    movimentos.append((UUID(int=9), 650000, SALARIO))
+    movimentos.append((UUID(int=10), 100, MERCADO))  # estorno no mercado: entrada
+    assert anomaly_scores(movimentos) == {}
+
+
+def test_grupos_separados_por_categoria():
+    movimentos = [(UUID(int=1 + i), -100, MERCADO) for i in range(5)]
+    movimentos += [(UUID(int=20 + i), -100, LAZER) for i in range(4)]
+    resultado = anomaly_scores(movimentos)
+    assert set(resultado) == {UUID(int=1 + i) for i in range(5)}
+
+
+def test_mediana_par_no_grupo():
+    # Seis saídas: mediana 100, MAD 0, desvio médio 35 / 6.
+    assert _scores([100, 100, 100, 100, 105, 130])[-2:] == [Decimal("0.1563"), Decimal("0.9379")]
+
+
+@pytest.mark.parametrize(
+    "magnitudes",
+    [[100, 100, 110, 120, 1000], [1, 2, 3, 4, 5, 6, 7], [100, 100, 100, 100, 200], [3] * 9],
+)
+def test_score_decimal_entre_zero_e_um_com_quatro_casas(magnitudes):
+    for score in _scores(magnitudes):
+        assert isinstance(score, Decimal)
+        assert Decimal(0) <= score <= Decimal(1)
+        assert score.as_tuple().exponent == -4
+
+
+def test_limiar_de_anomalia():
+    assert ANOMALY_THRESHOLD == Decimal("0.8")
+    assert is_anomaly(Decimal("0.8000")) is True
+    assert is_anomaly(Decimal("0.7999")) is False
+    assert is_anomaly(None) is False

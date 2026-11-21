@@ -121,7 +121,7 @@ class TransactionCategoryOut(BaseModel):
 
 
 class TransactionOut(BaseModel):
-    # anomaly_score fica fora até a F6; recurrence_key é detalhe interno da série.
+    # recurrence_key é detalhe interno da série e não é exposto.
     id: UUID
     date: date
     description: str
@@ -132,6 +132,10 @@ class TransactionOut(BaseModel):
     predicted_category_id: UUID
     # Recalculado ao fim de cada importação (ADR-0010, seção 3); recurrence_key não é exposto.
     is_recurring: bool
+    # Score heurístico de 0 a 1 (ADR-0010, seção 4), não probabilidade; null sem grupo suficiente.
+    anomaly_score: Decimal | None
+    # Derivado de anomaly_score >= 0,8, não gravado no banco.
+    is_anomaly: bool
 
 
 class CategoryTotalOut(BaseModel):

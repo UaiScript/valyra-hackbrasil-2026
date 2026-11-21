@@ -1,9 +1,11 @@
 """Acesso a dados do Finance; não faz commit, quem controla a transação é o service."""
 
+from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Select, func, select, update
+from sqlalchemy import Select, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -105,6 +107,8 @@ def list_transactions(
     date_to: date | None,
     category_id: UUID | None,
     is_recurring: bool | None,
+    is_anomaly: bool | None,
+    anomaly_threshold: Decimal,
     limit: int,
     offset: int,
 ) -> tuple[list[tuple[Transaction, Category]], int]:
@@ -125,6 +129,13 @@ def list_transactions(
         query = query.where(Transaction.category_id == category_id)
     if is_recurring is not None:
         query = query.where(Transaction.is_recurring.is_(is_recurring))
+    if is_anomaly is True:
+        query = query.where(Transaction.anomaly_score >= anomaly_threshold)
+    elif is_anomaly is False:
+        # Sem score não há anomalia: NULL entra no grupo "não atípico".
+        query = query.where(
+            or_(Transaction.anomaly_score.is_(None), Transaction.anomaly_score < anomaly_threshold)
+        )
     # created_at e id desempatam transações do mesmo dia, mantendo a paginação estável.
     query = query.order_by(
         Transaction.date.desc(), Transaction.created_at.desc(), Transaction.id.desc()
@@ -181,24 +192,36 @@ def get_categories(session: Session, category_ids: list[UUID]) -> dict[UUID, Cat
     return {category.id: category for category in categories}
 
 
-def list_recurrence_inputs(
-    session: Session, account_id: UUID
-) -> list[tuple[UUID, date, int, str, bool, str | None]]:
-    """Todas as transações da conta, de qualquer lote, com os flags atuais de recorrência."""
+@dataclass(frozen=True)
+class SignalInput:
+    id: UUID
+    date: date
+    amount_cents: int
+    description: str
+    category_id: UUID
+    is_recurring: bool
+    recurrence_key: str | None
+    anomaly_score: Decimal | None
+
+
+def list_signal_inputs(session: Session, account_id: UUID) -> list[SignalInput]:
+    """Todas as transações da conta, de qualquer lote, com os sinais gravados hoje."""
     rows = session.execute(
         select(
             Transaction.id,
             Transaction.date,
             Transaction.amount_cents,
             Transaction.description,
+            Transaction.category_id,
             Transaction.is_recurring,
             Transaction.recurrence_key,
+            Transaction.anomaly_score,
         ).where(Transaction.account_id == account_id)
     )
-    return [(row[0], row[1], row[2], row[3], row[4], row[5]) for row in rows]
+    return [SignalInput(*row) for row in rows]
 
 
-def update_recurrence(session: Session, changes: list[dict]) -> None:
-    """UPDATE em lote por chave primária; cada item tem id, is_recurring e recurrence_key."""
+def update_signals(session: Session, changes: list[dict]) -> None:
+    """UPDATE em lote por chave primária: id, is_recurring, recurrence_key e anomaly_score."""
     if changes:
         session.execute(update(Transaction), changes)

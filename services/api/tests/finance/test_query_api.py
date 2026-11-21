@@ -151,13 +151,14 @@ def test_intervalo_invertido_retorna_lista_vazia(client, seed, importar):
     assert body["total"] == 0 and body["items"] == []
 
 
-def test_transacao_em_centavos_sem_campos_ainda_nao_calculados(client, seed, importar):
+def test_transacao_em_centavos_e_sem_campos_internos(client, seed, importar):
     importar(b"2026-11-01,A,-1.00\n")
     item = client.get("/api/v1/finance/transactions").json()["items"][0]
     assert item["amount_cents"] == -100 and "amount" not in item
-    # is_recurring existe desde a #44; anomalia e chave da série continuam fora.
-    assert "is_anomaly" not in item and "anomaly_score" not in item
+    # Sinais calculados entram desde #44/#45; a chave interna da série continua fora.
     assert "recurrence_key" not in item
+    # Uma saída isolada não forma grupo: sem score, e portanto não atípica.
+    assert (item["anomaly_score"], item["is_anomaly"]) == (None, False)
 
 
 def test_formato_completo_da_transacao(client, seed, importar):
@@ -174,6 +175,8 @@ def test_formato_completo_da_transacao(client, seed, importar):
         "category_confidence",
         "predicted_category_id",
         "is_recurring",
+        "anomaly_score",
+        "is_anomaly",
     }
     assert item["category"] == {"id": mercado, "slug": "mercado", "name": "Mercado"}
     assert (item["category_source"], item["category_confidence"]) == ("rule", None)
