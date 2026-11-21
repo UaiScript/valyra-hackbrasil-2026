@@ -1,5 +1,5 @@
 """Casos de uso do Finance: importação (#14), consultas (#15), correção (#42), resumo (#43),
-recorrência (#44) e gastos atípicos (#45)."""
+recorrência (#44), gastos atípicos (#45) e projeção de caixa (#46)."""
 
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -15,11 +15,15 @@ from valyra.finance import repository
 from valyra.finance.analytics import (
     ANOMALY_THRESHOLD,
     MonthSummary,
+    Projection,
     anomaly_scores,
     detect_recurrences,
     month_bounds,
+    project_cash,
     realized_balance_cents,
+    recurring_series,
     summarize_month,
+    variable_daily_cents,
 )
 from valyra.finance.domain import (
     CsvFormatError,
@@ -287,4 +291,46 @@ def get_summary(
         realized_balance_cents=realized,
         month_summary=month_summary,
         categories=categories,
+    )
+
+
+@dataclass(frozen=True)
+class AccountProjection:
+    account_id: UUID
+    today: date
+    projection: Projection
+
+
+def get_projection(
+    session: Session, user_id: UUID, account_id: UUID, days: int
+) -> AccountProjection:
+    """Projeção diária de caixa da conta; só leitura, nada é gravado (ADR-0010, seção 5)."""
+    account = get_account_for_user(session, user_id, account_id)
+    today = clock.get_today()
+    rows = repository.list_signal_inputs(session, account.id)
+    start = realized_balance_cents(
+        account.balance_cents,
+        account.balance_as_of,
+        ((row.date, row.amount_cents) for row in rows),
+        today,
+    )
+    if start is None:
+        # Referência posterior a hoje: o fechamento não permite reconstruir o saldo atual.
+        raise AppError(
+            "BALANCE_UNAVAILABLE",
+            "Saldo de referência posterior a hoje; não é possível projetar",
+            422,
+        )
+    series = recurring_series(
+        (row.date, row.amount_cents, row.description, row.recurrence_key)
+        for row in rows
+        if row.is_recurring
+    )
+    variable = variable_daily_cents(
+        ((row.date, row.amount_cents, row.is_recurring) for row in rows), today
+    )
+    return AccountProjection(
+        account_id=account.id,
+        today=today,
+        projection=project_cash(start, today, days, series, variable),
     )

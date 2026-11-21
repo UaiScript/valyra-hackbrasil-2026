@@ -428,6 +428,116 @@
         "title": "Page[TransactionOut]",
         "type": "object"
       },
+      "ProjectedRecurrenceOut": {
+        "properties": {
+          "amount_cents": {
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "amount_cents"
+        ],
+        "title": "ProjectedRecurrenceOut",
+        "type": "object"
+      },
+      "ProjectionDayOut": {
+        "properties": {
+          "balance_cents": {
+            "title": "Balance Cents",
+            "type": "integer"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "recurrences": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectedRecurrenceOut"
+            },
+            "title": "Recurrences",
+            "type": "array"
+          },
+          "recurring_cents": {
+            "title": "Recurring Cents",
+            "type": "integer"
+          },
+          "variable_cents": {
+            "title": "Variable Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "recurrences",
+          "recurring_cents",
+          "variable_cents",
+          "balance_cents"
+        ],
+        "title": "ProjectionDayOut",
+        "type": "object"
+      },
+      "ProjectionOut": {
+        "description": "Proje\u00e7\u00e3o da Issue #46: valores previstos, separados do saldo realizado de partida.",
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectionDayOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "min_balance_cents": {
+            "title": "Min Balance Cents",
+            "type": "integer"
+          },
+          "min_balance_date": {
+            "format": "date",
+            "title": "Min Balance Date",
+            "type": "string"
+          },
+          "start_balance_cents": {
+            "title": "Start Balance Cents",
+            "type": "integer"
+          },
+          "today": {
+            "format": "date",
+            "title": "Today",
+            "type": "string"
+          },
+          "variable_daily_cents": {
+            "title": "Variable Daily Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "account_id",
+          "today",
+          "start_balance_cents",
+          "variable_daily_cents",
+          "days",
+          "items",
+          "min_balance_cents",
+          "min_balance_date"
+        ],
+        "title": "ProjectionOut",
+        "type": "object"
+      },
       "SummaryOut": {
         "description": "Resumo da Issue #43: saldo realizado de hoje e movimenta\u00e7\u00f5es realizadas do m\u00eas.",
         "properties": {
@@ -815,6 +925,73 @@
           }
         },
         "summary": "Finance Update Account",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/accounts/{id}/projection": {
+      "get": {
+        "operationId": "finance_get_projection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Horizonte em dias, a partir de amanh\u00e3",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "description": "Horizonte em dias, a partir de amanh\u00e3",
+              "maximum": 90,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso n\u00e3o encontrado"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Finance Get Projection",
         "tags": [
           "finance"
         ]

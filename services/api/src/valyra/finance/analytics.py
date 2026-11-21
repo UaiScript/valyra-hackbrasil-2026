@@ -1,4 +1,5 @@
-"""Cálculos puros do Finance: saldo, resumo (#43), recorrência (#44) e atípicos (#45), ADR-0010.
+"""Cálculos puros do Finance (ADR-0010): saldo e resumo (#43), recorrência (#44), atípicos (#45)
+e projeção de caixa (#46).
 
 Sem banco, HTTP ou relógio: "hoje" chega como parâmetro para os testes fixarem a data.
 Dinheiro em centavos inteiros, com sinal: entrada positiva, saída negativa.
@@ -8,7 +9,7 @@ import calendar
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_HALF_EVEN, Decimal
 from itertools import pairwise
 from uuid import UUID
@@ -221,3 +222,144 @@ def anomaly_scores(movements: Iterable[tuple[UUID, int, UUID]]) -> dict[UUID, De
 
 def is_anomaly(score: Decimal | None) -> bool:
     return score is not None and score >= ANOMALY_THRESHOLD
+
+
+# Projeção de caixa (ADR-0010, seção 5). Nada aqui é gravado: é calculado sob demanda.
+PROJECTION_DEFAULT_DAYS = 30
+PROJECTION_MAX_DAYS = 90
+VARIABLE_WINDOW_DAYS = 90
+
+
+@dataclass(frozen=True)
+class RecurringSeries:
+    key: str
+    # Descrição original da última ocorrência, para a projeção ser legível e rastreável.
+    description: str
+    amount_cents: int
+    interval_days: int
+    last_date: date
+
+
+def _floor_median(values: list[int]) -> int:
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    # A ADR não fixa o arredondamento da mediana par; o piso (para baixo, com sinal) é
+    # conservador no valor: saída prevista maior, entrada prevista menor.
+    return (ordered[middle - 1] + ordered[middle]) // 2
+
+
+def recurring_series(
+    movements: Iterable[tuple[date, int, str, str | None]],
+) -> list[RecurringSeries]:
+    """Séries já marcadas como recorrentes, a partir de (data, valor, descrição, chave)."""
+    groups: dict[str, list[tuple[date, int, str]]] = {}
+    for movement_date, amount, description, key in movements:
+        if key is not None:
+            groups.setdefault(key, []).append((movement_date, amount, description))
+    series = []
+    for key, occurrences in sorted(groups.items()):
+        occurrences.sort(key=lambda item: (item[0], item[2]))
+        dates = [movement_date for movement_date, _, _ in occurrences]
+        intervals = [(later - earlier).days for earlier, later in pairwise(dates)]
+        if not intervals:
+            continue
+        series.append(
+            RecurringSeries(
+                key=key,
+                description=occurrences[-1][2],
+                amount_cents=_floor_median([amount for _, amount, _ in occurrences]),
+                interval_days=_floor_median(intervals),
+                last_date=dates[-1],
+            )
+        )
+    return series
+
+
+def next_occurrence(series: RecurringSeries, today: date) -> date:
+    """Primeira data prevista depois de hoje: uma recorrência atrasada pula para a seguinte."""
+    step = timedelta(days=series.interval_days)
+    predicted = series.last_date + step
+    while predicted <= today:
+        predicted += step
+    return predicted
+
+
+def variable_daily_cents(movements: Iterable[tuple[date, int, bool]], today: date) -> int:
+    """Média diária das saídas não recorrentes de [hoje − 89, hoje], com sinal negativo."""
+    start = today - timedelta(days=VARIABLE_WINDOW_DAYS - 1)
+    total = sum(
+        -amount
+        for movement_date, amount, is_recurring in movements
+        if amount < 0 and not is_recurring and start <= movement_date <= today
+    )
+    # Magnitude arredondada para cima (teto inteiro): conservador, erra no máximo 1 centavo/dia.
+    magnitude = -(-total // VARIABLE_WINDOW_DAYS)
+    return -magnitude
+
+
+@dataclass(frozen=True)
+class ProjectedRecurrence:
+    description: str
+    amount_cents: int
+
+
+@dataclass(frozen=True)
+class ProjectionDay:
+    date: date
+    recurrences: tuple[ProjectedRecurrence, ...]
+    recurring_cents: int
+    variable_cents: int
+    balance_cents: int
+
+
+@dataclass(frozen=True)
+class Projection:
+    start_balance_cents: int
+    variable_daily_cents: int
+    days: int
+    items: tuple[ProjectionDay, ...]
+    min_balance_cents: int
+    min_balance_date: date
+
+
+def project_cash(
+    start_balance_cents: int,
+    today: date,
+    days: int,
+    series: Iterable[RecurringSeries],
+    variable_daily: int,
+) -> Projection:
+    """Saldo previsto ao fim de cada dia de amanhã até hoje + days."""
+    if not 1 <= days <= PROJECTION_MAX_DAYS:
+        raise ValueError(f"days deve estar entre 1 e {PROJECTION_MAX_DAYS}")
+    end = today + timedelta(days=days)
+    scheduled: dict[date, list[ProjectedRecurrence]] = {}
+    for item in series:
+        predicted = next_occurrence(item, today)
+        # Intervalo curto pode prever mais de uma ocorrência dentro do horizonte.
+        while predicted <= end:
+            scheduled.setdefault(predicted, []).append(
+                ProjectedRecurrence(item.description, item.amount_cents)
+            )
+            predicted += timedelta(days=item.interval_days)
+
+    balance = start_balance_cents
+    items = []
+    for offset in range(1, days + 1):
+        day = today + timedelta(days=offset)
+        recurrences = tuple(scheduled.get(day, ()))
+        recurring = sum(r.amount_cents for r in recurrences)
+        balance += recurring + variable_daily
+        items.append(ProjectionDay(day, recurrences, recurring, variable_daily, balance))
+    # min() devolve o primeiro em empate: o dia mais cedo em que o mínimo acontece.
+    lowest = min(items, key=lambda item: item.balance_cents)
+    return Projection(
+        start_balance_cents=start_balance_cents,
+        variable_daily_cents=variable_daily,
+        days=days,
+        items=tuple(items),
+        min_balance_cents=lowest.balance_cents,
+        min_balance_date=lowest.date,
+    )

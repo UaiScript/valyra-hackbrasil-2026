@@ -11,7 +11,7 @@ from valyra.core.deps import get_current_user_id
 from valyra.core.errors import AppError, error_responses
 from valyra.core.pagination import Page, PageParams
 from valyra.finance import service
-from valyra.finance.analytics import MONTH_PATTERN
+from valyra.finance.analytics import MONTH_PATTERN, PROJECTION_DEFAULT_DAYS, PROJECTION_MAX_DAYS
 
 # Alias: o filtro da rota também se chama is_anomaly.
 from valyra.finance.analytics import is_anomaly as anomaly_flag
@@ -26,6 +26,9 @@ from valyra.finance.schemas import (
     ImportBatchSummaryOut,
     ImportRejectionOut,
     IsoDate,
+    ProjectedRecurrenceOut,
+    ProjectionDayOut,
+    ProjectionOut,
     SummaryOut,
     TransactionCategoryOut,
     TransactionOut,
@@ -230,4 +233,46 @@ def get_summary(
             )
             for total in totals.categories
         ],
+    )
+
+
+# 404 para conta alheia ou inexistente; 422 BALANCE_UNAVAILABLE com referência futura.
+@router.get(
+    "/accounts/{id}/projection",
+    name="finance_get_projection",
+    response_model=ProjectionOut,
+    responses=error_responses(404),
+)
+def get_projection(
+    id: UUID,
+    session: SessionDep,
+    user_id: UserIdDep,
+    days: Annotated[
+        int,
+        Query(ge=1, le=PROJECTION_MAX_DAYS, description="Horizonte em dias, a partir de amanhã"),
+    ] = PROJECTION_DEFAULT_DAYS,
+) -> ProjectionOut:
+    result = service.get_projection(session, user_id, id, days)
+    projection = result.projection
+    return ProjectionOut(
+        account_id=result.account_id,
+        today=result.today,
+        start_balance_cents=projection.start_balance_cents,
+        variable_daily_cents=projection.variable_daily_cents,
+        days=projection.days,
+        items=[
+            ProjectionDayOut(
+                date=day.date,
+                recurrences=[
+                    ProjectedRecurrenceOut(description=r.description, amount_cents=r.amount_cents)
+                    for r in day.recurrences
+                ],
+                recurring_cents=day.recurring_cents,
+                variable_cents=day.variable_cents,
+                balance_cents=day.balance_cents,
+            )
+            for day in projection.items
+        ],
+        min_balance_cents=projection.min_balance_cents,
+        min_balance_date=projection.min_balance_date,
     )

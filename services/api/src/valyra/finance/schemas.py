@@ -159,3 +159,35 @@ class SummaryOut(BaseModel):
     expenses_cents: int
     net_cents: int
     categories: list[CategoryTotalOut]
+
+
+class ProjectedRecurrenceOut(BaseModel):
+    description: str
+    # Com sinal; mediana da série recorrente, não um valor realizado.
+    amount_cents: int
+
+
+class ProjectionDayOut(BaseModel):
+    date: date
+    recurrences: list[ProjectedRecurrenceOut]
+    # Soma das recorrências previstas no dia, com sinal.
+    recurring_cents: int
+    # Média diária de saídas variáveis (<= 0), igual em todos os dias.
+    variable_cents: int
+    # Saldo previsto ao fim do dia.
+    balance_cents: int
+
+
+class ProjectionOut(BaseModel):
+    """Projeção da Issue #46: valores previstos, separados do saldo realizado de partida."""
+
+    account_id: UUID
+    today: date
+    # Saldo realizado ao fim de hoje (ADR-0010, seção 1).
+    start_balance_cents: int
+    variable_daily_cents: int
+    days: int
+    items: list[ProjectionDayOut]
+    min_balance_cents: int
+    # Primeiro dia em que o mínimo ocorre.
+    min_balance_date: date
