@@ -51,6 +51,46 @@ source_modules = ["valyra.core"]
 forbidden_modules = ["valyra.finance"]
 
 [[tool.importlinter.contracts]]
+name = "Core não depende de Alerts"
+type = "forbidden"
+source_modules = ["valyra.core"]
+forbidden_modules = ["valyra.alerts"]
+
+[[tool.importlinter.contracts]]
+name = "Alerts não importa Finance"
+type = "forbidden"
+source_modules = ["valyra.alerts"]
+forbidden_modules = ["valyra.finance"]
+
+[[tool.importlinter.contracts]]
+name = "Finance usa Alerts só pelo service"
+type = "forbidden"
+source_modules = ["valyra.finance"]
+forbidden_modules = [
+    "valyra.alerts.router", "valyra.alerts.schemas", "valyra.alerts.domain",
+    "valyra.alerts.repository", "valyra.alerts.models",
+]
+# O service de Alerts importa os próprios models e repository; o caminho indireto é permitido.
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Domínio Alerts sem banco, HTTP, IA ou configuração"
+type = "forbidden"
+source_modules = ["valyra.alerts.domain"]
+forbidden_modules = [
+    "sqlalchemy", "fastapi", "httpx", "requests", "openai", "google", "valyra.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "Camadas do Alerts"
+type = "layers"
+layers = [
+    "valyra.alerts.router",
+    "valyra.alerts.service",
+    "valyra.alerts.domain | valyra.alerts.repository",
+]
+
+[[tool.importlinter.contracts]]
 name = "Domínio Finance sem banco, HTTP ou IA"
 type = "forbidden"
 source_modules = ["valyra.finance.domain"]

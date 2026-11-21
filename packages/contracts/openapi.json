@@ -53,6 +53,98 @@
         "title": "AccountUpdate",
         "type": "object"
       },
+      "AlertOut": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/CashPressureEvidenceOut"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "cash_pressure",
+            "title": "Kind",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "new",
+              "read"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "severity",
+          "status",
+          "title",
+          "message",
+          "evidence",
+          "account_id",
+          "created_at",
+          "read_at"
+        ],
+        "title": "AlertOut",
+        "type": "object"
+      },
+      "AlertUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "const": "read",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "AlertUpdate",
+        "type": "object"
+      },
       "Body_finance_create_import_batch": {
         "properties": {
           "file": {
@@ -65,6 +157,42 @@
           "file"
         ],
         "title": "Body_finance_create_import_batch",
+        "type": "object"
+      },
+      "CashPressureEvidenceOut": {
+        "description": "Snapshot da proje\u00e7\u00e3o que gerou o alerta; valores previstos, n\u00e3o realizados.",
+        "properties": {
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "min_balance_cents": {
+            "title": "Min Balance Cents",
+            "type": "integer"
+          },
+          "min_balance_date": {
+            "format": "date",
+            "title": "Min Balance Date",
+            "type": "string"
+          },
+          "start_balance_cents": {
+            "title": "Start Balance Cents",
+            "type": "integer"
+          },
+          "today": {
+            "format": "date",
+            "title": "Today",
+            "type": "string"
+          }
+        },
+        "required": [
+          "days",
+          "today",
+          "start_balance_cents",
+          "min_balance_cents",
+          "min_balance_date"
+        ],
+        "title": "CashPressureEvidenceOut",
         "type": "object"
       },
       "CategoryOut": {
@@ -183,6 +311,63 @@
           "postgres"
         ],
         "title": "HealthResponse",
+        "type": "object"
+      },
+      "ImportBatchCreatedOut": {
+        "properties": {
+          "alerts_created": {
+            "title": "Alerts Created",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "rejections": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRejectionOut"
+            },
+            "title": "Rejections",
+            "type": "array"
+          },
+          "rows_duplicated": {
+            "title": "Rows Duplicated",
+            "type": "integer"
+          },
+          "rows_imported": {
+            "title": "Rows Imported",
+            "type": "integer"
+          },
+          "rows_rejected": {
+            "title": "Rows Rejected",
+            "type": "integer"
+          },
+          "rows_total": {
+            "title": "Rows Total",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "processing",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "rows_total",
+          "rows_imported",
+          "rows_duplicated",
+          "rows_rejected",
+          "rejections",
+          "alerts_created"
+        ],
+        "title": "ImportBatchCreatedOut",
         "type": "object"
       },
       "ImportBatchOut": {
@@ -333,6 +518,37 @@
           "offset"
         ],
         "title": "Page[AccountOut]",
+        "type": "object"
+      },
+      "Page_AlertOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AlertOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[AlertOut]",
         "type": "object"
       },
       "Page_CategoryOut_": {
@@ -738,6 +954,125 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/alerts": {
+      "get": {
+        "operationId": "alerts_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AlertOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Alerts List",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/api/v1/alerts/{id}": {
+      "patch": {
+        "operationId": "alerts_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso n\u00e3o encontrado"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Alerts Update",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
     "/api/v1/finance/accounts": {
       "get": {
         "operationId": "finance_list_accounts",
@@ -824,7 +1159,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImportBatchOut"
+                  "$ref": "#/components/schemas/ImportBatchCreatedOut"
                 }
               }
             },

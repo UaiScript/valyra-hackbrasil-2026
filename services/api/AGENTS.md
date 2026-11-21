@@ -1,10 +1,10 @@
 # Contexto de backend
 
-Leia o [contexto raiz](../../AGENTS.md). Esta pasta contém core HTTP (/health), seis modelos, Alembic, seed, domínio CSV, importação, consultas, correção de categoria, resumo mensal, recorrência, gastos atípicos e projeção de caixa Finance via HTTP (#14/#15/#42/#43/#44/#45/#46) e testes. Pressão de caixa (#47), Alpha, alertas e IA continuam planejados.
+Leia o [contexto raiz](../../AGENTS.md). Esta pasta contém core HTTP (/health), sete modelos, Alembic, seed, domínio CSV, importação, consultas, correção de categoria, resumo mensal, recorrência, gastos atípicos e projeção de caixa Finance via HTTP (#14/#15/#42/#43/#44/#45/#46), alertas de pressão de caixa (#47) e testes. Alpha, alertas `market_signal` e IA continuam planejados.
 
 ## Estrutura e dependências
 
-O backend é um único FastAPI, com `core` compartilhado e módulos por domínio sob `src/valyra/`: `finance`, `alpha`, `alerts` e `ai`. `alerts` integra o desenho da modelagem; sua implementação é posterior ao Finance inicial.
+O backend é um único FastAPI, com `core` compartilhado e módulos por domínio sob `src/valyra/`: `finance`, `alpha`, `alerts` e `ai`. `alerts` existe só para `cash_pressure` (#47): Finance chama `alerts.service` dentro da transação da importação, e Alerts não importa Finance (contratos import-linter). `alerts.service.create_cash_pressure` não faz commit.
 
 Cada módulo separa `router.py` (HTTP), `schemas.py` (entrada/saída Pydantic), `service.py` (casos de uso), `domain.py` (regras puras), `repository.py` (I/O) e `models.py` (ORM), criando apenas o que o incremento utilizar.
 
@@ -36,7 +36,7 @@ Fontes: [contrato Finance](../../docs/api-design.md), [modelagem](../../docs/mod
 - Autogenerate é rascunho: revisar tipos, defaults, checks, índices, FKs, operações de dados e downgrade à mão.
 - Nunca edite migração já integrada na `main`; crie uma nova. Resolva múltiplas cabeças antes do merge, preservando a história integrada.
 - Banco de testes separado e explícito por `TEST_DATABASE_URL`; nunca recorrer ao banco da aplicação para limpar dados. Verifique o destino efetivo antes de operações destrutivas.
-- Seed idempotente, sem reset nem importação automática de transações. A primeira migração cobre somente User e as cinco tabelas Finance da revisão.
+- Seed idempotente, sem reset nem importação automática de transações. A primeira migração cobre somente User e as cinco tabelas Finance da revisão; `0002_alerts` cria `alerts`.
 - Testes de regras, HTTP e persistência conforme o incremento; testes de `as_of` precisam excluir publicações/revisões futuras. Não gerar contratos manuais para passar CI.
 
 ## Ordem para criar um endpoint
@@ -47,7 +47,7 @@ Fontes: [contrato Finance](../../docs/api-design.md), [modelagem](../../docs/mod
 4. Adicionar teste de comportamento, incluindo erro relevante.
 5. Executar `make openapi`, revisar o contrato gerado e avisar os consumidores.
 
-Comandos disponíveis na raiz: `make dev`, `make lint`, `make migrate`, `make seed`, `make test`, `make openapi`. A configuração oficial é services/api/pyproject.toml com uv.lock. make test-domain roda os 242 casos puros (domínio CSV, analytics e clock) sem conexão PostgreSQL; pytest completo usa banco exclusivo para persistência, health e Finance HTTP (fixtures `client` e `db_session` em `tests/conftest.py`; `seed` e `importar` em `tests/finance/conftest.py`). A dependência de fixtures de banco é explícita, não autouse.
+Comandos disponíveis na raiz: `make dev`, `make lint`, `make migrate`, `make seed`, `make test`, `make openapi`. A configuração oficial é services/api/pyproject.toml com uv.lock. make test-domain roda os 255 casos puros (domínio CSV, analytics, clock e domínio de alertas) sem conexão PostgreSQL; pytest completo usa banco exclusivo para persistência, health, Finance e Alerts HTTP (fixtures `client` e `db_session` em `tests/conftest.py`; `seed` e `importar` em `tests/finance/conftest.py`). A dependência de fixtures de banco é explícita, não autouse.
 
 No CSV, line_number é a primeira linha física; raw_line preserva quebras internas. Registros malformados e estouro de csv.field_size_limit são wrong_column_count; o limite do processo (normalmente 131072 caracteres) não é alterado. O enquadramento lógico impede importar fragmentos após erro. O router de importação lê no máximo `MAX_FILE_BYTES + 1` bytes e responde 413 acima de 1 MiB; o servidor ainda recebe o corpo inteiro antes, então um limite de requisição precisa vir do servidor/proxy.
 

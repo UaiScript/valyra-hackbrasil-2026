@@ -22,6 +22,7 @@ from valyra.finance.schemas import (
     AccountUpdate,
     CategoryOut,
     CategoryTotalOut,
+    ImportBatchCreatedOut,
     ImportBatchOut,
     ImportBatchSummaryOut,
     ImportRejectionOut,
@@ -71,18 +72,19 @@ def _transaction_out(t: Transaction, category: Category) -> TransactionOut:
     "/accounts/{account_id}/import-batches",
     name="finance_create_import_batch",
     status_code=201,
-    response_model=ImportBatchOut,
+    response_model=ImportBatchCreatedOut,
     responses=error_responses(404, 413),
 )
 def create_import_batch(
     account_id: UUID, file: Annotated[UploadFile, File()], session: SessionDep, user_id: UserIdDep
-) -> ImportBatchOut:
+) -> ImportBatchCreatedOut:
     # Lê no máximo um byte além do limite: basta para saber que excedeu sem carregar o resto.
     content = file.file.read(MAX_FILE_BYTES + 1)
     if len(content) > MAX_FILE_BYTES:
         raise AppError("FILE_TOO_LARGE", "O arquivo excede o limite de 1 MiB", 413)
-    batch = service.import_csv(session, user_id, account_id, file.filename or "", content)
-    return _batch_out(session, user_id, batch.id)
+    result = service.import_csv(session, user_id, account_id, file.filename or "", content)
+    batch = _batch_out(session, user_id, result.batch.id)
+    return ImportBatchCreatedOut(**batch.model_dump(), alerts_created=result.alerts_created)
 
 
 @router.get(
