@@ -1,4 +1,5 @@
-"""Casos de uso do Finance: importação (#14), consultas (#15), correção (#42) e resumo (#43)."""
+"""Casos de uso do Finance: importação (#14), consultas (#15), correção (#42), resumo (#43)
+e recorrência (#44)."""
 
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -13,6 +14,7 @@ from valyra.core.errors import AppError
 from valyra.finance import repository
 from valyra.finance.analytics import (
     MonthSummary,
+    detect_recurrences,
     month_bounds,
     realized_balance_cents,
     summarize_month,
@@ -22,6 +24,7 @@ from valyra.finance.domain import (
     categorize,
     category_kind_matches,
     compute_row_hashes,
+    normalize_description,
     parse_csv,
 )
 from valyra.finance.models import Account, Category, ImportBatch, ImportRejection, Transaction
@@ -90,6 +93,8 @@ def import_csv(
                 }
             )
         inserted = repository.insert_transactions(session, values)
+        # Na mesma transação da importação: falha no recálculo desfaz também as linhas novas.
+        _refresh_recurrence(session, account.id)
 
         batch.rows_imported = inserted
         batch.rows_duplicated = len(result.rows) - inserted
@@ -102,6 +107,23 @@ def import_csv(
     except BaseException:
         session.rollback()
         raise
+
+
+def _refresh_recurrence(session: Session, account_id: UUID) -> None:
+    """Recalcula a recorrência de toda a conta e grava só as linhas cujo flag mudou."""
+    rows = repository.list_recurrence_inputs(session, account_id)
+    recurring = detect_recurrences(
+        (row_id, row_date, amount, normalize_description(description))
+        for row_id, row_date, amount, description, _, _ in rows
+    )
+    # Gravar só a diferença mantém updated_at intacto quando reimportar não muda nada; uma
+    # ocorrência nova fora da regra também pode desmarcar uma série antes recorrente.
+    changes = [
+        {"id": row_id, "is_recurring": row_id in recurring, "recurrence_key": recurring.get(row_id)}
+        for row_id, _, _, _, is_recurring, key in rows
+        if (is_recurring, key) != (row_id in recurring, recurring.get(row_id))
+    ]
+    repository.update_recurrence(session, changes)
 
 
 def get_import_batch(
@@ -177,6 +199,7 @@ def list_transactions(
     date_from: date | None,
     date_to: date | None,
     category_id: UUID | None,
+    is_recurring: bool | None,
     limit: int,
     offset: int,
 ) -> tuple[list[tuple[Transaction, Category]], int]:
@@ -190,6 +213,7 @@ def list_transactions(
         date_from=date_from,
         date_to=date_to,
         category_id=category_id,
+        is_recurring=is_recurring,
         limit=limit,
         offset=offset,
     )

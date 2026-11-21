@@ -121,7 +121,7 @@ class TransactionCategoryOut(BaseModel):
 
 
 class TransactionOut(BaseModel):
-    # is_recurring e anomalia ficam fora até existirem os cálculos que os preenchem.
+    # anomaly_score fica fora até a F6; recurrence_key é detalhe interno da série.
     id: UUID
     date: date
     description: str
@@ -130,6 +130,8 @@ class TransactionOut(BaseModel):
     category_source: Literal["rule", "model", "user"]
     category_confidence: Decimal | None
     predicted_category_id: UUID
+    # Recalculado ao fim de cada importação (ADR-0010, seção 3); recurrence_key não é exposto.
+    is_recurring: bool
 
 
 class CategoryTotalOut(BaseModel):

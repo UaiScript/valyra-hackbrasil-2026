@@ -54,6 +54,7 @@ def _transaction_out(t: Transaction, category: Category) -> TransactionOut:
         category_source=t.category_source,
         category_confidence=t.category_confidence,
         predicted_category_id=t.predicted_category_id,
+        is_recurring=t.is_recurring,
     )
 
 
@@ -144,6 +145,7 @@ def list_transactions(
     date_from: IsoDate | None = None,
     date_to: IsoDate | None = None,
     category_id: UUID | None = None,
+    is_recurring: bool | None = None,
 ) -> Page[TransactionOut]:
     rows, total = service.list_transactions(
         session,
@@ -152,6 +154,7 @@ def list_transactions(
         date_from=date_from,
         date_to=date_to,
         category_id=category_id,
+        is_recurring=is_recurring,
         limit=page.limit,
         offset=page.offset,
     )

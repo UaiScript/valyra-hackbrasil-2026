@@ -155,7 +155,9 @@ def test_transacao_em_centavos_sem_campos_ainda_nao_calculados(client, seed, imp
     importar(b"2026-11-01,A,-1.00\n")
     item = client.get("/api/v1/finance/transactions").json()["items"][0]
     assert item["amount_cents"] == -100 and "amount" not in item
-    assert "is_recurring" not in item and "is_anomaly" not in item
+    # is_recurring existe desde a #44; anomalia e chave da série continuam fora.
+    assert "is_anomaly" not in item and "anomaly_score" not in item
+    assert "recurrence_key" not in item
 
 
 def test_formato_completo_da_transacao(client, seed, importar):
@@ -171,6 +173,7 @@ def test_formato_completo_da_transacao(client, seed, importar):
         "category_source",
         "category_confidence",
         "predicted_category_id",
+        "is_recurring",
     }
     assert item["category"] == {"id": mercado, "slug": "mercado", "name": "Mercado"}
     assert (item["category_source"], item["category_confidence"]) == ("rule", None)
