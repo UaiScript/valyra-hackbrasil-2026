@@ -1,0 +1,403 @@
+/*
+ * Valyra global styles and primitive UI patterns.
+ * Import after tokens.css, themes.css and typography.css.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  scroll-behavior: smooth;
+  background: var(--color-bg);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+textarea:disabled,
+select:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+img,
+svg,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+img {
+  height: auto;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+::selection {
+  color: var(--color-primary-contrast);
+  background: var(--color-primary);
+}
+
+hr {
+  height: 1px;
+  margin: var(--space-6) 0;
+  border: 0;
+  background: var(--color-divider);
+}
+
+/* Layout helpers */
+.container {
+  width: min(100% - (2 * var(--page-gutter)), var(--content-width-xl));
+  margin-inline: auto;
+}
+
+.container--narrow {
+  max-width: var(--content-width-md);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.surface {
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+/* Buttons */
+.button {
+  display: inline-flex;
+  min-height: 2.625rem;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0.625rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+.button:hover:not(:disabled) {
+  text-decoration: none;
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button--primary {
+  color: var(--color-primary-contrast);
+  background: var(--color-primary);
+}
+.button--primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+.button--primary:active:not(:disabled) {
+  background: var(--color-primary-active);
+}
+
+.button--secondary {
+  color: var(--color-secondary-contrast);
+  background: var(--color-secondary);
+  border-color: var(--color-border);
+}
+.button--secondary:hover:not(:disabled) {
+  background: var(--color-secondary-hover);
+}
+
+.button--outline {
+  color: var(--color-text);
+  background: transparent;
+  border-color: var(--color-border-strong);
+}
+.button--outline:hover:not(:disabled) {
+  background: var(--color-bg-subtle);
+}
+
+.button--ghost {
+  color: var(--color-text-muted);
+  background: transparent;
+}
+.button--ghost:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-bg-subtle);
+}
+
+.button--danger {
+  color: #fff;
+  background: var(--color-danger);
+}
+.button--danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+.button--sm {
+  min-height: 2rem;
+  padding: 0.4375rem 0.75rem;
+  font-size: var(--font-size-xs);
+}
+.button--lg {
+  min-height: 3rem;
+  padding: 0.875rem 1.25rem;
+  font-size: var(--font-size-md);
+}
+.button--full {
+  width: 100%;
+}
+
+/* Form controls */
+.field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.field__label {
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.6875rem 0.875rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+.textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.input:hover:not(:disabled),
+.select:hover:not(:disabled),
+.textarea:hover:not(:disabled) {
+  border-color: var(--color-text-subtle);
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 var(--focus-ring-width) color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.input[aria-invalid="true"],
+.select[aria-invalid="true"],
+.textarea[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+.field__hint {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-xs);
+}
+
+.field__error {
+  color: var(--color-danger-text);
+  font-size: var(--font-size-xs);
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  min-height: 1.5rem;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.1875rem 0.625rem;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.badge--neutral {
+  color: var(--color-text-muted);
+  background: var(--color-bg-subtle);
+}
+.badge--success {
+  color: var(--color-success-text);
+  background: var(--color-success-soft);
+}
+.badge--warning {
+  color: var(--color-warning-text);
+  background: var(--color-warning-soft);
+}
+.badge--danger {
+  color: var(--color-danger-text);
+  background: var(--color-danger-soft);
+}
+.badge--info {
+  color: var(--color-info-text);
+  background: var(--color-info-soft);
+}
+.badge--brand {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+/* Cards */
+.card {
+  padding: var(--space-5);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+}
+
+.card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.card__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.card__description {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* Loading and reduced-motion behavior */
+.is-loading {
+  cursor: progress;
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.skeleton {
+  min-height: 1rem;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-subtle) 25%,
+    var(--color-border) 50%,
+    var(--color-bg-subtle) 75%
+  );
+  background-size: 200% 100%;
+  animation: valyra-skeleton 1.4s ease-in-out infinite;
+}
+
+@keyframes valyra-skeleton {
+  to { background-position: -200% 0; }
+}
+
+.spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: valyra-spin 0.7s linear infinite;
+}
+
+@keyframes valyra-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 40rem) {
+  .card {
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+  }
+
+  .button--mobile-full {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
