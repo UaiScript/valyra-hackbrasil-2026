@@ -1,0 +1,21 @@
+# Blueprint do Render: publica a API (services/api) no plano gratuito.
+# O banco fica no Neon porque o PostgreSQL gratuito do Render expira em 30 dias.
+# Passo a passo em docs/deploy.md.
+services:
+  - type: web
+    name: valyra-api
+    runtime: docker
+    plan: free
+    # Virginia fica junto do Neon em AWS us-east-1; banco e API na mesma região reduz latência.
+    region: virginia
+    branch: main
+    dockerContext: ./services/api
+    dockerfilePath: ./services/api/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      # Connection string direta do Neon (sem pooler); o start.sh acrescenta o driver psycopg.
+      - key: DATABASE_URL
+        sync: false
+      # Origem exata do front na Vercel, sem barra final, por exemplo https://valyra.vercel.app.
+      - key: CORS_ORIGIN
+        sync: false
