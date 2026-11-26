@@ -11,6 +11,8 @@ dependencies = [
     "pydantic-settings>=2.7,<3",
     "sqlalchemy>=2.0.36,<2.1",
     "python-multipart>=0.0.20,<1",
+    # zoneinfo no Windows não tem a base IANA do sistema; core/clock usa America/Sao_Paulo.
+    "tzdata>=2024.1; sys_platform == 'win32'",
 ]
 
 [dependency-groups]
@@ -49,10 +51,58 @@ source_modules = ["valyra.core"]
 forbidden_modules = ["valyra.finance"]
 
 [[tool.importlinter.contracts]]
+name = "Core não depende de Alerts"
+type = "forbidden"
+source_modules = ["valyra.core"]
+forbidden_modules = ["valyra.alerts"]
+
+[[tool.importlinter.contracts]]
+name = "Alerts não importa Finance"
+type = "forbidden"
+source_modules = ["valyra.alerts"]
+forbidden_modules = ["valyra.finance"]
+
+[[tool.importlinter.contracts]]
+name = "Finance usa Alerts só pelo service"
+type = "forbidden"
+source_modules = ["valyra.finance"]
+forbidden_modules = [
+    "valyra.alerts.router", "valyra.alerts.schemas", "valyra.alerts.domain",
+    "valyra.alerts.repository", "valyra.alerts.models",
+]
+# O service de Alerts importa os próprios models e repository; o caminho indireto é permitido.
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Domínio Alerts sem banco, HTTP, IA ou configuração"
+type = "forbidden"
+source_modules = ["valyra.alerts.domain"]
+forbidden_modules = [
+    "sqlalchemy", "fastapi", "httpx", "requests", "openai", "google", "valyra.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "Camadas do Alerts"
+type = "layers"
+layers = [
+    "valyra.alerts.router",
+    "valyra.alerts.service",
+    "valyra.alerts.domain | valyra.alerts.repository",
+]
+
+[[tool.importlinter.contracts]]
 name = "Domínio Finance sem banco, HTTP ou IA"
 type = "forbidden"
 source_modules = ["valyra.finance.domain"]
 forbidden_modules = ["sqlalchemy", "fastapi", "httpx", "requests", "openai", "google"]
+
+[[tool.importlinter.contracts]]
+name = "Analytics Finance sem banco, HTTP, IA ou configuração"
+type = "forbidden"
+source_modules = ["valyra.finance.analytics"]
+forbidden_modules = [
+    "sqlalchemy", "fastapi", "httpx", "requests", "openai", "google", "valyra.core",
+]
 
 [[tool.importlinter.contracts]]
 name = "Camadas do Finance"
@@ -60,5 +110,5 @@ type = "layers"
 layers = [
     "valyra.finance.router",
     "valyra.finance.service",
-    "valyra.finance.domain | valyra.finance.repository",
+    "valyra.finance.domain | valyra.finance.analytics | valyra.finance.repository",
 ]

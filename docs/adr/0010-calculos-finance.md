@@ -97,4 +97,4 @@ score = min(1, z / 4,375)
 
 ## Status
 
-**Proposta — 2026-11-13.** Valores debatidos com Samuel na preparação da Issue #40. A ADR fica aceita só depois que o time confirmar ou ajustar os limiares no PR (critério 3 da Issue #40): 25–35 dias, ±10%, ≥ 3 meses, ≥ 5 saídas, `0,8` (z = 3,5), janela de 90 dias e gatilho `< 0`.
+**Aceita — 2026-11-18.** Proposta em 2026-11-13, com valores debatidos com Samuel na preparação da Issue #40. A Issue #40 foi concluída e a aceitação foi registrada no PR da Issue #43 (F4), primeiro código que depende destas convenções: 25–35 dias, ±10%, ≥ 3 meses, ≥ 5 saídas, `0,8` (z = 3,5), janela de 90 dias e gatilho `< 0`.

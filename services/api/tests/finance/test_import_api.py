@@ -29,7 +29,10 @@ def test_importacao_valida(client, seed):
     b = r.json()
     contadores = (b["rows_total"], b["rows_imported"], b["rows_duplicated"], b["rows_rejected"])
     assert (b["status"], *contadores) == ("completed", 2, 2, 0, 0)
-    assert b["rejections"] == [] and "alerts_created" not in b
+    # Saldo de referência alto: a projeção não fica negativa e nenhum alerta é criado.
+    assert b["rejections"] == [] and b["alerts_created"] == 0
+    # alerts_created descreve a criação; a consulta posterior do lote não o carrega.
+    assert "alerts_created" not in client.get(f"/api/v1/finance/import-batches/{b['id']}").json()
 
 
 def test_reimportar_mesmo_arquivo_nao_duplica(client, seed):
