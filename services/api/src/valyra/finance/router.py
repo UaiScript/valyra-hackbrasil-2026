@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from valyra.core.db import get_session
@@ -11,16 +11,26 @@ from valyra.core.deps import get_current_user_id
 from valyra.core.errors import AppError, error_responses
 from valyra.core.pagination import Page, PageParams
 from valyra.finance import service
+from valyra.finance.analytics import MONTH_PATTERN, PROJECTION_DEFAULT_DAYS, PROJECTION_MAX_DAYS
+
+# Alias: o filtro da rota também se chama is_anomaly.
+from valyra.finance.analytics import is_anomaly as anomaly_flag
 from valyra.finance.domain import MAX_FILE_BYTES
 from valyra.finance.models import Category, Transaction
 from valyra.finance.schemas import (
     AccountOut,
     AccountUpdate,
     CategoryOut,
+    CategoryTotalOut,
+    ImportBatchCreatedOut,
     ImportBatchOut,
     ImportBatchSummaryOut,
     ImportRejectionOut,
     IsoDate,
+    ProjectedRecurrenceOut,
+    ProjectionDayOut,
+    ProjectionOut,
+    SummaryOut,
     TransactionCategoryOut,
     TransactionOut,
     TransactionUpdate,
@@ -51,6 +61,9 @@ def _transaction_out(t: Transaction, category: Category) -> TransactionOut:
         category_source=t.category_source,
         category_confidence=t.category_confidence,
         predicted_category_id=t.predicted_category_id,
+        is_recurring=t.is_recurring,
+        anomaly_score=t.anomaly_score,
+        is_anomaly=anomaly_flag(t.anomaly_score),
     )
 
 
@@ -59,18 +72,19 @@ def _transaction_out(t: Transaction, category: Category) -> TransactionOut:
     "/accounts/{account_id}/import-batches",
     name="finance_create_import_batch",
     status_code=201,
-    response_model=ImportBatchOut,
+    response_model=ImportBatchCreatedOut,
     responses=error_responses(404, 413),
 )
 def create_import_batch(
     account_id: UUID, file: Annotated[UploadFile, File()], session: SessionDep, user_id: UserIdDep
-) -> ImportBatchOut:
+) -> ImportBatchCreatedOut:
     # Lê no máximo um byte além do limite: basta para saber que excedeu sem carregar o resto.
     content = file.file.read(MAX_FILE_BYTES + 1)
     if len(content) > MAX_FILE_BYTES:
         raise AppError("FILE_TOO_LARGE", "O arquivo excede o limite de 1 MiB", 413)
-    batch = service.import_csv(session, user_id, account_id, file.filename or "", content)
-    return _batch_out(session, user_id, batch.id)
+    result = service.import_csv(session, user_id, account_id, file.filename or "", content)
+    batch = _batch_out(session, user_id, result.batch.id)
+    return ImportBatchCreatedOut(**batch.model_dump(), alerts_created=result.alerts_created)
 
 
 @router.get(
@@ -141,6 +155,8 @@ def list_transactions(
     date_from: IsoDate | None = None,
     date_to: IsoDate | None = None,
     category_id: UUID | None = None,
+    is_recurring: bool | None = None,
+    is_anomaly: bool | None = None,
 ) -> Page[TransactionOut]:
     rows, total = service.list_transactions(
         session,
@@ -149,6 +165,8 @@ def list_transactions(
         date_from=date_from,
         date_to=date_to,
         category_id=category_id,
+        is_recurring=is_recurring,
+        is_anomaly=is_anomaly,
         limit=page.limit,
         offset=page.offset,
     )
@@ -181,4 +199,82 @@ def list_categories(
         total=total,
         limit=page.limit,
         offset=page.offset,
+    )
+
+
+# 404 quando account_id aponta conta inexistente ou de outro usuário.
+@router.get(
+    "/summary",
+    name="finance_get_summary",
+    response_model=SummaryOut,
+    responses=error_responses(404),
+)
+def get_summary(
+    session: SessionDep,
+    user_id: UserIdDep,
+    account_id: UUID | None = None,
+    month: Annotated[
+        str | None, Query(pattern=f"^{MONTH_PATTERN}$", description="AAAA-MM; padrão: mês de hoje")
+    ] = None,
+) -> SummaryOut:
+    summary = service.get_summary(session, user_id, account_id, month)
+    totals = summary.month_summary
+    return SummaryOut(
+        account_id=summary.account_id,
+        month=summary.month,
+        today=summary.today,
+        realized_balance_cents=summary.realized_balance_cents,
+        income_cents=totals.income_cents,
+        expenses_cents=totals.expenses_cents,
+        net_cents=totals.net_cents,
+        categories=[
+            CategoryTotalOut(
+                category=CategoryOut.model_validate(summary.categories[total.category_id]),
+                total_cents=total.total_cents,
+                count=total.count,
+            )
+            for total in totals.categories
+        ],
+    )
+
+
+# 404 para conta alheia ou inexistente; 422 BALANCE_UNAVAILABLE com referência futura.
+@router.get(
+    "/accounts/{id}/projection",
+    name="finance_get_projection",
+    response_model=ProjectionOut,
+    responses=error_responses(404),
+)
+def get_projection(
+    id: UUID,
+    session: SessionDep,
+    user_id: UserIdDep,
+    days: Annotated[
+        int,
+        Query(ge=1, le=PROJECTION_MAX_DAYS, description="Horizonte em dias, a partir de amanhã"),
+    ] = PROJECTION_DEFAULT_DAYS,
+) -> ProjectionOut:
+    result = service.get_projection(session, user_id, id, days)
+    projection = result.projection
+    return ProjectionOut(
+        account_id=result.account_id,
+        today=result.today,
+        start_balance_cents=projection.start_balance_cents,
+        variable_daily_cents=projection.variable_daily_cents,
+        days=projection.days,
+        items=[
+            ProjectionDayOut(
+                date=day.date,
+                recurrences=[
+                    ProjectedRecurrenceOut(description=r.description, amount_cents=r.amount_cents)
+                    for r in day.recurrences
+                ],
+                recurring_cents=day.recurring_cents,
+                variable_cents=day.variable_cents,
+                balance_cents=day.balance_cents,
+            )
+            for day in projection.items
+        ],
+        min_balance_cents=projection.min_balance_cents,
+        min_balance_date=projection.min_balance_date,
     )

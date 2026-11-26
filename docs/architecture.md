@@ -3,14 +3,14 @@
 Visão operacional da branch integrada. Histórico e propostas permanecem nos três specs abaixo; não comprovam funcionalidades disponíveis.
 
 ```text
-apps/landing — React/TypeScript, estática → repositório oficial (futura aplicação configurável)
-apps/web — aplicação React planejada
-                         | /api/v1/finance (importação de CSV e consultas)
-services/api — FastAPI único: /health, Finance (8 operações no total) e OpenAPI
-core · finance (router → service → domínio CSV | repository → ORM)
+apps/web — React/TypeScript: landing estática → repositório oficial (aplicação Finance planejada)
+                         | /api/v1/finance (importação, consultas, resumo, projeção) · /api/v1/alerts
+services/api — FastAPI único: /health, Finance (10 operações), Alerts (2 operações) e OpenAPI
+core · finance (router → service → domínio CSV | analytics | repository → ORM)
+     · alerts (router → service → domínio | repository → ORM; Finance chama só o service)
         | PostgreSQL 18
         + pipelines → DuckDB/Parquet/fontes públicas (planejado)
-        + alpha · alerts · ai / provedor LLM (planejado)
+        + alpha · ai / provedor LLM (planejado)
 ```
 
 ## Estado efetivo
@@ -21,13 +21,15 @@ core · finance (router → service → domínio CSV | repository → ORM)
 - Importação Finance da Issue #14: `POST /api/v1/finance/accounts/{account_id}/import-batches` (multipart `file`, até 1 MiB) e consulta de lotes em `GET /api/v1/finance/import-batches` e `/import-batches/{id}`. O service grava lote, rejeições e transações em uma única transação, com `ON CONFLICT (account_id, row_hash) DO NOTHING`; falha técnica desfaz tudo. Contas de outro usuário respondem como inexistentes. Exemplo sintético em `datasets/samples/transactions_demo.csv`.
 - Consultas Finance da Issue #15: `GET /api/v1/finance/accounts`, `PATCH /api/v1/finance/accounts/{id}` (nome, saldo de referência em centavos e data, todos omissíveis), `GET /api/v1/finance/transactions` (filtros `account_id`, `date_from`, `date_to`, `category_id`; data decrescente) e `GET /api/v1/finance/categories` (por `kind` e `name`). Todas paginadas e restritas ao usuário demo. Campos ainda não calculados (`is_recurring`, anomalia) não são expostos.
 - Correção de categoria da Issue #42: `PATCH /api/v1/finance/transactions/{id}` com `{category_id}`; grava `category_source = user` e preserva a sugestão original (`predicted_category_id`, `category_confidence`). Transação de outro usuário responde 404 como inexistente; tipo da categoria precisa corresponder ao sinal.
-- Landing do PR #18: pacote independente apps/landing com build e testes próprios; números sintéticos identificados. CTA aponta ao GitHub. O destino futuro HTTPS é configurado no build, não pelo visitante.
+- Cálculos Finance das Issues #43–#46 (ADR-0010): saldo realizado e resumo mensal (`GET /api/v1/finance/summary`), recorrência e gasto atípico recalculados na importação e na correção de categoria, e projeção de caixa sob demanda (`GET /api/v1/finance/accounts/{id}/projection`). Funções puras em `finance/analytics.py`, sem banco, HTTP ou relógio.
+- Alertas da Issue #47: módulo `alerts/` com a tabela `alerts` (migração `0002_alerts`, só `cash_pressure`), `GET /api/v1/alerts` e `PATCH /api/v1/alerts/{id}`. A importação cria, na mesma transação, um alerta de pressão de caixa por conta por mês quando a projeção de 30 dias fica negativa, e o `POST` devolve `alerts_created`. Texto por template, sem LLM.
+- Landing do PR #18, movida para apps/web no PR #64, com build e testes próprios; números sintéticos identificados. CTA aponta ao GitHub. O destino futuro HTTPS é configurado no build, não pelo visitante.
 - CI: PostgreSQL/Compose, API consolidada e workflow independente da landing. Claude preparado; configuração externa e primeiro review são verificação separada. Resultados desta integração no PR e em [integração](integracao-11-12.md).
-- Não implementados no Finance: resumo, projeção de saldo, detecção de recorrência e de gastos atípicos. Fora do Finance: aplicação apps/web, projeções, categorização ML, sinais, replay, pipelines, DuckDB, alertas e IA.
+- Não implementados: aplicação Finance em apps/web, categorização ML, sinais, replay, pipelines, DuckDB, alertas `market_signal` (com o Alpha) e IA.
 
 ## Fronteiras
 
-Um backend modular, conforme [ADR-0001](adr/0001-monolito-modular.md). Router → service → domain/repository, verificado pelo contrato de camadas; core não importa Finance; domínio não importa banco/HTTP/IA. Contratos import-linter oficiais estão no pyproject da API. FKs cruzadas não autorizam acesso a repositories de outro domínio.
+Um backend modular, conforme [ADR-0001](adr/0001-monolito-modular.md). Router → service → domain/repository, verificado pelo contrato de camadas; core não importa Finance nem Alerts; Alerts não importa Finance e Finance usa Alerts só pelo service; domínio não importa banco/HTTP/IA. Contratos import-linter oficiais estão no pyproject da API. FKs cruzadas não autorizam acesso a repositories de outro domínio.
 
 Dinheiro Finance usa centavos inteiros ([ADR-0009](adr/0009-dinheiro-em-centavos.md)); datas de negócio são DATE e instantes UTC. Conta tem saldo de referência (fechamento), não cálculo realizado diário; convenções de cálculo na [ADR-0010](adr/0010-calculos-finance.md). Valores BIGINT além da precisão segura do JavaScript exigem alinhamento antes do frontend consumir esses extremos.
 
@@ -35,7 +37,7 @@ No desenho futuro, pipelines escrevem sinais append-only e API apenas lê; obser
 
 ## Frontend e remoção
 
-A landing não ocupa apps/web nem depende da API. Execução, configuração e remoção estão em [apps/landing/README.md](../apps/landing/README.md). A [arquitetura inicial do frontend na branch histórica](https://github.com/UaiScript/valyra-hackbrasil-2026/blob/9c2a87c2e992f83db7c84f37e0e0737ae16e06f4/docs/arquitetura-inicial.md) ainda não é um arquivo local. Não recuperar essa base ou renomear valyre/@valyre/web sem tarefa própria.
+A landing não depende da API. Execução e configuração estão em [apps/web/README.md](../apps/web/README.md). A [arquitetura inicial do frontend na branch histórica](https://github.com/UaiScript/valyra-hackbrasil-2026/blob/9c2a87c2e992f83db7c84f37e0e0737ae16e06f4/docs/arquitetura-inicial.md) ainda não é um arquivo local. Não recuperar essa base ou renomear valyre/@valyre/web sem tarefa própria.
 
 ## Histórico das decisões
 

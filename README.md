@@ -51,9 +51,9 @@ O MVP não inclui integração bancária real, execução de operações ou reco
 
 ## Landing page
 
-A página de apresentação está isolada em [`apps/landing/`](apps/landing/README.md), com build estático próprio e exemplos visuais sintéticos. Os links de acesso levam inicialmente ao [repositório oficial](https://github.com/UaiScript/valyra-hackbrasil-2026). Ela não depende da API ou do banco e não ocupa o diretório `apps/web` previsto para a aplicação.
+A página de apresentação fica em [`apps/web/`](apps/web/README.md), com build estático próprio e exemplos visuais sintéticos. Os links de acesso levam inicialmente ao [repositório oficial](https://github.com/UaiScript/valyra-hackbrasil-2026). Ela não depende da API ou do banco.
 
-Com Node.js 22.12 ou superior, execute `npm --prefix apps/landing ci --ignore-scripts` e `npm --prefix apps/landing run dev`. As instruções de validação, troca futura do destino, hospedagem e remoção estão no README da landing.
+Com Node.js 22.12 ou superior, execute `npm --prefix apps/web ci --ignore-scripts` e `npm --prefix apps/web run dev`. As instruções de validação, troca futura do destino e hospedagem estão no README de apps/web.
 
 ## Base técnica e estágio do projeto
 

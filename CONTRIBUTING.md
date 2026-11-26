@@ -28,14 +28,14 @@ O init roda em volume novo. Em volume existente, preserve os dados e execute ape
 ## Landing
 
 ```sh
-npm --prefix apps/landing ci --ignore-scripts
-npm --prefix apps/landing run dev
-npm --prefix apps/landing run check
-npm --prefix apps/landing test
-npm --prefix apps/landing run build
+npm --prefix apps/web ci --ignore-scripts
+npm --prefix apps/web run dev
+npm --prefix apps/web run check
+npm --prefix apps/web test
+npm --prefix apps/web run build
 ```
 
-Para navegador, na pasta apps/landing: npx --no-install playwright install chromium e npm run test:e2e. No Windows com Chrome instalado, defina PLAYWRIGHT_CHANNEL=chrome no processo. Veja [README da landing](apps/landing/README.md). apps/web e seus scripts npm dev/check/format:check são uma base histórica ainda não integrada; não há comando format:check da aplicação aqui.
+Para navegador, na pasta apps/web: npx --no-install playwright install chromium e npm run test:e2e. No Windows com Chrome instalado, defina PLAYWRIGHT_CHANNEL=chrome no processo. Veja [README de apps/web](apps/web/README.md).
 
 ## Fluxo e revisão
 

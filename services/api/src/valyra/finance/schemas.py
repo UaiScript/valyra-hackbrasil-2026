@@ -43,8 +43,12 @@ class ImportBatchSummaryOut(BaseModel):
 
 
 class ImportBatchOut(ImportBatchSummaryOut):
-    # alerts_created entra com o módulo de alertas; expor 0 agora afirmaria algo não verificado.
     rejections: list[ImportRejectionOut]
+
+
+class ImportBatchCreatedOut(ImportBatchOut):
+    # Só na criação: o GET do lote não sabe quantos alertas aquela importação gerou.
+    alerts_created: int
 
 
 class AccountOut(BaseModel):
@@ -121,7 +125,7 @@ class TransactionCategoryOut(BaseModel):
 
 
 class TransactionOut(BaseModel):
-    # is_recurring e anomalia ficam fora até existirem os cálculos que os preenchem.
+    # recurrence_key é detalhe interno da série e não é exposto.
     id: UUID
     date: date
     description: str
@@ -130,3 +134,64 @@ class TransactionOut(BaseModel):
     category_source: Literal["rule", "model", "user"]
     category_confidence: Decimal | None
     predicted_category_id: UUID
+    # Recalculado ao fim de cada importação (ADR-0010, seção 3); recurrence_key não é exposto.
+    is_recurring: bool
+    # Score heurístico de 0 a 1 (ADR-0010, seção 4), não probabilidade; null sem grupo suficiente.
+    anomaly_score: Decimal | None
+    # Derivado de anomaly_score >= 0,8, não gravado no banco.
+    is_anomaly: bool
+
+
+class CategoryTotalOut(BaseModel):
+    category: CategoryOut
+    # Com sinal, como amount_cents: categoria de saída soma valores negativos.
+    total_cents: int
+    count: int
+
+
+class SummaryOut(BaseModel):
+    """Resumo da Issue #43: saldo realizado de hoje e movimentações realizadas do mês."""
+
+    # null quando o resumo soma todas as contas do usuário.
+    account_id: UUID | None
+    month: str
+    today: date
+    # null quando alguma referência de saldo é posterior a hoje (ADR-0010, seção 1).
+    realized_balance_cents: int | None
+    income_cents: int
+    # Soma das saídas, com sinal negativo; net_cents = income_cents + expenses_cents.
+    expenses_cents: int
+    net_cents: int
+    categories: list[CategoryTotalOut]
+
+
+class ProjectedRecurrenceOut(BaseModel):
+    description: str
+    # Com sinal; mediana da série recorrente, não um valor realizado.
+    amount_cents: int
+
+
+class ProjectionDayOut(BaseModel):
+    date: date
+    recurrences: list[ProjectedRecurrenceOut]
+    # Soma das recorrências previstas no dia, com sinal.
+    recurring_cents: int
+    # Média diária de saídas variáveis (<= 0), igual em todos os dias.
+    variable_cents: int
+    # Saldo previsto ao fim do dia.
+    balance_cents: int
+
+
+class ProjectionOut(BaseModel):
+    """Projeção da Issue #46: valores previstos, separados do saldo realizado de partida."""
+
+    account_id: UUID
+    today: date
+    # Saldo realizado ao fim de hoje (ADR-0010, seção 1).
+    start_balance_cents: int
+    variable_daily_cents: int
+    days: int
+    items: list[ProjectionDayOut]
+    min_balance_cents: int
+    # Primeiro dia em que o mínimo ocorre.
+    min_balance_date: date
