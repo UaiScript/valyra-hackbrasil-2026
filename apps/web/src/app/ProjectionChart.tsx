@@ -143,8 +143,8 @@ export const ProjectionChart: FC<{ projection: ProjectionOut; height?: number; c
         <div className="vx-chart__tip" style={{ left: `${(x(hover) / W) * 100}%` }} role="status">
           <strong>{hover === 0 ? 'Hoje' : formatShortDate(active.date)}</strong>
           <span className="vx-chart__tip-balance">{formatCents(active.balance)}</span>
-          {active.recurrences.map((r) => (
-            <span key={r.description} className="vx-chart__tip-row">{r.description}<em>{formatCents(r.amount_cents)}</em></span>
+          {active.recurrences.map((r, i) => (
+            <span key={i} className="vx-chart__tip-row">{r.description}<em>{formatCents(r.amount_cents)}</em></span>
           ))}
           {hover > 0 && <span className="vx-chart__tip-row vx-chart__tip-row--muted">Gasto variável<em>{formatCents(active.variable)}</em></span>}
         </div>

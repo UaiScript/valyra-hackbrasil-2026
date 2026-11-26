@@ -223,8 +223,9 @@
   min-width: 1.35rem;
   padding: 0 var(--space-1);
   border-radius: var(--radius-full);
-  background: var(--color-warning);
-  color: #fff;
+  background: var(--color-warning-soft);
+  color: var(--color-warning-text);
+  box-shadow: inset 0 0 0 1px var(--color-warning);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   line-height: 1.35rem;
@@ -462,6 +463,7 @@ line.vx-chart__zero { stroke: var(--color-border-strong); }
 }
 .vx-flag--recurring { background: var(--color-info-soft); color: var(--color-info-text); }
 .vx-flag--anomaly { background: var(--color-warning-soft); color: var(--color-warning-text); }
+.vx-flag__score { margin-left: 2px; font-weight: var(--font-weight-regular); font-variant-numeric: tabular-nums; }
 
 .vx-chips { display: flex; gap: var(--space-2); }
 .vx-chip {

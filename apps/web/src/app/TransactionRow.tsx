@@ -25,8 +25,8 @@ export const TransactionFlags: FC<{ t: TransactionOut }> = ({ t }) => (
       </span>
     )}
     {t.is_anomaly && (
-      <span className="vx-flag vx-flag--anomaly" title={`Acima do padrão da categoria. Indicador ${t.anomaly_score ? formatScore(t.anomaly_score) : ''} (marca a partir de 0,80).`}>
-        <TrendingUp size={12} aria-hidden="true" />Atípico
+      <span className="vx-flag vx-flag--anomaly" title="Acima do padrão da categoria; o selo aparece a partir do indicador 0,80.">
+        <TrendingUp size={12} aria-hidden="true" />Atípico{t.anomaly_score && <span className="vx-flag__score">{formatScore(t.anomaly_score)}</span>}
       </span>
     )}
   </>

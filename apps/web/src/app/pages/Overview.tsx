@@ -13,16 +13,17 @@ import { useApi } from '../useApi';
 
 // Painel do topo: o realizado (resumo) ao lado do previsto (projeção), sempre rotulados
 // separadamente para não confundir saldo de hoje com saldo estimado.
-const OverviewHero: FC<{ accountId: string | undefined; reloadKey: number }> = ({ accountId, reloadKey }) => {
-  const summary = useApi((s) => api.getSummary({}, s), [reloadKey]);
-  const projection = useApi((s) => (accountId ? api.getProjection(accountId, 30, s) : new Promise<never>(() => {})), [accountId, reloadKey]);
+// Realizado e previsto usam a mesma conta, para que os dois números tenham o mesmo escopo.
+const OverviewHero: FC<{ account: AccountOut; showName: boolean; reloadKey: number }> = ({ account, showName, reloadKey }) => {
+  const summary = useApi((s) => api.getSummary({ account_id: account.id }, s), [account.id, reloadKey]);
+  const projection = useApi((s) => api.getProjection(account.id, 30, s), [account.id, reloadKey]);
   const s = summary.state.data;
   const p = projection.state.data;
   const quiet = s && s.income_cents === 0 && s.expenses_cents === 0;
   return (
     <section className="vx-hero vx-hero--overview" aria-label="Saldo de hoje e próximos 30 dias">
       <div className="vx-hero__lead">
-        <span className="vx-hero__label">Saldo realizado hoje{s ? `, ${formatIsoDate(s.today)}` : ''}</span>
+        <span className="vx-hero__label">Saldo realizado hoje{s ? `, ${formatIsoDate(s.today)}` : ''}{showName ? ` · ${account.name}` : ''}</span>
         {summary.state.status === 'error' && !s ? <span className="app-muted">Resumo indisponível.</span> : (
           <strong className={`vx-figure${s?.realized_balance_cents === null ? ' vx-figure--muted' : ''}`}>
             {s ? (s.realized_balance_cents === null ? 'Indisponível' : formatCents(s.realized_balance_cents)) : '—'}
@@ -57,7 +58,7 @@ const NewAlertsBanner: FC = () => {
   const fresh = alerts.state.data?.items.filter((a) => a.status === 'new') ?? [];
   if (fresh.length === 0) return null;
   return (
-    <a className="app-inline-alert app-inline-alert--wide" href={ROUTES.alerts}>
+    <a className="app-inline-alert" href={ROUTES.alerts}>
       <BellRing size={18} aria-hidden="true" />
       <span><strong>{fresh[0].title}</strong>{fresh.length > 1 ? ` e mais ${fresh.length - 1}` : ''}. Ver alertas</span>
     </a>
@@ -121,7 +122,9 @@ export const Overview: FC = () => {
   return (
     <div className="app-grid">
       <NewAlertsBanner />
-      <OverviewHero accountId={accounts.state.data?.items[0]?.id} reloadKey={heroKey} />
+      {accounts.state.data?.items[0] && (
+        <OverviewHero account={accounts.state.data.items[0]} showName={accounts.state.data.items.length > 1} reloadKey={heroKey} />
+      )}
       <NoticeBar notice={notice} onClose={() => setNotice(null)} />
       <div className="app-stack app-stack--loose">
       <Card title="Contas">

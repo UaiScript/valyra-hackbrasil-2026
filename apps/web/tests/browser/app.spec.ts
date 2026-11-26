@@ -165,6 +165,7 @@ test('transações exibem selos de recorrente e atípico e filtram por eles', as
   const row = page.getByRole('row', { name: /Cemig energia/ });
   await expect(row.getByText('Recorrente')).toBeVisible();
   await expect(row.getByText('Atípico')).toBeVisible();
+  await expect(row.getByText('1,00')).toBeVisible();
   await page.getByRole('button', { name: 'Só recorrentes' }).click();
   await expect.poll(() => calls.some((c) => c.url.includes('is_recurring=true'))).toBe(true);
 });

@@ -28,7 +28,7 @@ const Figures: FC<{ p: ProjectionOut }> = ({ p }) => {
         </div>
         <div>
           <dt>Gasto variável estimado</dt>
-          <dd>{formatCents(-p.variable_daily_cents)}</dd>
+          <dd>{formatCents(p.variable_daily_cents)}</dd>
           <span>por dia</span>
         </div>
       </dl>
@@ -41,8 +41,8 @@ const Upcoming: FC<{ p: ProjectionOut }> = ({ p }) => {
   if (rows.length === 0) return <Empty>Nenhuma recorrência prevista neste horizonte.</Empty>;
   return (
     <ul className="vx-timeline">
-      {rows.map((r) => (
-        <li key={`${r.date}-${r.description}`}>
+      {rows.map((r, i) => (
+        <li key={`${r.date}-${i}`}>
           <time dateTime={r.date}>{formatShortDate(r.date)}</time>
           <span className="vx-timeline__desc"><Repeat size={14} aria-hidden="true" /><span className="vx-timeline__text">{r.description}</span></span>
           <Amount cents={r.amount_cents} />
@@ -103,6 +103,7 @@ export const Projection: FC = () => {
                 <Card title="Recorrências previstas" action={<CalendarClock size={18} className="app-muted" aria-hidden="true" />}>
                   <Upcoming p={p} />
                 </Card>
+                {/* Texto espelha as regras da ADR-0010; ao mudar um limiar lá, atualize aqui. */}
                 <Card title="Como a projeção é feita">
                   <ul className="vx-method">
                     <li>Começa no saldo realizado de hoje, a partir do saldo de referência da conta.</li>

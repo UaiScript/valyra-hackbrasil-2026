@@ -58,8 +58,8 @@ export const Alerts: FC = () => {
   async function markRead(alert: AlertOut) {
     try {
       const updated = await api.markAlertRead(alert.id);
-      const page = alerts.state.data;
-      if (page) alerts.setState({ status: 'success', data: { ...page, items: page.items.map((a) => (a.id === updated.id ? updated : a)) } });
+      // Atualização funcional: com cliques seguidos, cada resposta parte da lista mais recente.
+      alerts.setState((prev) => (prev.data ? { status: 'success', data: { ...prev.data, items: prev.data.items.map((a) => (a.id === updated.id ? updated : a)) } } : prev));
       window.dispatchEvent(new Event(ALERTS_CHANGED));
       setNotice({ kind: 'success', text: 'Alerta marcado como lido.' });
     } catch (err) {
