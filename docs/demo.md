@@ -11,11 +11,11 @@ Roteiro de 3 minutos para apresentar o Valyra Finance publicado (front na Vercel
 
 O histórico dá ao Valyra três meses para reconhecer as recorrências e o padrão de gasto de cada categoria. Novembro traz a surpresa: os dois gastos atípicos e, com o aluguel vencendo antes do salário, o alerta de saldo negativo.
 
-As contas de energia e água ficam na mesma categoria que internet e celular, com valores próximos; assim nenhuma conta comum aparece como atípica. O arquivo antigo `transactions_demo.csv` continua disponível para testes, mas não deve ser misturado com estes dois na mesma conta.
+As contas de energia e água ficam na mesma categoria que internet e celular, com valores próximos; assim nenhuma conta comum aparece como atípica. Estes dois arquivos são o conjunto oficial da apresentação. O `transactions_demo.csv` continua disponível para desenvolvimento e testes, mas não deve ser misturado com eles na mesma conta.
 
 ## Preparação (uma vez, antes do dia)
 
-1. **Banco limpo.** Se a conta demo já tiver transações de testes anteriores, volte ao estado inicial como descrito em [deploy.md](deploy.md#cuidados). Dados antigos entram nos mesmos cálculos e mudam os números do roteiro.
+1. **Banco limpo.** Se a conta demo já tiver transações de testes anteriores, volte ao estado inicial como descrito em [deploy.md](deploy.md#cuidados), de preferência criando um branch novo no Neon. Antes de apagar qualquer tabela, confirme no painel que é o banco da demo e que ele é descartável. Dados antigos entram nos mesmos cálculos e mudam os números do roteiro.
 2. **Data fixa.** No Render, em *Environment*, crie `DEMO_TODAY=2026-11-26` e faça o redeploy. Sem ela, "hoje" é o dia real e, a partir de dezembro, o aluguel previsto já terá passado e o alerta deixa de aparecer.
 3. **Histórico.** Em `/#/app/importar`, importe `demo_historico.csv`. Resultado esperado: 129 importadas, 0 duplicadas, 0 rejeitadas, nenhum alerta.
 4. **Saldo de referência.** Em *Visão geral*, clique em *Editar* na conta e informe R$ 1.150,00 em 01/11/2026 (saldo depois de pagar aluguel e condomínio de novembro).
@@ -23,7 +23,7 @@ As contas de energia e água ficam na mesma categoria que internet e celular, co
 
 ## Checklist dos 10 minutos antes
 
-- Abra `https://valyra-api.onrender.com/health` e espere `{"status":"ok","postgres":"ok"}`. A API gratuita dorme após 15 minutos parada e leva cerca de 1 minuto para acordar.
+- Abra `https://valyra-api.onrender.com/health` (endereços atuais da publicação; se o serviço for recriado, confira no painel do Render e da Vercel) e espere `{"status":"ok","postgres":"ok"}`. A API gratuita dorme após 15 minutos parada e leva cerca de 1 minuto para acordar.
 - Abra `https://valyra-landing.vercel.app` em uma aba e confira, dentro do app, o indicador "API conectada".
 - Deixe `demo_novembro.csv` em uma pasta fácil de achar, como a Área de Trabalho.
 - Zoom do navegador em 110% a 125%, notificações desligadas e só as abas da demo abertas.
@@ -31,7 +31,9 @@ As contas de energia e água ficam na mesma categoria que internet e celular, co
 
 ## Roteiro (3 minutos)
 
-Números abaixo conferidos com `DEMO_TODAY=2026-11-26`, banco limpo e a preparação acima.
+Números conferidos manualmente em 26/11/2026, na API local da `main` no commit `d98c6be`, com `DEMO_TODAY=2026-11-26`, banco limpo e a preparação acima. Mudanças nos cálculos podem alterá-los; repita a conferência depois delas.
+
+A projeção não usa o dia do mês: cada recorrência é prevista a partir da última ocorrência mais a mediana dos intervalos (ADR-0010, seção 5). Como os intervalos de agosto a novembro são 31, 30 e 31 dias, a mediana é 31, e por isso o aluguel de 01/11 aparece em 02/12 e o salário de 05/11 em 06/12.
 
 **0:00 a 0:20, landing.** "Todo mês a gente descobre tarde demais que o dinheiro não fecha. O Valyra lê o seu extrato e avisa antes." Clique em *Abrir demonstração*.
 
