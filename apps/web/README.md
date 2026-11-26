@@ -1,8 +1,37 @@
-# Landing page do Valyra
+# Valyra web: landing e aplicação
+
+Este pacote serve duas coisas: a **landing** em `/` (estática, dados sintéticos, sem API) e a **aplicação Finance** em `#/app`, ligada à API.
+
+## Aplicação Finance (`#/app`)
+
+| Tela | Rota | Operações da API |
+| --- | --- | --- |
+| Visão geral | `#/app` | `finance_list_accounts`, `finance_update_account`, `finance_list_transactions`, `finance_list_import_batches` |
+| Transações | `#/app/transacoes` | `finance_list_transactions` (filtros de conta, categoria e período), `finance_list_categories`, `finance_update_transaction` |
+| Importar CSV | `#/app/importar` | `finance_create_import_batch`, `finance_list_import_batches` |
+
+O indicador do cabeçalho usa `system_health`. Não há login: a API responde pelo usuário demo do seed.
+
+Para rodar com dados reais, na raiz:
+
+```sh
+make dev            # PostgreSQL + API em http://127.0.0.1:8000
+make migrate && make seed
+npm --prefix apps/web run dev
+```
+
+Abra <http://127.0.0.1:3000/#/app> e importe `datasets/samples/transactions_demo.csv` pela tela Importar CSV.
+
+- **Chamadas à API:** em dev e preview o Vite repassa `/api` e `/health` para `VITE_API_PROXY_TARGET` (padrão `http://127.0.0.1:8000`), então o navegador fala só com a própria origem e não depende de CORS. Para um build publicado com a API em outro domínio, defina `VITE_API_URL` (HTTPS fora de localhost); a origem entra no `connect-src` da CSP. Veja `.env.example`.
+- **Contrato:** os tipos em `src/lib/api/schema.ts` são gerados de `packages/contracts/openapi.json`. Não edite à mão: após `make openapi`, rode `npm --prefix apps/web run gen:api`. O `check` (e portanto o `build`) falha se os tipos estiverem desatualizados. O cliente escrito à mão fica em `src/app/api/client.ts`.
+- **Dinheiro:** valores chegam em centavos inteiros e são formatados/lidos por `src/app/money.ts` sem ponto flutuante. Totais e cálculos financeiros ficam no backend.
+- **Testes:** `tests/money.test.ts` cobre a conversão; `tests/browser/app.spec.ts` simula a API com `page.route`, sem precisar de banco.
+
+## Landing (`/`)
 
 Página estática de apresentação, adaptada do arquivo `valyra-intelligence.zip` fornecido pela equipe. A identidade visual utiliza os tokens centralizados em `src/styles/`, com uma apresentação editorial, uma prévia interativa do produto, os três módulos, o fluxo conceitual da plataforma e seções de transparência. Mantém os idiomas PT/EN e não depende da API ou da aplicação principal.
 
-`apps/landing` é um pacote independente. O futuro frontend da aplicação continua previsto em `apps/web`. Não existe integração com a API, PostgreSQL, feeds financeiros ou provedor de IA nesta landing. Os dados e os números exibidos são **sintéticos**, sem previsões ou resultados reais.
+A landing não importa código da aplicação. Não existe integração com a API, PostgreSQL, feeds financeiros ou provedor de IA nesta landing. Os dados e os números exibidos são **sintéticos**, sem previsões ou resultados reais.
 
 ## Executar localmente
 

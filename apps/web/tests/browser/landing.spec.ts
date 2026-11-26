@@ -10,7 +10,7 @@ test('loads without runtime errors or third-party requests, with honest demo con
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Inteligência financeira');
   await expect(page.getByRole('note')).toContainText('exemplos sintéticos');
-  await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute('content', /connect-src 'none'/);
+  await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute('content', /connect-src 'self'/);
   await expect(page.locator('body')).not.toContainText(/MOTOR DOCKER ATIVO|Capital Monitorado|FEED CME|FIX Protocol|Convexidade dinâmica ativada|Proteção estrita de cauda/);
   expect(errors).toEqual([]);
   expect(external).toEqual([]);
