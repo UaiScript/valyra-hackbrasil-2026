@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { ArrowDownRight, ArrowUpRight, ChartNoAxesCombined, CircleHelp, ShieldCheck } from 'lucide-react';
+import { ArrowDownRight, ArrowRight, ArrowUpRight, ChartNoAxesCombined, CircleHelp, ShieldCheck } from 'lucide-react';
 import { CONTENT, COCKPIT_TIMEFRAMES } from '../content';
+import { DEMO_HASH } from '../links';
 import type { Language, Timeframe } from '../types/content';
 
 export const TerminalHeroWithCockpit: FC<{ lang: Language; systemUrl: string }> = ({ lang, systemUrl }) => {
@@ -34,7 +35,10 @@ export const TerminalHeroWithCockpit: FC<{ lang: Language; systemUrl: string }> 
           <h1>{hero.titleLine1} <em>{hero.titleLine2}</em></h1>
           <p className="hero-copy__description">{hero.subtitle}</p>
           <div className="hero-actions">
-            <a href={systemUrl} rel="noopener noreferrer" data-primary-cta="true" className="button button--primary button--large">
+            <a href={DEMO_HASH} data-demo-cta="true" className="button button--primary button--large">
+              {CONTENT[lang].nav.openDemo}<ArrowRight size={18} aria-hidden="true" />
+            </a>
+            <a href={systemUrl} rel="noopener noreferrer" data-primary-cta="true" className="button button--outline button--large">
               {hero.ctaPrimary}<ArrowUpRight size={18} aria-hidden="true" />
             </a>
             <a href="#capacidades" className="text-link">{lang === 'pt' ? 'Conheça os módulos' : 'Explore the modules'}<ArrowDownRight size={17} aria-hidden="true" /></a>

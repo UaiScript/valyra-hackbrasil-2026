@@ -84,6 +84,8 @@ Validação local em **08/11/2026**: instalação pelo lockfile com scripts desa
 
 ## Destino dos links de acesso
 
+Os botões **Abrir demonstração** (cabeçalho, hero, menu móvel e faixa final) sempre levam a `#/app`, a aplicação desta mesma build, e não dependem desta configuração. Ela vale para os links de repositório/aplicação externa (`data-primary-cta`).
+
 O padrão, sem arquivo local de configuração, é:
 
 ```text

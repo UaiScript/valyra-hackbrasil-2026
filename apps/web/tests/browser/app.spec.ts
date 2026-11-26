@@ -170,6 +170,21 @@ test('transações exibem selos de recorrente e atípico e filtram por eles', as
   await expect.poll(() => calls.some((c) => c.url.includes('is_recurring=true'))).toBe(true);
 });
 
+test('indicador da API se recupera quando a primeira checagem falha (API acordando)', async ({ page }) => {
+  await mockApi(page);
+  let first = true;
+  await page.unroute('**/health');
+  await page.route('**/health', (r) => {
+    if (first) { first = false; return json(r, { status: 'degraded', postgres: 'error' }, 503); }
+    return json(r, { status: 'ok', postgres: 'ok' });
+  });
+  await page.goto('/#/app');
+  await expect(page.getByText('API indisponível, tentando de novo')).toBeVisible();
+  // Trocar de tela dispara nova checagem, sem esperar o intervalo.
+  await page.goto('/#/app/transacoes');
+  await expect(page.getByText('API conectada')).toBeVisible();
+});
+
 test('API fora do ar gera estado de erro com nova tentativa', async ({ page }) => {
   await page.route('**/health', (r) => r.abort());
   await page.route('**/api/v1/finance/**', (r) => r.abort());

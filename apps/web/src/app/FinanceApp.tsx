@@ -22,12 +22,27 @@ const NAV: { route: AppRoute; label: string; icon: typeof LayoutDashboard }[] = 
   { route: 'import', label: 'Importar CSV', icon: Upload },
 ];
 
-const ApiStatus: FC = () => {
-  const { state } = useApi((signal) => api.health(signal), []);
+// No plano gratuito (Render + Neon) a API e o banco dormem: a primeira checagem pode
+// falhar ou voltar 503 enquanto acordam, e logo depois tudo responde. Por isso o
+// indicador não fica preso no primeiro resultado e volta a checar na troca de tela, a cada
+// 15 s enquanto estiver fora e a cada 60 s quando estiver ok.
+const ApiStatus: FC<{ route: AppRoute }> = ({ route }) => {
+  const [tick, setTick] = useState(0);
+  const { state } = useApi((signal) => api.health(signal), [route, tick]);
   const ok = state.status === 'success' && state.data.status === 'ok';
-  const label = state.status === 'loading' ? 'Verificando API…' : ok ? 'API conectada' : 'API indisponível';
+  const settled = state.status !== 'loading';
+  useEffect(() => {
+    if (!settled) return;
+    const id = window.setTimeout(() => setTick((t) => t + 1), ok ? 60_000 : 15_000);
+    return () => window.clearTimeout(id);
+  }, [settled, ok, tick]);
+  // Durante a rechecagem mantemos o último resultado na tela, sem piscar.
+  const known = state.status === 'loading' ? state.data : state.status === 'success' ? state.data : undefined;
+  const shownOk = state.status === 'loading' ? known?.status === 'ok' : ok;
+  const pending = state.status === 'loading' && known === undefined;
+  const label = pending ? 'Verificando API…' : shownOk ? 'API conectada' : 'API indisponível, tentando de novo';
   return (
-    <span className={`app-health app-health--${state.status === 'loading' ? 'pending' : ok ? 'ok' : 'down'}`} role="status">
+    <span className={`app-health app-health--${pending ? 'pending' : shownOk ? 'ok' : 'down'}`} role="status">
       <span className="app-health__dot" aria-hidden="true" />{label}
     </span>
   );
@@ -78,7 +93,7 @@ export default function FinanceApp() {
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <h1>{current.label}</h1>
-          <ApiStatus />
+          <ApiStatus route={route} />
         </header>
         <main className="app-content" id="main">
           <p className="app-demo-note" role="note">Ambiente de demonstração: usuário demo e dados sintéticos, sem login.</p>

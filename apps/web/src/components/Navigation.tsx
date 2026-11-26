@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { ArrowUpRight, Menu, X } from 'lucide-react';
+import { ArrowUpRight, LayoutDashboard, Menu, X } from 'lucide-react';
 import { CONTENT } from '../content';
+import { DEMO_HASH } from '../links';
 import type { Language } from '../types/content';
 
 interface NavigationProps {
@@ -41,7 +42,11 @@ export const TerminalTopNavigation: FC<NavigationProps> = ({ lang, onToggleLang,
             <button type="button" onClick={() => { onToggleLang('pt'); closeMenu(); }} aria-pressed={lang === 'pt'}>PT</button>
             <button type="button" onClick={() => { onToggleLang('en'); closeMenu(); }} aria-pressed={lang === 'en'}>EN</button>
           </div>
-          <a href={systemUrl} rel="noopener noreferrer" data-primary-cta="true" className="button button--primary header-cta">
+          {/* Em telas estreitas o botão da demonstração vira só ícone, com o nome no aria-label. */}
+          <a href={DEMO_HASH} data-demo-cta="true" className="button button--primary header-cta header-cta--demo" aria-label={t.openDemo}>
+            <LayoutDashboard size={16} aria-hidden="true" /><span className="header-cta__label">{t.openDemo}</span>
+          </a>
+          <a href={systemUrl} rel="noopener noreferrer" data-primary-cta="true" className="button button--outline header-cta">
             {t.accessSystem}<ArrowUpRight size={16} aria-hidden="true" />
           </a>
           <button
@@ -66,6 +71,9 @@ export const TerminalTopNavigation: FC<NavigationProps> = ({ lang, onToggleLang,
               <button type="button" onClick={() => { onToggleLang('en'); closeMenu(); }} aria-pressed={lang === 'en'}>EN</button>
             </div>
           </div>
+          <a href={DEMO_HASH} onClick={closeMenu}>
+            {t.openDemo}<LayoutDashboard size={16} aria-hidden="true" />
+          </a>
           <a href={systemUrl} rel="noopener noreferrer" onClick={closeMenu}>
             {t.accessSystem}<ArrowUpRight size={16} aria-hidden="true" />
           </a>
