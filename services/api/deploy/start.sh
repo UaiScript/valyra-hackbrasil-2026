@@ -16,6 +16,7 @@ alembic upgrade head
 python -m valyra.seed
 
 # --proxy-headers: o Render termina o HTTPS no proxy e repassa a requisição em HTTP.
+# Aceitar X-Forwarded-* de qualquer IP é seguro aqui porque o contêiner só recebe tráfego pelo proxy do Render.
 exec uvicorn valyra.main:create_app --factory \
   --host 0.0.0.0 --port "${PORT:-8000}" \
   --proxy-headers --forwarded-allow-ips='*'

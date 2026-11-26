@@ -30,4 +30,6 @@ O PostgreSQL gratuito do próprio Render foi descartado porque expira 30 dias ap
 
 - `CORS_ORIGIN` aceita uma única origem. Deploys de preview da Vercel têm outro endereço e serão recusados pelo navegador; teste pelo domínio de produção.
 - Antes de apresentar, abra `/health` uma vez para acordar a API. Um monitor gratuito chamando `/health` a cada 10 minutos mantém o serviço acordado dentro das 750 horas.
-- O Neon guarda dados de demonstração; use apenas os CSVs sintéticos de `datasets/samples/`.
+- A API publicada é aberta: não há login e todas as rotas usam o usuário demo. O CORS só barra navegadores em outros sites; qualquer cliente HTTP consegue importar CSV e editar transações. Trate o ambiente como descartável e use apenas os CSVs sintéticos de `datasets/samples/`, nunca dados reais ou pessoais.
+- Para voltar ao estado inicial, apague as tabelas do banco no painel do Neon (ou crie um branch novo) e faça *Manual Deploy* no Render; a inicialização recria o schema e o seed.
+- O script assume uma única instância, como no plano gratuito; não há trava contra duas migrações simultâneas. Se o seed acusar conflito (`SeedConflictError`), a API não sobe até o dado incompatível ser corrigido no banco.

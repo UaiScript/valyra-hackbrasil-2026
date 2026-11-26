@@ -19,5 +19,3 @@ services:
       # Origem exata do front na Vercel, sem barra final, por exemplo https://valyra.vercel.app.
       - key: CORS_ORIGIN
         sync: false
-      - key: DEMO_USER_ID
-        value: 00000000-0000-0000-0000-000000000001
