@@ -14,6 +14,7 @@ Leia apenas as referências pertinentes à tarefa. A arquitetura é um monorepo 
 | CSV, schemas e contratos HTTP Finance | [api-design.md](api-design.md) |
 | Migração inicial, seed e decisões pendentes | [revisao-modelagem.md](revisao-modelagem.md) |
 | CI, Claude e configuração manual do GitHub | [github-setup.md](github-setup.md) |
+| Publicação gratuita da API (Render e Neon) | [deploy.md](deploy.md) |
 
 ## Estado das referências
 
