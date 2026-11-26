@@ -5,7 +5,15 @@ from sqlalchemy import inspect
 
 from tests.conftest import migration_config
 
-TABLES = {"users", "accounts", "import_batches", "import_rejections", "categories", "transactions"}
+FINANCE_TABLES = {
+    "users",
+    "accounts",
+    "import_batches",
+    "import_rejections",
+    "categories",
+    "transactions",
+}
+TABLES = FINANCE_TABLES | {"alerts"}
 
 
 def test_single_migration_head():
@@ -16,6 +24,11 @@ def test_single_migration_head():
 def test_initial_migration_is_in_history():
     history = ScriptDirectory.from_config(migration_config()).walk_revisions()
     assert any(revision.revision == "0001_finance_inicial" for revision in history)
+
+
+def test_alerts_migration_follows_finance():
+    revision = ScriptDirectory.from_config(migration_config()).get_revision("0002_alerts")
+    assert revision.down_revision == "0001_finance_inicial"
 
 
 @pytest.mark.postgres
@@ -36,6 +49,18 @@ def test_downgrade_and_upgrade_only_in_disposable_schema(empty_engine):
         command.downgrade(config, "base")
         assert set(inspect(connection).get_table_names()) == {"alembic_version"}
         command.upgrade(config, "head")
+        command.check(config)
+
+
+@pytest.mark.postgres
+def test_alerts_downgrade_keeps_finance(empty_engine):
+    with empty_engine.begin() as connection:
+        config = migration_config(connection)
+        command.upgrade(config, "head")
+        command.downgrade(config, "0001_finance_inicial")
+        assert set(inspect(connection).get_table_names()) == FINANCE_TABLES | {"alembic_version"}
+        command.upgrade(config, "head")
+        assert set(inspect(connection).get_table_names()) == TABLES | {"alembic_version"}
         command.check(config)
 
 

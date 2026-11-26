@@ -1,19 +1,39 @@
-"""Casos de uso do Finance: importação de CSV (#14), consultas (#15) e correção (#42)."""
+"""Casos de uso do Finance: importação (#14), consultas (#15), correção (#42), resumo (#43),
+recorrência (#44), gastos atípicos (#45), projeção de caixa (#46) e pressão de caixa (#47)."""
 
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, timedelta
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from valyra.alerts import service as alerts_service
+from valyra.core import clock
 from valyra.core.errors import AppError
 from valyra.finance import repository
+from valyra.finance.analytics import (
+    ANOMALY_THRESHOLD,
+    CASH_PRESSURE_DAYS,
+    MonthSummary,
+    Projection,
+    anomaly_scores,
+    detect_recurrences,
+    is_cash_pressure,
+    month_bounds,
+    project_cash,
+    realized_balance_cents,
+    recurring_series,
+    summarize_month,
+    variable_daily_cents,
+)
 from valyra.finance.domain import (
     CsvFormatError,
     categorize,
     category_kind_matches,
     compute_row_hashes,
+    normalize_description,
     parse_csv,
 )
 from valyra.finance.models import Account, Category, ImportBatch, ImportRejection, Transaction
@@ -33,10 +53,17 @@ def get_account_for_user(session: Session, user_id: UUID, account_id: UUID) -> A
     return account
 
 
+@dataclass(frozen=True)
+class ImportResult:
+    batch: ImportBatch
+    alerts_created: int
+
+
 def import_csv(
     session: Session, user_id: UUID, account_id: UUID, file_name: str, content: bytes
-) -> ImportBatch:
-    """Importa em uma única transação: qualquer falha técnica desfaz lote, rejeições e linhas."""
+) -> ImportResult:
+    """Importa em uma única transação: qualquer falha técnica desfaz lote, rejeições, linhas e
+    alerta."""
     try:
         account = get_account_for_user(session, user_id, account_id)
         try:
@@ -82,6 +109,9 @@ def import_csv(
                 }
             )
         inserted = repository.insert_transactions(session, values)
+        # Na mesma transação da importação: falha no recálculo desfaz também as linhas novas.
+        _refresh_signals(session, account.id)
+        alerts_created = _check_cash_pressure(session, user_id, account)
 
         batch.rows_imported = inserted
         batch.rows_duplicated = len(result.rows) - inserted
@@ -90,10 +120,51 @@ def import_csv(
         # clock_timestamp marca o fim real; now() repetiria o início da transação.
         batch.completed_at = func.clock_timestamp()
         session.commit()
-        return batch
+        return ImportResult(batch=batch, alerts_created=alerts_created)
     except BaseException:
         session.rollback()
         raise
+
+
+def _check_cash_pressure(session: Session, user_id: UUID, account: Account) -> int:
+    """Alerta de pressão de caixa (ADR-0010, seção 6); roda antes do commit da importação."""
+    today = clock.get_today()
+    projection = _project(session, account, today, CASH_PRESSURE_DAYS)
+    # Saldo indisponível (referência futura) não gera alerta: não há saldo de partida.
+    if projection is None or not is_cash_pressure(projection):
+        return 0
+    created = alerts_service.create_cash_pressure(
+        session,
+        user_id,
+        account.id,
+        today,
+        start_balance_cents=projection.start_balance_cents,
+        min_balance_cents=projection.min_balance_cents,
+        min_balance_date=projection.min_balance_date,
+        days=projection.days,
+    )
+    return int(created)
+
+
+def _refresh_signals(session: Session, account_id: UUID) -> None:
+    """Recalcula recorrência e gasto atípico da conta inteira e grava só o que mudou."""
+    rows = repository.list_signal_inputs(session, account_id)
+    recurring = detect_recurrences(
+        (row.id, row.date, row.amount_cents, normalize_description(row.description)) for row in rows
+    )
+    scores = anomaly_scores((row.id, row.amount_cents, row.category_id) for row in rows)
+    # Gravar só a diferença mantém updated_at intacto quando reimportar não muda nada; uma
+    # ocorrência nova também pode desmarcar uma série ou mudar o score do grupo inteiro.
+    changes = []
+    for row in rows:
+        new = {
+            "is_recurring": row.id in recurring,
+            "recurrence_key": recurring.get(row.id),
+            "anomaly_score": scores.get(row.id),
+        }
+        if (row.is_recurring, row.recurrence_key, row.anomaly_score) != tuple(new.values()):
+            changes.append({"id": row.id, **new})
+    repository.update_signals(session, changes)
 
 
 def get_import_batch(
@@ -154,6 +225,10 @@ def update_transaction_category(
         # não mudam: comparar sugestão e correção é o que permite avaliar a categorização.
         transaction.category_id = category.id
         transaction.category_source = "user"
+        # O score depende da categoria: a origem perde e o destino ganha uma saída. Recalcular a
+        # conta inteira equivale a recalcular os dois grupos, pois os demais não mudam.
+        session.flush()
+        _refresh_signals(session, transaction.account_id)
         session.commit()
         return transaction, category
     except BaseException:
@@ -169,6 +244,8 @@ def list_transactions(
     date_from: date | None,
     date_to: date | None,
     category_id: UUID | None,
+    is_recurring: bool | None,
+    is_anomaly: bool | None,
     limit: int,
     offset: int,
 ) -> tuple[list[tuple[Transaction, Category]], int]:
@@ -182,6 +259,10 @@ def list_transactions(
         date_from=date_from,
         date_to=date_to,
         category_id=category_id,
+        is_recurring=is_recurring,
+        is_anomaly=is_anomaly,
+        # O limiar é regra do analytics; o repository só o aplica na consulta.
+        anomaly_threshold=ANOMALY_THRESHOLD,
         limit=limit,
         offset=offset,
     )
@@ -189,3 +270,102 @@ def list_transactions(
 
 def list_categories(session: Session, limit: int, offset: int) -> tuple[list[Category], int]:
     return repository.list_categories(session, limit, offset)
+
+
+@dataclass(frozen=True)
+class Summary:
+    account_id: UUID | None
+    month: str
+    today: date
+    realized_balance_cents: int | None
+    month_summary: MonthSummary
+    categories: dict[UUID, Category]
+
+
+def get_summary(
+    session: Session, user_id: UUID, account_id: UUID | None, month: str | None
+) -> Summary:
+    """Saldo realizado de hoje e totais do mês; sem conta, considera todas as do usuário."""
+    if account_id is not None:
+        accounts = [get_account_for_user(session, user_id, account_id)]
+    else:
+        accounts = repository.list_user_accounts(session, user_id)
+    today = clock.get_today()
+    first, last = month_bounds(month, today)
+
+    # Uma leitura cobre as duas janelas: (referência, hoje] do realizado e o mês até hoje.
+    after = min([first - timedelta(days=1), *(a.balance_as_of for a in accounts)])
+    movements = repository.list_movements(session, [a.id for a in accounts], after, today)
+
+    balances = [
+        realized_balance_cents(
+            account.balance_cents,
+            account.balance_as_of,
+            ((d, amount) for acc_id, d, amount, _ in movements if acc_id == account.id),
+            today,
+        )
+        for account in accounts
+    ]
+    # Uma conta com referência futura torna a soma desconhecida, não menor.
+    realized = None if None in balances else sum(balances)
+
+    month_summary = summarize_month(
+        ((d, amount, category_id) for _, d, amount, category_id in movements), first, last, today
+    )
+    categories = repository.get_categories(
+        session, [total.category_id for total in month_summary.categories]
+    )
+    return Summary(
+        account_id=account_id,
+        month=f"{first.year:04d}-{first.month:02d}",
+        today=today,
+        realized_balance_cents=realized,
+        month_summary=month_summary,
+        categories=categories,
+    )
+
+
+@dataclass(frozen=True)
+class AccountProjection:
+    account_id: UUID
+    today: date
+    projection: Projection
+
+
+def get_projection(
+    session: Session, user_id: UUID, account_id: UUID, days: int
+) -> AccountProjection:
+    """Projeção diária de caixa da conta; só leitura, nada é gravado (ADR-0010, seção 5)."""
+    account = get_account_for_user(session, user_id, account_id)
+    today = clock.get_today()
+    projection = _project(session, account, today, days)
+    if projection is None:
+        # Referência posterior a hoje: o fechamento não permite reconstruir o saldo atual.
+        raise AppError(
+            "BALANCE_UNAVAILABLE",
+            "Saldo de referência posterior a hoje; não é possível projetar",
+            422,
+        )
+    return AccountProjection(account_id=account.id, today=today, projection=projection)
+
+
+def _project(session: Session, account: Account, today: date, days: int) -> Projection | None:
+    """Projeção da conta, ou None quando o saldo de partida é indisponível."""
+    rows = repository.list_signal_inputs(session, account.id)
+    start = realized_balance_cents(
+        account.balance_cents,
+        account.balance_as_of,
+        ((row.date, row.amount_cents) for row in rows),
+        today,
+    )
+    if start is None:
+        return None
+    series = recurring_series(
+        (row.date, row.amount_cents, row.description, row.recurrence_key)
+        for row in rows
+        if row.is_recurring
+    )
+    variable = variable_daily_cents(
+        ((row.date, row.amount_cents, row.is_recurring) for row in rows), today
+    )
+    return project_cash(start, today, days, series, variable)

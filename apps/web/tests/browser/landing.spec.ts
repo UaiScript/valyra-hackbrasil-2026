@@ -1,6 +1,13 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 const repository = 'https://github.com/UaiScript/valyra-hackbrasil-2026';
+
+// Abaixo de 22rem o seletor de idioma do cabeçalho some e só existe dentro do menu móvel.
+async function chooseLanguage(page: Page, label: 'PT' | 'EN') {
+  const inline = page.locator('.language-switch').getByRole('button', { name: label, exact: true });
+  if (!(await inline.isVisible())) await page.locator('.mobile-menu-toggle').click();
+  await page.getByRole('button', { name: label, exact: true }).click();
+}
 
 test('loads without runtime errors or third-party requests, with honest demo content', async ({ page }) => {
   const errors: string[] = [];
@@ -31,13 +38,13 @@ test('every access link leads to the official repository, even with stale stored
 
 test('language switch persists and updates document language', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'EN', exact: true }).click();
+  await chooseLanguage(page, 'EN');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Financial intelligence');
   await expect(page.locator('header [data-primary-cta]')).toHaveText('View repository');
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await page.getByRole('button', { name: 'PT', exact: true }).click();
+  await chooseLanguage(page, 'PT');
   await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
 });
 
@@ -49,7 +56,7 @@ test('the page works when browser storage is disabled', async ({ page }) => {
   page.on('pageerror', e => errors.push(e.message));
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await page.getByRole('button', { name: 'EN', exact: true }).click();
+  await chooseLanguage(page, 'EN');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   expect(errors).toEqual([]);
 });
@@ -83,7 +90,7 @@ test('showcases all three modules with the problem, features, product preview an
     await expect(cta).toHaveAttribute('target', '_blank');
   }
 
-  await page.getByRole('button', { name: 'EN', exact: true }).click();
+  await chooseLanguage(page, 'EN');
   await expect(page.locator('#capacidades')).toContainText('The problem it solves');
   await expect(page.locator('#capacidades')).toContainText('What it brings together');
 });

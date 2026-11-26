@@ -16,6 +16,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from tests.db.safety import assert_safe_database, database_identity
+from valyra.alerts import models as alerts_models  # noqa: F401 -- alerts entra no TRUNCATE
 from valyra.core.config import Settings
 from valyra.core.db import Base, User, get_session
 from valyra.finance.models import Account, Category, ImportBatch, Transaction

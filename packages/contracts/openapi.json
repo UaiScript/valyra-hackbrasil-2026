@@ -53,6 +53,98 @@
         "title": "AccountUpdate",
         "type": "object"
       },
+      "AlertOut": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/CashPressureEvidenceOut"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "cash_pressure",
+            "title": "Kind",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "new",
+              "read"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "severity",
+          "status",
+          "title",
+          "message",
+          "evidence",
+          "account_id",
+          "created_at",
+          "read_at"
+        ],
+        "title": "AlertOut",
+        "type": "object"
+      },
+      "AlertUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "const": "read",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "AlertUpdate",
+        "type": "object"
+      },
       "Body_finance_create_import_batch": {
         "properties": {
           "file": {
@@ -65,6 +157,42 @@
           "file"
         ],
         "title": "Body_finance_create_import_batch",
+        "type": "object"
+      },
+      "CashPressureEvidenceOut": {
+        "description": "Snapshot da proje\u00e7\u00e3o que gerou o alerta; valores previstos, n\u00e3o realizados.",
+        "properties": {
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "min_balance_cents": {
+            "title": "Min Balance Cents",
+            "type": "integer"
+          },
+          "min_balance_date": {
+            "format": "date",
+            "title": "Min Balance Date",
+            "type": "string"
+          },
+          "start_balance_cents": {
+            "title": "Start Balance Cents",
+            "type": "integer"
+          },
+          "today": {
+            "format": "date",
+            "title": "Today",
+            "type": "string"
+          }
+        },
+        "required": [
+          "days",
+          "today",
+          "start_balance_cents",
+          "min_balance_cents",
+          "min_balance_date"
+        ],
+        "title": "CashPressureEvidenceOut",
         "type": "object"
       },
       "CategoryOut": {
@@ -98,6 +226,28 @@
           "kind"
         ],
         "title": "CategoryOut",
+        "type": "object"
+      },
+      "CategoryTotalOut": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/CategoryOut"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "total_cents": {
+            "title": "Total Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "category",
+          "total_cents",
+          "count"
+        ],
+        "title": "CategoryTotalOut",
         "type": "object"
       },
       "ErrorBody": {
@@ -161,6 +311,63 @@
           "postgres"
         ],
         "title": "HealthResponse",
+        "type": "object"
+      },
+      "ImportBatchCreatedOut": {
+        "properties": {
+          "alerts_created": {
+            "title": "Alerts Created",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "rejections": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRejectionOut"
+            },
+            "title": "Rejections",
+            "type": "array"
+          },
+          "rows_duplicated": {
+            "title": "Rows Duplicated",
+            "type": "integer"
+          },
+          "rows_imported": {
+            "title": "Rows Imported",
+            "type": "integer"
+          },
+          "rows_rejected": {
+            "title": "Rows Rejected",
+            "type": "integer"
+          },
+          "rows_total": {
+            "title": "Rows Total",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "processing",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "rows_total",
+          "rows_imported",
+          "rows_duplicated",
+          "rows_rejected",
+          "rejections",
+          "alerts_created"
+        ],
+        "title": "ImportBatchCreatedOut",
         "type": "object"
       },
       "ImportBatchOut": {
@@ -313,6 +520,37 @@
         "title": "Page[AccountOut]",
         "type": "object"
       },
+      "Page_AlertOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AlertOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[AlertOut]",
+        "type": "object"
+      },
       "Page_CategoryOut_": {
         "properties": {
           "items": {
@@ -406,6 +644,184 @@
         "title": "Page[TransactionOut]",
         "type": "object"
       },
+      "ProjectedRecurrenceOut": {
+        "properties": {
+          "amount_cents": {
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "amount_cents"
+        ],
+        "title": "ProjectedRecurrenceOut",
+        "type": "object"
+      },
+      "ProjectionDayOut": {
+        "properties": {
+          "balance_cents": {
+            "title": "Balance Cents",
+            "type": "integer"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "recurrences": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectedRecurrenceOut"
+            },
+            "title": "Recurrences",
+            "type": "array"
+          },
+          "recurring_cents": {
+            "title": "Recurring Cents",
+            "type": "integer"
+          },
+          "variable_cents": {
+            "title": "Variable Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "recurrences",
+          "recurring_cents",
+          "variable_cents",
+          "balance_cents"
+        ],
+        "title": "ProjectionDayOut",
+        "type": "object"
+      },
+      "ProjectionOut": {
+        "description": "Proje\u00e7\u00e3o da Issue #46: valores previstos, separados do saldo realizado de partida.",
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectionDayOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "min_balance_cents": {
+            "title": "Min Balance Cents",
+            "type": "integer"
+          },
+          "min_balance_date": {
+            "format": "date",
+            "title": "Min Balance Date",
+            "type": "string"
+          },
+          "start_balance_cents": {
+            "title": "Start Balance Cents",
+            "type": "integer"
+          },
+          "today": {
+            "format": "date",
+            "title": "Today",
+            "type": "string"
+          },
+          "variable_daily_cents": {
+            "title": "Variable Daily Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "account_id",
+          "today",
+          "start_balance_cents",
+          "variable_daily_cents",
+          "days",
+          "items",
+          "min_balance_cents",
+          "min_balance_date"
+        ],
+        "title": "ProjectionOut",
+        "type": "object"
+      },
+      "SummaryOut": {
+        "description": "Resumo da Issue #43: saldo realizado de hoje e movimenta\u00e7\u00f5es realizadas do m\u00eas.",
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryTotalOut"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "expenses_cents": {
+            "title": "Expenses Cents",
+            "type": "integer"
+          },
+          "income_cents": {
+            "title": "Income Cents",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "net_cents": {
+            "title": "Net Cents",
+            "type": "integer"
+          },
+          "realized_balance_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realized Balance Cents"
+          },
+          "today": {
+            "format": "date",
+            "title": "Today",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "month",
+          "today",
+          "realized_balance_cents",
+          "income_cents",
+          "expenses_cents",
+          "net_cents",
+          "categories"
+        ],
+        "title": "SummaryOut",
+        "type": "object"
+      },
       "TransactionCategoryOut": {
         "properties": {
           "id": {
@@ -435,6 +851,17 @@
           "amount_cents": {
             "title": "Amount Cents",
             "type": "integer"
+          },
+          "anomaly_score": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anomaly Score"
           },
           "category": {
             "$ref": "#/components/schemas/TransactionCategoryOut"
@@ -473,6 +900,14 @@
             "title": "Id",
             "type": "string"
           },
+          "is_anomaly": {
+            "title": "Is Anomaly",
+            "type": "boolean"
+          },
+          "is_recurring": {
+            "title": "Is Recurring",
+            "type": "boolean"
+          },
           "predicted_category_id": {
             "format": "uuid",
             "title": "Predicted Category Id",
@@ -487,7 +922,10 @@
           "category",
           "category_source",
           "category_confidence",
-          "predicted_category_id"
+          "predicted_category_id",
+          "is_recurring",
+          "anomaly_score",
+          "is_anomaly"
         ],
         "title": "TransactionOut",
         "type": "object"
@@ -516,6 +954,125 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/alerts": {
+      "get": {
+        "operationId": "alerts_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AlertOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Alerts List",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/api/v1/alerts/{id}": {
+      "patch": {
+        "operationId": "alerts_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso n\u00e3o encontrado"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Alerts Update",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
     "/api/v1/finance/accounts": {
       "get": {
         "operationId": "finance_list_accounts",
@@ -602,7 +1159,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImportBatchOut"
+                  "$ref": "#/components/schemas/ImportBatchCreatedOut"
                 }
               }
             },
@@ -703,6 +1260,73 @@
           }
         },
         "summary": "Finance Update Account",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/accounts/{id}/projection": {
+      "get": {
+        "operationId": "finance_get_projection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Horizonte em dias, a partir de amanh\u00e3",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "description": "Horizonte em dias, a partir de amanh\u00e3",
+              "maximum": 90,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso n\u00e3o encontrado"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Finance Get Projection",
         "tags": [
           "finance"
         ]
@@ -873,6 +1497,85 @@
         ]
       }
     },
+    "/api/v1/finance/summary": {
+      "get": {
+        "operationId": "finance_get_summary",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "AAAA-MM; padr\u00e3o: m\u00eas de hoje",
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^([1-9][0-9]{3})-(0[1-9]|1[0-2])$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "AAAA-MM; padr\u00e3o: m\u00eas de hoje",
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso n\u00e3o encontrado"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Finance Get Summary",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/finance/transactions": {
       "get": {
         "operationId": "finance_list_transactions",
@@ -943,6 +1646,38 @@
                 }
               ],
               "title": "Category Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "is_recurring",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Recurring"
+            }
+          },
+          {
+            "in": "query",
+            "name": "is_anomaly",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Anomaly"
             }
           },
           {

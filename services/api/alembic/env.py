@@ -5,9 +5,10 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import create_engine, pool
 
+from valyra.alerts import models as alerts_models  # noqa: F401 -- registra alerts na Base
 from valyra.core.config import get_settings
 from valyra.core.db import Base
-from valyra.finance import models  # noqa: F401 -- registra as cinco tabelas na Base
+from valyra.finance import models  # noqa: F401 -- registra as cinco tabelas Finance na Base
 
 config = context.config
 if config.config_file_name is not None:

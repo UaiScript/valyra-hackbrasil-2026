@@ -1,9 +1,11 @@
 """Acesso a dados do Finance; não faz commit, quem controla a transação é o service."""
 
+from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -104,6 +106,9 @@ def list_transactions(
     date_from: date | None,
     date_to: date | None,
     category_id: UUID | None,
+    is_recurring: bool | None,
+    is_anomaly: bool | None,
+    anomaly_threshold: Decimal,
     limit: int,
     offset: int,
 ) -> tuple[list[tuple[Transaction, Category]], int]:
@@ -122,6 +127,15 @@ def list_transactions(
         query = query.where(Transaction.date <= date_to)
     if category_id is not None:
         query = query.where(Transaction.category_id == category_id)
+    if is_recurring is not None:
+        query = query.where(Transaction.is_recurring.is_(is_recurring))
+    if is_anomaly is True:
+        query = query.where(Transaction.anomaly_score >= anomaly_threshold)
+    elif is_anomaly is False:
+        # Sem score não há anomalia: NULL entra no grupo "não atípico".
+        query = query.where(
+            or_(Transaction.anomaly_score.is_(None), Transaction.anomaly_score < anomaly_threshold)
+        )
     # created_at e id desempatam transações do mesmo dia, mantendo a paginação estável.
     query = query.order_by(
         Transaction.date.desc(), Transaction.created_at.desc(), Transaction.id.desc()
@@ -142,3 +156,72 @@ def get_transaction(session: Session, user_id: UUID, transaction_id: UUID) -> Tr
 
 def get_category(session: Session, category_id: UUID) -> Category | None:
     return session.get(Category, category_id)
+
+
+def list_user_accounts(session: Session, user_id: UUID) -> list[Account]:
+    return list(
+        session.scalars(select(Account).where(Account.user_id == user_id).order_by(Account.id))
+    )
+
+
+def list_movements(
+    session: Session, account_ids: list[UUID], after: date, until: date
+) -> list[tuple[UUID, date, int, UUID]]:
+    """Movimentações com `after < date <= until`: só as colunas usadas pelos cálculos."""
+    if not account_ids:
+        return []
+    rows = session.execute(
+        select(
+            Transaction.account_id,
+            Transaction.date,
+            Transaction.amount_cents,
+            Transaction.category_id,
+        ).where(
+            Transaction.account_id.in_(account_ids),
+            Transaction.date > after,
+            Transaction.date <= until,
+        )
+    )
+    return [(row[0], row[1], row[2], row[3]) for row in rows]
+
+
+def get_categories(session: Session, category_ids: list[UUID]) -> dict[UUID, Category]:
+    if not category_ids:
+        return {}
+    categories = session.scalars(select(Category).where(Category.id.in_(category_ids)))
+    return {category.id: category for category in categories}
+
+
+@dataclass(frozen=True)
+class SignalInput:
+    id: UUID
+    date: date
+    amount_cents: int
+    description: str
+    category_id: UUID
+    is_recurring: bool
+    recurrence_key: str | None
+    anomaly_score: Decimal | None
+
+
+def list_signal_inputs(session: Session, account_id: UUID) -> list[SignalInput]:
+    """Todas as transações da conta, de qualquer lote, com os sinais gravados hoje."""
+    rows = session.execute(
+        select(
+            Transaction.id,
+            Transaction.date,
+            Transaction.amount_cents,
+            Transaction.description,
+            Transaction.category_id,
+            Transaction.is_recurring,
+            Transaction.recurrence_key,
+            Transaction.anomaly_score,
+        ).where(Transaction.account_id == account_id)
+    )
+    return [SignalInput(*row) for row in rows]
+
+
+def update_signals(session: Session, changes: list[dict]) -> None:
+    """UPDATE em lote por chave primária: id, is_recurring, recurrence_key e anomaly_score."""
+    if changes:
+        session.execute(update(Transaction), changes)

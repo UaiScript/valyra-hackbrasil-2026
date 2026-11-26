@@ -1,5 +1,7 @@
 # Modelagem de dados do Postgres — Design
 
+> **Issue #47 (21/11/2026):** tabela `alerts` implementada na migração `0002_alerts`, só com `cash_pressure`. Detalhes e escopo adiado na [seção 6](#6-alertas).
+
 > **Issue #15 (10/11/2026):** consultas de contas (com PATCH), transações e categorias implementadas; o contrato soma 7 operações Finance e `system_health`. Decisões de consulta que a especificação deixava abertas estão marcadas como provisórias em [api-design](api-design.md#operações-http--issues-14-e-15).
 
 > **Issue #14 (10/11/2026):** importação de CSV e consulta de lotes implementadas em `services/api/src/valyra/finance/` (router, service, repository, schemas), com OpenAPI regenerado. Consultas da #15 continuam planejadas. Estado atual em [arquitetura](architecture.md).
@@ -410,8 +412,8 @@ Contagem de registros segue o [contrato CSV da Issue #13](api-design.md#entrada-
 | `category_source` | VARCHAR NN | — | `rule` \| `model` \| `user` |
 | `category_confidence` | NUMERIC(4,3) NULL | `NULL` | Confiança da sugestão original, entre 0 e 1 inclusive |
 | `is_recurring` | BOOLEAN NN | `false` | Identificação de recorrência |
-| `recurrence_key` | VARCHAR NULL | `NULL` | Descrição normalizada que agrupa recorrências |
-| `anomaly_score` | NUMERIC(5,4) NULL | `NULL` | Entre 0 e 1 inclusive; pode ser recalculado |
+| `recurrence_key` | VARCHAR NULL | `NULL` | Sinal + descrição normalizada que agrupa recorrências (`-\|netflix.com`); `NULL` fora de série recorrente (#44) |
+| `anomaly_score` | NUMERIC(5,4) NULL | `NULL` | Entre 0 e 1 inclusive; recalculado na importação e na correção de categoria (#45) |
 | `row_hash` | VARCHAR NN | — | SHA-256 hexadecimal de 64 caracteres (#13) |
 | `created_at`, `updated_at` | TIMESTAMPTZ NN | `CURRENT_TIMESTAMP` | Seção 3.4 |
 
@@ -446,7 +448,7 @@ O modelo representa movimentações efetivadas de extrato, sem estado de agendam
 - **Limitação:** o índice é local ao arquivo. Se um CSV tem duas movimentações idênticas e outro contém apenas uma delas, não há como identificar universalmente qual é a mesma movimentação. Arquivos parcialmente sobrepostos podem confundir movimentações distintas com duplicatas; o hash não garante conciliação universal nem substitui um identificador bancário estável.
 - **[Registrado] Correção pelo usuário:** altera `category_id` e grava `category_source = 'user'`; `predicted_category_id` não muda. **[Proposta]** Preservar também a confiança original; a escrita deve atualizar `updated_at`. Essa imutabilidade depende do service futuro; a FK sozinha não a garante. **[Implementado, #42]** `update_transaction_category` altera só `category_id` e `category_source`, preservando `predicted_category_id` e `category_confidence`; `updated_at` vem do `onupdate` do ORM. Categoria `expense` exige saída e `income` exige entrada.
 - **[Registrado, Issues #13/#14] Classificação e fallback:** regras por sinal, slugs de fallback e valores iniciais da transação estão no [contrato do domínio](api-design.md#entrada-csv-e-domínio--issue-13). Ausência de score não equivale a zero. **[Proposta]** O service deve validar também a compatibilidade do `kind` das categorias resolvidas com o sinal, incluindo a prevista; um `CHECK` simples não consulta outra tabela.
-- **[Registrado no desenho]** Dashboard, recorrências, gastos atípicos e projeção são cálculos futuros em `finance/domain.py`, sem tabelas próprias. Não há código desses cálculos. A projeção deve identificar valores previstos separadamente do realizado; regras de recorrência, score e limiar de anomalia, arredondamento da projeção e gatilho de pressão de caixa estão na [ADR-0010](adr/0010-calculos-finance.md).
+- **[Registrado no desenho]** Dashboard, recorrências, gastos atípicos e projeção são cálculos sem tabelas próprias. **[Implementado, #43]** Saldo realizado e resumo mensal ficam em `finance/analytics.py`, funções puras, e são servidos por `GET /api/v1/finance/summary` ([contrato](api-design.md)). **[Implementado, #44]** A recorrência é recalculada ao fim de cada importação sobre toda a conta e grava só os flags que mudam. **[Implementado, #45]** O gasto atípico usa o mesmo recálculo, também disparado pela correção de categoria. **[Implementado, #46]** A projeção de caixa é calculada sob demanda em `GET /api/v1/finance/accounts/{id}/projection`, sem gravar nada, com valores previstos separados do realizado; regras de recorrência, score e limiar de anomalia, arredondamento da projeção e gatilho de pressão de caixa estão na [ADR-0010](adr/0010-calculos-finance.md).
 
 ### 4.4 Responsabilidade das validações
 
@@ -577,6 +579,14 @@ Regras:
 
 Módulo novo `alerts/` **[Altera fundação]**, chamado por `finance` e `alpha` via `service`.
 
+**[Implementado, #47]** A migração `0002_alerts` cria `alerts` só para `cash_pressure`. Por decisão da #47, `market_signal`, `signal_id` e `asset_id` ficam para o Alpha, porque `signals` e `assets` ainda não existem. A migração do Alpha acrescenta as colunas e as FKs e amplia o `CHECK` de `kind`. Checks implementados:
+
+- `kind IN ('cash_pressure')`, `severity IN ('info','warning')` e `status IN ('new','read')`;
+- `(status = 'read') = (read_at IS NOT NULL)` e `read_at >= created_at`;
+- `cash_pressure` exige `account_id`.
+
+Também estão implementados a unicidade `(user_id, dedup_key)` e os índices `(user_id, status, created_at)` e `account_id`. A geração é `alerts.service.create_cash_pressure`, chamada pela importação; a tabela abaixo é o desenho completo.
+
 **`alerts`**
 
 | Coluna | Tipo | Observação |
@@ -612,6 +622,8 @@ Exemplo não monetário de `evidence` (estrutura genérica relacionada a `messag
     "source_url": "https://...", "published_at": "2026-10-10T12:00:00Z" }
 ]
 ```
+
+**[Implementado, #47]** Para `cash_pressure`, `evidence` é um objeto tipado com dinheiro em centavos inteiros: `{"days", "today", "start_balance_cents", "min_balance_cents", "min_balance_date"}`, exposto como `CashPressureEvidenceOut` ([contrato](api-design.md)). A pendência abaixo continua para evidências do Alpha e da IA.
 
 **Pendência de contrato:** o antigo exemplo monetário em `value` textual foi retirado. Dinheiro em respostas da API precisa de inteiro com sufixo `_cents`; o formato tipado de evidências monetárias em alertas/IA ainda exige alinhamento. Esta revisão não acrescenta colunas nem muda silenciosamente a estrutura genérica de `message_evidences`.
 

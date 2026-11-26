@@ -2,9 +2,9 @@ name: Landing page
 
 on:
   push:
-    paths: ['apps/landing/**', '.github/workflows/landing.yml', 'packages/ui/**']
+    paths: ['apps/web/**', '.github/workflows/landing.yml', 'packages/ui/**']
   pull_request:
-    paths: ['apps/landing/**', '.github/workflows/landing.yml', 'packages/ui/**']
+    paths: ['apps/web/**', '.github/workflows/landing.yml', 'packages/ui/**']
 
 permissions:
   contents: read
@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: apps/landing
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
@@ -36,7 +36,7 @@ jobs:
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: apps/landing
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
