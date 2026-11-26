@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FC } from 'react';
-import { ArrowLeft, LayoutDashboard, ListOrdered, Menu, Upload, X } from 'lucide-react';
+import { ArrowLeft, Bell, ChartPie, ChartSpline, LayoutDashboard, ListOrdered, Menu, Upload, X } from 'lucide-react';
 import { api } from './api/client';
 import { ROUTES, routeFromHash, useHash } from './router';
 import type { AppRoute } from './router';
@@ -8,11 +8,17 @@ import { useApi } from './useApi';
 import { Overview } from './pages/Overview';
 import { Transactions } from './pages/Transactions';
 import { ImportCsv } from './pages/ImportCsv';
+import { Summary } from './pages/Summary';
+import { Projection } from './pages/Projection';
+import { Alerts, ALERTS_CHANGED } from './pages/Alerts';
 import './app.css';
 
 const NAV: { route: AppRoute; label: string; icon: typeof LayoutDashboard }[] = [
   { route: 'overview', label: 'Visão geral', icon: LayoutDashboard },
+  { route: 'summary', label: 'Resumo do mês', icon: ChartPie },
+  { route: 'projection', label: 'Projeção de caixa', icon: ChartSpline },
   { route: 'transactions', label: 'Transações', icon: ListOrdered },
+  { route: 'alerts', label: 'Alertas', icon: Bell },
   { route: 'import', label: 'Importar CSV', icon: Upload },
 ];
 
@@ -27,10 +33,21 @@ const ApiStatus: FC = () => {
   );
 };
 
+/** Quantidade de alertas novos para o selo do menu; recarrega quando um alerta muda. */
+function useNewAlertCount(route: AppRoute): number {
+  const { state, reload } = useApi((signal) => api.listAlerts(signal), [route]);
+  useEffect(() => {
+    window.addEventListener(ALERTS_CHANGED, reload);
+    return () => window.removeEventListener(ALERTS_CHANGED, reload);
+  }, [reload]);
+  return state.data?.items.filter((a) => a.status === 'new').length ?? 0;
+}
+
 export default function FinanceApp() {
   const route = routeFromHash(useHash());
   const [menuOpen, setMenuOpen] = useState(false);
   const current = NAV.find((n) => n.route === route)!;
+  const newAlerts = useNewAlertCount(route);
 
   useEffect(() => {
     document.documentElement.lang = 'pt-BR';
@@ -49,6 +66,7 @@ export default function FinanceApp() {
           {NAV.map(({ route: r, label, icon: Icon }) => (
             <a key={r} href={ROUTES[r]} aria-current={r === route ? 'page' : undefined}>
               <Icon size={18} aria-hidden="true" />{label}
+              {r === 'alerts' && newAlerts > 0 && <span className="app-nav__count" aria-label={`${newAlerts} novos`}>{newAlerts}</span>}
             </a>
           ))}
         </nav>
@@ -66,6 +84,9 @@ export default function FinanceApp() {
           <p className="app-demo-note" role="note">Ambiente de demonstração: usuário demo e dados sintéticos, sem login.</p>
           {route === 'overview' && <Overview />}
           {route === 'transactions' && <Transactions />}
+          {route === 'summary' && <Summary />}
+          {route === 'projection' && <Projection />}
+          {route === 'alerts' && <Alerts />}
           {route === 'import' && <ImportCsv />}
         </main>
       </div>

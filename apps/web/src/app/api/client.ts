@@ -2,6 +2,12 @@
 // Base vazia = mesma origem: em dev/preview o Vite repassa /api e /health para a API.
 import type {
   AccountOut,
+  AlertOut,
+  FinanceGetSummaryQuery,
+  ImportBatchCreatedOut,
+  PageAlertOut,
+  ProjectionOut,
+  SummaryOut,
   AccountUpdate,
   ErrorResponse,
   FinanceListTransactionsQuery,
@@ -98,8 +104,20 @@ export const api = {
   importCsv: (accountId: string, file: File) => {
     const form = new FormData();
     form.append('file', file);
-    return request<ImportBatchOut>('POST', `/api/v1/finance/accounts/${id(accountId)}/import-batches`, { body: form });
+    return request<ImportBatchCreatedOut>('POST', `/api/v1/finance/accounts/${id(accountId)}/import-batches`, { body: form });
   },
+
+  getSummary: (query: FinanceGetSummaryQuery, signal?: AbortSignal) =>
+    request<SummaryOut>('GET', '/api/v1/finance/summary', { query, signal }),
+
+  getProjection: (accountId: string, days: number, signal?: AbortSignal) =>
+    request<ProjectionOut>('GET', `/api/v1/finance/accounts/${id(accountId)}/projection`, { query: { days }, signal }),
+
+  listAlerts: (signal?: AbortSignal) =>
+    request<PageAlertOut>('GET', '/api/v1/alerts', { query: { limit: 200 }, signal }),
+
+  markAlertRead: (alertId: string) =>
+    request<AlertOut>('PATCH', `/api/v1/alerts/${id(alertId)}`, { json: { status: 'read' } }),
 };
 
 /** Mensagens em português para códigos conhecidos do backend; demais usam a mensagem da API. */
@@ -112,6 +130,8 @@ const MESSAGES: Record<string, string> = {
   CATEGORY_KIND_MISMATCH: 'Essa categoria não combina com o tipo da transação (entrada ou saída).',
   TRANSACTION_NOT_FOUND: 'Transação não encontrada.',
   CATEGORY_NOT_FOUND: 'Categoria não encontrada.',
+  ALERT_NOT_FOUND: 'Alerta não encontrado.',
+  BALANCE_UNAVAILABLE: 'O saldo de referência da conta é posterior a hoje. Ajuste a data do saldo na visão geral para calcular a projeção.',
 };
 
 export function describeError(error: unknown): string {

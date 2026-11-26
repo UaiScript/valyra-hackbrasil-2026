@@ -1,14 +1,68 @@
 import { useState } from 'react';
 import type { FC, FormEvent } from 'react';
-import { Pencil } from 'lucide-react';
+import { ArrowUpRight, BellRing, Pencil } from 'lucide-react';
 import { api, describeError } from '../api/client';
 import type { AccountOut, AccountUpdate } from '../../lib/api/schema';
-import { centsToInput, formatCents, formatIsoDate, parseReaisToCents } from '../money';
+import { centsToInput, formatCents, formatIsoDate, formatMonth, formatShortDate, parseReaisToCents } from '../money';
+import { ProjectionChart } from '../ProjectionChart';
 import { ROUTES } from '../router';
 import { TransactionSummary } from '../TransactionRow';
 import { Async, Card, Empty, NoticeBar } from '../ui';
 import type { Notice } from '../ui';
 import { useApi } from '../useApi';
+
+// Painel do topo: o realizado (resumo) ao lado do previsto (projeção), sempre rotulados
+// separadamente para não confundir saldo de hoje com saldo estimado.
+const OverviewHero: FC<{ accountId: string | undefined; reloadKey: number }> = ({ accountId, reloadKey }) => {
+  const summary = useApi((s) => api.getSummary({}, s), [reloadKey]);
+  const projection = useApi((s) => (accountId ? api.getProjection(accountId, 30, s) : new Promise<never>(() => {})), [accountId, reloadKey]);
+  const s = summary.state.data;
+  const p = projection.state.data;
+  const quiet = s && s.income_cents === 0 && s.expenses_cents === 0;
+  return (
+    <section className="vx-hero vx-hero--overview" aria-label="Saldo de hoje e próximos 30 dias">
+      <div className="vx-hero__lead">
+        <span className="vx-hero__label">Saldo realizado hoje{s ? `, ${formatIsoDate(s.today)}` : ''}</span>
+        {summary.state.status === 'error' && !s ? <span className="app-muted">Resumo indisponível.</span> : (
+          <strong className={`vx-figure${s?.realized_balance_cents === null ? ' vx-figure--muted' : ''}`}>
+            {s ? (s.realized_balance_cents === null ? 'Indisponível' : formatCents(s.realized_balance_cents)) : '—'}
+          </strong>
+        )}
+        {s && (
+          <a className="vx-hero__month" href={ROUTES.summary}>
+            {quiet
+              ? <>Sem movimentações em {formatMonth(s.month)} até agora</>
+              : <>Resultado de {formatMonth(s.month)}: <b className={s.net_cents < 0 ? 'vx-totals__neg' : 'vx-totals__in'}>{formatCents(s.net_cents)}</b></>}
+            <ArrowUpRight size={14} aria-hidden="true" />
+          </a>
+        )}
+      </div>
+      <a className="vx-hero__forecast" href={ROUTES.projection} aria-label="Abrir projeção de caixa">
+        <span className="vx-hero__label">Próximos 30 dias, previsto</span>
+        {p ? (
+          <>
+            <ProjectionChart projection={p} height={120} compact />
+            <span className="vx-hero__caption">
+              Menor saldo <b className={p.min_balance_cents < 0 ? 'vx-totals__neg' : undefined}>{formatCents(p.min_balance_cents)}</b> em {formatShortDate(p.min_balance_date)}
+            </span>
+          </>
+        ) : <span className="app-muted vx-hero__placeholder">{projection.state.status === 'error' ? 'Projeção indisponível.' : 'Calculando projeção…'}</span>}
+      </a>
+    </section>
+  );
+};
+
+const NewAlertsBanner: FC = () => {
+  const alerts = useApi((s) => api.listAlerts(s), []);
+  const fresh = alerts.state.data?.items.filter((a) => a.status === 'new') ?? [];
+  if (fresh.length === 0) return null;
+  return (
+    <a className="app-inline-alert app-inline-alert--wide" href={ROUTES.alerts}>
+      <BellRing size={18} aria-hidden="true" />
+      <span><strong>{fresh[0].title}</strong>{fresh.length > 1 ? ` e mais ${fresh.length - 1}` : ''}. Ver alertas</span>
+    </a>
+  );
+};
 
 const STATUS_LABEL = { processing: 'Processando', completed: 'Concluído', failed: 'Falhou' } as const;
 
@@ -61,10 +115,15 @@ export const Overview: FC = () => {
   const batches = useApi((s) => api.listImportBatches({ limit: 5 }, s), []);
   const [editing, setEditing] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
+  // Editar o saldo de referência muda o realizado e a projeção: recarrega o painel.
+  const [heroKey, setHeroKey] = useState(0);
 
   return (
     <div className="app-grid">
+      <NewAlertsBanner />
+      <OverviewHero accountId={accounts.state.data?.items[0]?.id} reloadKey={heroKey} />
       <NoticeBar notice={notice} onClose={() => setNotice(null)} />
+      <div className="app-stack app-stack--loose">
       <Card title="Contas">
         <Async state={accounts.state} onRetry={accounts.reload}>
           {(page) => page.items.length === 0 ? <Empty>Nenhuma conta cadastrada. Rode o seed da API.</Empty> : (
@@ -77,6 +136,7 @@ export const Overview: FC = () => {
                       onCancel={() => setEditing(null)}
                       onSaved={(updated) => {
                         setEditing(null);
+                        setHeroKey((k) => k + 1);
                         accounts.setState({ status: 'success', data: { ...page, items: page.items.map((a) => (a.id === updated.id ? updated : a)) } });
                         setNotice({ kind: 'success', text: `Conta “${updated.name}” atualizada.` });
                       }}
@@ -100,17 +160,10 @@ export const Overview: FC = () => {
         </Async>
       </Card>
 
-      <Card title="Últimas transações" action={<a className="app-link" href={ROUTES.transactions}>Ver todas</a>}>
-        <Async state={recent.state} onRetry={recent.reload}>
-          {(page) => page.items.length === 0
-            ? <Empty>Sem transações ainda. <a className="app-link" href={ROUTES.import}>Importe um CSV</a>.</Empty>
-            : <ul className="app-tx-list">{page.items.map((t) => <TransactionSummary key={t.id} t={t} />)}</ul>}
-        </Async>
-      </Card>
-
       <Card title="Importações recentes" action={<a className="app-link" href={ROUTES.import}>Importar</a>}>
         <Async state={batches.state} onRetry={batches.reload}>
           {(page) => page.items.length === 0 ? <Empty>Nenhuma importação feita.</Empty> : (
+            <div className="app-table-wrap">
             <table className="app-table">
               <thead><tr><th>Status</th><th>Linhas</th><th>Importadas</th><th>Duplicadas</th><th>Rejeitadas</th></tr></thead>
               <tbody>
@@ -122,9 +175,19 @@ export const Overview: FC = () => {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </Async>
       </Card>
+      </div>
+      <Card title="Últimas transações" action={<a className="app-link" href={ROUTES.transactions}>Ver todas</a>}>
+        <Async state={recent.state} onRetry={recent.reload}>
+          {(page) => page.items.length === 0
+            ? <Empty>Sem transações ainda. <a className="app-link" href={ROUTES.import}>Importe um CSV</a>.</Empty>
+            : <ul className="app-tx-list">{page.items.map((t) => <TransactionSummary key={t.id} t={t} />)}</ul>}
+        </Async>
+      </Card>
+
     </div>
   );
 };

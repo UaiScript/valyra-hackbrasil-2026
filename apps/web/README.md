@@ -6,9 +6,14 @@ Este pacote serve duas coisas: a **landing** em `/` (estática, dados sintético
 
 | Tela | Rota | Operações da API |
 | --- | --- | --- |
-| Visão geral | `#/app` | `finance_list_accounts`, `finance_update_account`, `finance_list_transactions`, `finance_list_import_batches` |
-| Transações | `#/app/transacoes` | `finance_list_transactions` (filtros de conta, categoria e período), `finance_list_categories`, `finance_update_transaction` |
-| Importar CSV | `#/app/importar` | `finance_create_import_batch`, `finance_list_import_batches` |
+| Visão geral | `#/app` | `finance_get_summary` (saldo realizado de hoje), `finance_get_projection` (30 dias), `alerts_list`, `finance_list_accounts`, `finance_update_account`, `finance_list_transactions`, `finance_list_import_batches` |
+| Resumo do mês | `#/app/resumo` | `finance_get_summary` (mês e conta), `finance_list_accounts` |
+| Projeção de caixa | `#/app/projecao` | `finance_get_projection` (30, 60 ou 90 dias), `finance_list_accounts` |
+| Transações | `#/app/transacoes` | `finance_list_transactions` (filtros de conta, categoria, período, recorrente e atípico), `finance_list_categories`, `finance_update_transaction` |
+| Alertas | `#/app/alertas` | `alerts_list`, `alerts_update` (marcar como lido) |
+| Importar CSV | `#/app/importar` | `finance_create_import_batch` (inclui `alerts_created`), `finance_list_import_batches` |
+
+Todas as operações do contrato atual têm tela. Valores previstos (projeção, evidências de alerta) aparecem sempre rotulados como previstos, separados do saldo realizado. O score de gasto atípico é exibido como indicador (ADR-0010), sem porcentagem nem causa.
 
 O indicador do cabeçalho usa `system_health`. Não há login: a API responde pelo usuário demo do seed.
 
@@ -24,7 +29,7 @@ Abra <http://127.0.0.1:3000/#/app> e importe `datasets/samples/transactions_demo
 
 - **Chamadas à API:** em dev e preview o Vite repassa `/api` e `/health` para `VITE_API_PROXY_TARGET` (padrão `http://127.0.0.1:8000`), então o navegador fala só com a própria origem e não depende de CORS. Para um build publicado com a API em outro domínio, defina `VITE_API_URL` (HTTPS fora de localhost); a origem entra no `connect-src` da CSP. Veja `.env.example`.
 - **Contrato:** os tipos em `src/lib/api/schema.ts` são gerados de `packages/contracts/openapi.json`. Não edite à mão: após `make openapi`, rode `npm --prefix apps/web run gen:api`. O `check` (e portanto o `build`) falha se os tipos estiverem desatualizados. O cliente escrito à mão fica em `src/app/api/client.ts`.
-- **Dinheiro:** valores chegam em centavos inteiros e são formatados/lidos por `src/app/money.ts` sem ponto flutuante. Totais e cálculos financeiros ficam no backend.
+- **Dinheiro:** valores chegam em centavos inteiros e são formatados/lidos por `src/app/money.ts` sem ponto flutuante. Totais e cálculos financeiros ficam no backend. O gráfico de projeção (`src/app/ProjectionChart.tsx`) usa ponto flutuante só para posicionar pixels; todo rótulo vem de `formatCents`.
 - **Testes:** `tests/money.test.ts` cobre a conversão; `tests/browser/app.spec.ts` simula a API com `page.route`, sem precisar de banco.
 
 ## Landing (`/`)

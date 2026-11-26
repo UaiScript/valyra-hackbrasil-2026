@@ -36,3 +36,37 @@ export function formatIsoDate(iso: string): string {
   const [y, m, d] = iso.split('-');
   return d && m && y ? `${d}/${m}/${y}` : iso;
 }
+
+const MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+/** Mês AAAA-MM por extenso, ex.: "2026-10" → "outubro de 2026". */
+export function formatMonth(month: string): string {
+  const [y, m] = month.split('-');
+  const name = MONTHS[Number(m) - 1];
+  return name && y ? `${name} de ${y}` : month;
+}
+
+/** Soma `delta` meses a AAAA-MM com aritmética inteira, sem Date nem fuso. */
+export function shiftMonth(month: string, delta: number): string {
+  const [y, m] = month.split('-').map(Number);
+  const index = y * 12 + (m - 1) + delta;
+  return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`;
+}
+
+/** Data ISO curta para eixos e marcadores, ex.: "2026-11-09" → "9 nov". */
+export function formatShortDate(iso: string): string {
+  const [, m, d] = iso.split('-');
+  const name = MONTHS_SHORT[Number(m) - 1];
+  return name && d ? `${Number(d)} ${name}` : iso;
+}
+
+/**
+ * Score de gasto atípico chega como texto decimal ("0.8125", NUMERIC no banco).
+ * Mostramos duas casas com vírgula por manipulação de texto, sem converter para float.
+ * É um indicador heurístico (ADR-0010), não uma probabilidade: não exibimos como %.
+ */
+export function formatScore(score: string): string {
+  const [int = '0', frac = ''] = score.split('.');
+  return `${int},${frac.padEnd(2, '0').slice(0, 2)}`;
+}
