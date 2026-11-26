@@ -13,7 +13,7 @@ Inteligência financeira para planejar o orçamento e compreender o contexto dos
 - Não edite código gerado em packages/contracts/ ou apps/web/src/lib/api/; regenere pelo exportador correspondente.
 - Sem ADR aceita para uma nova decisão arquitetural, pergunte ao humano. Solicitações explícitas já autorizadas orientam a tarefa; propostas não viram decisões aceitas automaticamente.
 - Preserve branches, alterações locais, stashes e dados; commit/push/merge/publicação exigem autorização. Nunca apague volumes para validar uma entrega.
-- Texto público usa Valyra; preserve nomes técnicos valyre/@valyre/web ao integrar a base web histórica. A landing independente se chama @valyra/landing.
+- Texto público usa Valyra; preserve nomes técnicos valyre/@valyre/web ao integrar a base web histórica. O pacote da landing em apps/web se chama @valyra/landing.
 - Comentários em português explicam o porquê de regras não evidentes. Não altere registros históricos para aparentar verificações atuais.
 - CLAUDE.md contém apenas @AGENTS.md; não duplique conteúdo entre eles.
 
@@ -24,8 +24,7 @@ Na raiz, com GNU Make, uv e Docker Compose; instalação e Windows em [CONTRIBUT
 | Área | Comandos disponíveis |
 | --- | --- |
 | Backend | make sync; make dev; make test; make test-domain; make lint; make migrate; make seed; make openapi |
-| Landing | npm --prefix apps/landing ci --ignore-scripts; npm --prefix apps/landing run dev; npm --prefix apps/landing run check; npm --prefix apps/landing run build; npm --prefix apps/landing test |
-| Aplicação web futura | npm run dev/check/format:check são comandos da base histórica, indisponíveis neste checkout |
+| Landing | npm --prefix apps/web ci --ignore-scripts; npm --prefix apps/web run dev; npm --prefix apps/web run check; npm --prefix apps/web run build; npm --prefix apps/web test |
 | Documentação | python infra/check_docs.py |
 
 Make aceita UV=/caminho/uv e ENV_FILE=/caminho/configuração. Usa .env existente ou .env.example, sem sobrescrever configuração. Suíte de banco exige TEST_DATABASE_URL no processo e banco dedicado. make test-domain não conecta ao banco.
@@ -33,12 +32,12 @@ Make aceita UV=/caminho/uv e ENV_FILE=/caminho/configuração. Usa .env existent
 ## Mapa de pastas
 
 - services/api/: [contexto de backend](services/api/AGENTS.md), core HTTP, Finance (ORM, domínio CSV, importação, consultas e cálculos HTTP), Alerts (pressão de caixa), Alembic e testes.
-- apps/landing/: [página estática isolada](apps/landing/README.md), apontando inicialmente ao repositório oficial.
+- apps/web/: [landing estática](apps/web/README.md) (movida de apps/landing no PR #64), apontando inicialmente ao repositório oficial.
 - packages/ui/: estilos CSS compartilhados e [guia de uso](packages/ui/README.md).
 - packages/contracts/: OpenAPI gerado; infra/postgres/init/: criação idempotente do banco de testes.
 - docs/: arquitetura, glossário, ADRs e specs. .github/: CI, templates e revisão.
 - datasets/samples/: dados sintéticos de demonstração (CSV de transações), nunca dados reais.
-- apps/web, pipelines e experiments são caminhos planejados, não funcionalidades implementadas.
+- pipelines e experiments são caminhos planejados, não funcionalidades implementadas.
 
 ## Onde buscar contexto
 
