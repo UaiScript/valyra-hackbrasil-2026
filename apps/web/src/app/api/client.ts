@@ -29,7 +29,8 @@ export class ApiError extends Error {
   }
 }
 
-type Query = Record<string, string | number | null | undefined>;
+// boolean entra desde o filtro is_recurring da #44; String(false) vira "false", que o FastAPI aceita.
+type Query = Record<string, string | number | boolean | null | undefined>;
 
 function buildUrl(path: string, query?: Query): string {
   const params = new URLSearchParams();
