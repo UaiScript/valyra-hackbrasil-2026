@@ -15,6 +15,7 @@ Leia apenas as referências pertinentes à tarefa. A arquitetura é um monorepo 
 | Migração inicial, seed e decisões pendentes | [revisao-modelagem.md](revisao-modelagem.md) |
 | CI, Claude e configuração manual do GitHub | [github-setup.md](github-setup.md) |
 | Publicação gratuita da API (Render e Neon) | [deploy.md](deploy.md) |
+| Dados sintéticos e roteiro da apresentação | [demo.md](demo.md) |
 
 ## Estado das referências
 
