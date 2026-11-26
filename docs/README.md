@@ -19,4 +19,4 @@ Leia apenas as referências pertinentes à tarefa. A arquitetura é um monorepo 
 
 Os três specs de design — fundação, modelagem e API — registram decisões, contratos e propostas. Os itens explicitamente em revisão permanecem assim até decisão da equipe. A revisão de modelagem complementa esses specs para as Issues de Finance.
 
-A aplicação web histórica segue fora deste checkout. A landing fica em apps/web; veja seu [README](../apps/web/README.md). Estado das entregas #11/#12, validações e pendências em [integracao-11-12.md](integracao-11-12.md). Não substituir registros históricos por resultados de hoje.
+A aplicação web histórica segue fora deste checkout. A landing e a aplicação Finance ficam em apps/web; veja seu [README](../apps/web/README.md). Estado das entregas #11/#12, validações e pendências em [integracao-11-12.md](integracao-11-12.md). Não substituir registros históricos por resultados de hoje.

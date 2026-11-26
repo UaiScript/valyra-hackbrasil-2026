@@ -23,3 +23,20 @@ test('application also rejects executable schemes and embedded credentials', () 
   }
   assert.throws(() => resolveDestination({ VITE_DESTINATION_KIND: 'unknown' }));
 });
+
+import { resolveApi, DEFAULT_PROXY_TARGET } from '../config/api.mjs';
+
+test('api defaults to same origin behind the Vite proxy', () => {
+  assert.deepEqual(resolveApi({}), { proxyTarget: DEFAULT_PROXY_TARGET, apiOrigin: null, connectSrc: "'self'" });
+});
+test('explicit api origin is added to the CSP', () => {
+  const api = resolveApi({ VITE_API_URL: 'https://api.example.com' });
+  assert.equal(api.apiOrigin, 'https://api.example.com');
+  assert.equal(api.connectSrc, "'self' https://api.example.com");
+  assert.equal(resolveApi({ VITE_API_URL: 'http://localhost:8000' }).apiOrigin, 'http://localhost:8000');
+});
+for (const url of ['javascript:alert(1)', 'http://api.example.com', 'https://user:secret@api.example.com', 'https://api.example.com/v1', '/api']) {
+  test(`reject unsafe api url: ${url.split(':')[0]}`, () => {
+    assert.throws(() => resolveApi({ VITE_API_URL: url }));
+  });
+}

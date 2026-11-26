@@ -3,7 +3,7 @@
 Visão operacional da branch integrada. Histórico e propostas permanecem nos três specs abaixo; não comprovam funcionalidades disponíveis.
 
 ```text
-apps/web — React/TypeScript: landing estática → repositório oficial (aplicação Finance planejada)
+apps/web — React/TypeScript: landing estática em / e aplicação Finance em #/app
                          | /api/v1/finance (importação, consultas, resumo, projeção) · /api/v1/alerts
 services/api — FastAPI único: /health, Finance (10 operações), Alerts (2 operações) e OpenAPI
 core · finance (router → service → domínio CSV | analytics | repository → ORM)
@@ -23,9 +23,10 @@ core · finance (router → service → domínio CSV | analytics | repository �
 - Correção de categoria da Issue #42: `PATCH /api/v1/finance/transactions/{id}` com `{category_id}`; grava `category_source = user` e preserva a sugestão original (`predicted_category_id`, `category_confidence`). Transação de outro usuário responde 404 como inexistente; tipo da categoria precisa corresponder ao sinal.
 - Cálculos Finance das Issues #43–#46 (ADR-0010): saldo realizado e resumo mensal (`GET /api/v1/finance/summary`), recorrência e gasto atípico recalculados na importação e na correção de categoria, e projeção de caixa sob demanda (`GET /api/v1/finance/accounts/{id}/projection`). Funções puras em `finance/analytics.py`, sem banco, HTTP ou relógio.
 - Alertas da Issue #47: módulo `alerts/` com a tabela `alerts` (migração `0002_alerts`, só `cash_pressure`), `GET /api/v1/alerts` e `PATCH /api/v1/alerts/{id}`. A importação cria, na mesma transação, um alerta de pressão de caixa por conta por mês quando a projeção de 30 dias fica negativa, e o `POST` devolve `alerts_created`. Texto por template, sem LLM.
-- Landing do PR #18, movida para apps/web no PR #64, com build e testes próprios; números sintéticos identificados. CTA aponta ao GitHub. O destino futuro HTTPS é configurado no build, não pelo visitante.
+- Landing do PR #18, movida para apps/web no PR #64: números sintéticos identificados; CTA aponta ao GitHub. O destino futuro HTTPS é configurado no build, não pelo visitante.
+- Aplicação Finance em apps/web (#/app): visão geral de contas, transações com filtros e correção de categoria, importação de CSV com rejeições. Consome as 8 operações Finance anteriores aos cálculos e /health, com tipos gerados de packages/contracts/openapi.json em src/lib/api/. Valores em centavos formatados sem float. Usuário demo, sem login. Resumo, projeção e alertas ainda não aparecem na tela.
 - CI: PostgreSQL/Compose, API consolidada e workflow independente da landing. Claude preparado; configuração externa e primeiro review são verificação separada. Resultados desta integração no PR e em [integração](integracao-11-12.md).
-- Não implementados: aplicação Finance em apps/web, categorização ML, sinais, replay, pipelines, DuckDB, alertas `market_signal` (com o Alpha) e IA.
+- Não implementados: categorização ML, sinais, replay, pipelines, DuckDB, alertas `market_signal` (com o Alpha) e IA.
 
 ## Fronteiras
 
@@ -37,7 +38,7 @@ No desenho futuro, pipelines escrevem sinais append-only e API apenas lê; obser
 
 ## Frontend e remoção
 
-A landing não depende da API. Execução e configuração estão em [apps/web/README.md](../apps/web/README.md). A [arquitetura inicial do frontend na branch histórica](https://github.com/UaiScript/valyra-hackbrasil-2026/blob/9c2a87c2e992f83db7c84f37e0e0737ae16e06f4/docs/arquitetura-inicial.md) ainda não é um arquivo local. Não recuperar essa base ou renomear valyre/@valyre/web sem tarefa própria.
+A landing não depende da API; a aplicação em #/app é carregada sob demanda e chama a API pela mesma origem (proxy do Vite) ou por VITE_API_URL. Execução e configuração em [apps/web/README.md](../apps/web/README.md). A [arquitetura inicial do frontend na branch histórica](https://github.com/UaiScript/valyra-hackbrasil-2026/blob/9c2a87c2e992f83db7c84f37e0e0737ae16e06f4/docs/arquitetura-inicial.md) ainda não é um arquivo local. Não recuperar essa base ou renomear valyre/@valyre/web sem tarefa própria.
 
 ## Histórico das decisões
 

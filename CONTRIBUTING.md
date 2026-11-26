@@ -35,7 +35,7 @@ npm --prefix apps/web test
 npm --prefix apps/web run build
 ```
 
-Para navegador, na pasta apps/web: npx --no-install playwright install chromium e npm run test:e2e. No Windows com Chrome instalado, defina PLAYWRIGHT_CHANNEL=chrome no processo. Veja [README de apps/web](apps/web/README.md).
+Para navegador, na pasta apps/web: npx --no-install playwright install chromium e npm run test:e2e. No Windows com Chrome instalado, defina PLAYWRIGHT_CHANNEL=chrome no processo. Veja [README de apps/web](apps/web/README.md). Após mudar o contrato da API, rode make openapi e npm --prefix apps/web run gen:api; o check falha se os tipos do front estiverem desatualizados.
 
 ## Fluxo e revisão
 
