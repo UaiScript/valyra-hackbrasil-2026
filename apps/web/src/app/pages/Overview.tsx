@@ -236,14 +236,14 @@ export const Overview: FC = () => {
   return (
     <div className="cx-grid">
       <MarketTicker reloadKey={heroKey} />
-      {account && <Hero account={account} reloadKey={heroKey} />}
-      {account && (
+      {account ? <Hero account={account} reloadKey={heroKey} /> : <div className="cx-placeholder cx-span-8" aria-hidden="true" />}
+      {account ? (
         <div className="cx-stack cx-span-4">
           <ForecastCard account={account} reloadKey={heroKey} />
           <BudgetCard reloadKey={heroKey} />
         </div>
-      )}
-      {account && <CandlesCard account={account} reloadKey={heroKey} />}
+      ) : <div className="cx-placeholder cx-span-4" aria-hidden="true" />}
+      {account ? <CandlesCard account={account} reloadKey={heroKey} /> : <div className="cx-placeholder cx-placeholder--candles cx-span-8" aria-hidden="true" />}
       <SignalRadar />
       <BudgetPanel reloadKey={heroKey} />
       <NoticeBar notice={notice} onClose={() => setNotice(null)} />
