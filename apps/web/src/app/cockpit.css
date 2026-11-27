@@ -491,7 +491,7 @@ body:has(.cx) { background: #0a0c13; }
 .cx-eyebrow { color: var(--cx-muted); font-size: 0.84rem; }
 .cx-hero__figure {
   font-family: var(--cx-display);
-  font-size: clamp(2rem, 15cqi, 4rem);
+  font-size: clamp(1.4rem, 15cqi, 4rem);
   font-weight: 600;
   line-height: 0.95;
   white-space: nowrap;

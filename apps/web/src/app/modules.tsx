@@ -8,7 +8,15 @@ import { pt } from '../content/pt';
  */
 export type ModuleId = 'finance' | 'alpha' | 'ai';
 
-const [finance, alpha, ai] = pt.capabilities.items;
+// Busca pelo número do módulo na landing, não pela posição: reordenar a landing não troca nomes.
+function byNumber(n: string) {
+  const item = pt.capabilities.items.find((i) => i.number === n);
+  if (!item) throw new Error(`Módulo ${n} ausente em content/pt.ts`);
+  return item;
+}
+const finance = byNumber('01');
+const alpha = byNumber('02');
+const ai = byNumber('03');
 
 export const MODULES: Record<ModuleId, { title: string; subtitle: string; Icon: typeof Compass }> = {
   finance: { title: finance.title, subtitle: finance.subtitle, Icon: ChartNoAxesCombined },

@@ -125,7 +125,7 @@ export default function FinanceApp() {
           <div className="cx-nav__group cx-nav__group--alpha">
             <span className="cx-nav__title"><ModuleBadge id="alpha" compact /></span>
             <span className="cx-nav__soon" data-tip={`${MODULES.alpha.title} · em breve`} title="Módulo em pesquisa; ainda sem dados conectados">
-              <Compass size={19} aria-hidden="true" /><span className="cx-nav__label">Radar · em breve</span>
+              <Compass size={19} aria-hidden="true" /><span className="cx-nav__label">{MODULES.alpha.subtitle} · em breve</span>
             </span>
           </div>
         </nav>

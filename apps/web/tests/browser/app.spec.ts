@@ -142,9 +142,22 @@ test('app usa os nomes dos módulos da landing no menu e no cabeçalho', async (
   await expect(page.locator('.cx-crumb')).toContainText('Planejar o orçamento');
   const titles = page.locator('.cx-nav__title');
   await expect(titles).toHaveText(['Valyra Finance', 'Valyra AI', 'Alternative Alpha']);
+  await expect(page.locator('.cx-nav__soon')).toContainText('Investigar o contexto econômico');
   await page.goto('/#/app/valyra-ai');
   await expect(page.locator('.cx-crumb')).toContainText('Valyra AI');
   await expect(page.locator('.cx-crumb')).toContainText('Compreender evidências');
+});
+
+test('central cabe na largura da tela, sem rolagem lateral nem saldo cortado', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/#/app');
+  await expect(page.locator('.cx-hero__figure')).toBeVisible();
+  const fit = await page.evaluate(() => {
+    const figure = document.querySelector('.cx-hero__figure')!.getBoundingClientRect();
+    const body = document.querySelector('.cx-hero__body')!.getBoundingClientRect();
+    return { page: document.documentElement.scrollWidth <= window.innerWidth, figure: figure.right <= body.right + 1 };
+  });
+  expect(fit).toEqual({ page: true, figure: true });
 });
 
 test('orçamento mostra consumo, status e envia limite em centavos', async ({ page }) => {
