@@ -38,7 +38,11 @@ Proposta para o time aprovar:
    suporte verificável.
 4. A Valyra AI recebe até 8 manchetes da semana como evidência textual `alpha_signal`,
    com fonte e data, e só pode reproduzi-las literalmente (contrato da ADR-0011).
-5. Coleta por workflow agendado três vezes ao dia, com o mesmo interruptor e secret da
+5. Imagem da notícia só por endereço (a Valyra não copia o arquivo), quando o feed traz
+   uma hospedada no domínio da própria fonte (EBC, IBGE ou BCB) e em https, com o crédito
+   do feed ou o nome da fonte. A CSP do app libera só esses domínios em `img-src`. Sem
+   imagem, a tela usa um visual do tema feito em CSS.
+6. Coleta por workflow agendado três vezes ao dia, com o mesmo interruptor e secret da
    coleta Alpha. Sem migração nova.
 
 ## Alternativas consideradas

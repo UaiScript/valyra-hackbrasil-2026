@@ -98,10 +98,13 @@ const RADAR = {
 // Manchetes sintéticas só para o teste; a coleta real lê Agência Brasil, BCB e IBGE.
 const AB = { slug: 'agencia-brasil', name: 'Agência Brasil (EBC) — Economia', url: 'https://agenciabrasil.ebc.com.br/economia', license: 'Reprodução permitida com citação da Agência Brasil; aqui só título, trecho e link' };
 const IBGE = { slug: 'ibge-noticias', name: 'Agência de Notícias do IBGE', url: 'https://agenciadenoticias.ibge.gov.br/', license: 'Conteúdo público do IBGE; citar a fonte' };
-const news = (key: string, title: string, summary: string, source: typeof AB, published: string, tickers: string[] = []) => ({
+const news = (key: string, title: string, summary: string, source: typeof AB, published: string, tickers: string[] = [], image: string | null = null) => ({
   signal_key: `news:${source.slug}:${key}`, title, summary, url: `${source.url}/noticia/${key}`, source,
   observation_date: published.slice(0, 10), published_at: published, ingested_at: '2026-11-27T14:17:00Z', tickers,
+  image_url: image, image_credit: image ? 'Fotógrafo/Agência Brasil' : null,
 });
+// Imagem sintética servida pelo próprio teste: nenhum arquivo real da fonte é baixado.
+const PHOTO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1d6b3a"/><stop offset="1" stop-color="#e3b341"/></linearGradient></defs><rect width="640" height="360" fill="url(#g)"/><circle cx="520" cy="80" r="46" fill="#ffe9a8" opacity=".8"/><path d="M0 280 Q160 220 320 270 T640 250 V360 H0Z" fill="#14532d" opacity=".75"/></svg>`;
 const WEEKLY = {
   as_of: '2026-11-27T18:00:00Z', week_start: '2026-11-20T18:00:00Z', rule: 'news_theme_v2',
   total_items: 9, unmatched_items: 2, last_ingested_at: '2026-11-27T14:17:00Z', sources: [AB, IBGE],
@@ -114,7 +117,7 @@ const WEEKLY = {
     {
       key: 'agro', title: 'Agro e cadeia da soja', why: 'Safra e clima nos polos de grãos podem chegar ao preço de óleo, carnes e derivados no mercado.',
       category_slugs: ['mercado'], radar_theme: 'clima',
-      items: [news('soja', 'Plantio de soja atrasa em Mato Grosso com chuva irregular', 'Levantamento acompanha o ritmo do plantio.', AB, '2026-11-25T16:00:00Z')],
+      items: [news('soja', 'Plantio de soja atrasa em Mato Grosso com chuva irregular', 'Levantamento acompanha o ritmo do plantio.', AB, '2026-11-25T16:00:00Z', [], 'https://imagens.ebc.com.br/teste/soja.jpg')],
     },
     {
       key: 'alimentos', title: 'Alimentos', why: 'Alta ou queda de alimentos pesa na ida ao mercado.', category_slugs: ['mercado'], radar_theme: 'inflacao',
@@ -152,6 +155,7 @@ async function mockApi(page: Page) {
     return json(route, url.searchParams.has('as_of') ? { ...RADAR, as_of: url.searchParams.get('as_of'), indicators: [], signals: [], sources: [], last_ingested_at: null } : RADAR);
   });
   await page.route('**/api/v1/alpha/news/weekly**', (route) => json(route, WEEKLY));
+  await page.route('https://imagens.ebc.com.br/**', (route) => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: PHOTO_SVG }));
   await page.route('**/api/v1/finance/**', (route) => {
     const req = route.request();
     const url = new URL(req.url());
@@ -416,7 +420,7 @@ test('relatório da semana liga manchetes ao orçamento com fonte, data e IA', a
   // O chip usa o orçamento calculado pela API: R$ 1.800,00 de R$ 1.500,00, estourado.
   await expect(food.locator('.nx-chip')).toContainText('R$ 1.800,00 de R$ 1.500,00');
   await expect(food.locator('.nx-chip')).toContainText('Estourado');
-  const headline = food.getByRole('link', { name: /Preço do café/ });
+  const headline = food.locator('.nx-headline__title').filter({ hasText: 'Preço do café' });
   await expect(headline).toHaveAttribute('href', 'https://agenciabrasil.ebc.com.br/economia/noticia/cafe');
   await expect(food).toContainText('publicado em 26/11/2026, 10:20');
   await expect(page.getByRole('article', { name: 'Renda, emprego e impostos' }).locator('.nx-chip')).toContainText('recebidos no mês');
@@ -453,4 +457,19 @@ test('relatório da semana mostra o dado do radar e gera o resumo da Valyra AI n
   await page.getByRole('button', { name: 'Gerar resumo' }).click();
   await expect(page.getByText('Evidências citadas (1)')).toBeVisible();
   expect(asked).toContain('notícias desta semana');
+});
+
+test('notícias trazem foto com crédito, visual do tema sem foto e link para a fonte', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/#/app/alpha/semana');
+  const agro = page.getByRole('article', { name: 'Agro e cadeia da soja' });
+  const photo = agro.locator('.nx-media img');
+  await expect(photo).toHaveAttribute('src', 'https://imagens.ebc.com.br/teste/soja.jpg');
+  await expect(photo).toHaveAttribute('loading', 'lazy');
+  await expect(agro.locator('.nx-media__credit')).toHaveText('Foto: Fotógrafo/Agência Brasil');
+  // Sem foto no feed: visual do tema feito em CSS.
+  await expect(page.getByRole('article', { name: 'Juros e Selic' }).locator('.nx-media__art')).toBeVisible();
+  const source = agro.getByRole('link', { name: /Ler na fonte/ });
+  await expect(source).toHaveAttribute('href', 'https://agenciabrasil.ebc.com.br/economia/noticia/soja');
+  await expect(source).toHaveAttribute('target', '_blank');
 });

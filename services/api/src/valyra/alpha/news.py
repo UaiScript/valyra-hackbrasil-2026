@@ -9,6 +9,7 @@ explica o que esta regra já decidiu.
 from __future__ import annotations
 
 import html
+import json
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
@@ -18,6 +19,7 @@ from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from hashlib import sha256
 from typing import Literal, Protocol
+from urllib.parse import urljoin, urlsplit
 from zoneinfo import ZoneInfo
 
 BUSINESS_ZONE = ZoneInfo("America/Sao_Paulo")
@@ -39,6 +41,9 @@ class NewsSource:
     site_url: str
     license: str
     format: FeedFormat
+    # Domínios de onde a imagem da notícia pode vir: só a própria fonte, nunca terceiros
+    # (pixel de rastreio, conteúdo de agência parceira com reprodução proibida).
+    image_hosts: tuple[str, ...] = ()
 
 
 NEWS_SOURCES: tuple[NewsSource, ...] = (
@@ -49,6 +54,7 @@ NEWS_SOURCES: tuple[NewsSource, ...] = (
         site_url="https://agenciabrasil.ebc.com.br/economia",
         license="Reprodução permitida com citação da Agência Brasil; aqui só título, trecho e link",
         format="rss",
+        image_hosts=("ebc.com.br",),
     ),
     NewsSource(
         slug="bcb-notas",
@@ -57,6 +63,7 @@ NEWS_SOURCES: tuple[NewsSource, ...] = (
         site_url="https://www.bcb.gov.br/detalhenoticia",
         license="Conteúdo público do Banco Central; citar a fonte",
         format="rss",
+        image_hosts=("bcb.gov.br",),
     ),
     NewsSource(
         slug="ibge-noticias",
@@ -65,6 +72,7 @@ NEWS_SOURCES: tuple[NewsSource, ...] = (
         site_url="https://agenciadenoticias.ibge.gov.br/",
         license="Conteúdo público do IBGE; citar a fonte",
         format="ibge_json",
+        image_hosts=("ibge.gov.br",),
     ),
 )
 SOURCES_BY_SLUG = {source.slug: source for source in NEWS_SOURCES}
@@ -82,6 +90,9 @@ class FeedItem:
     link: str
     # Instante informado pela fonte; None quando o feed não traz data confiável.
     source_published_at: datetime | None
+    # Imagem publicada pela própria fonte junto da notícia, e o crédito quando o feed traz.
+    image_url: str | None = None
+    image_credit: str | None = None
 
 
 def news_key(source_slug: str, link: str) -> str:
@@ -144,6 +155,49 @@ def _child_text(element: ET.Element, *names: str) -> str | None:
     return None
 
 
+_IMG_SRC = re.compile(r"""<img[^>]+src=["']([^"']+)["']""", re.IGNORECASE)
+_IMAGE_EXT = re.compile(r"\.(?:jpe?g|png|webp|gif)(?:$|\?)", re.IGNORECASE)
+
+
+def safe_image_url(source_slug: str, raw: str | None, base: str | None = None) -> str | None:
+    """URL https de imagem hospedada na própria fonte; qualquer outra coisa vira None."""
+    text = clean_text(raw)
+    if not text:
+        return None
+    url = urljoin(base, text) if base else text
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    source = SOURCES_BY_SLUG.get(source_slug)
+    if parts.scheme != "https" or source is None or not host:
+        return None
+    if not any(host == allowed or host.endswith(f".{allowed}") for allowed in source.image_hosts):
+        return None
+    return url if len(url) <= 1000 else None
+
+
+def _rss_image(node: ET.Element) -> tuple[str | None, str | None]:
+    """Imagem do item: media:content/thumbnail, enclosure de imagem ou primeiro <img>."""
+    credit = None
+    for child in node.iter():
+        if _local_name(child.tag) == "credit" and child.text:
+            credit = clean_text(child.text) or None
+    for child in node.iter():
+        name = _local_name(child.tag)
+        url = child.get("url")
+        if not url:
+            continue
+        kind = (child.get("type") or child.get("medium") or "").lower()
+        if name in {"content", "thumbnail"} and (
+            "image" in kind or not kind and _IMAGE_EXT.search(url)
+        ):
+            return url, credit
+        if name == "enclosure" and kind.startswith("image"):
+            return url, credit
+    html_text = _child_text(node, "encoded", "description") or ""
+    match = _IMG_SRC.search(html.unescape(html_text))
+    return (match.group(1) if match else None), credit
+
+
 def parse_rss(source_slug: str, body: bytes) -> list[FeedItem]:
     """Itens de um RSS 2.0. DOCTYPE e entidades são recusados antes do parser (XXE, bombas)."""
     if len(body) > MAX_FEED_BYTES:
@@ -165,6 +219,8 @@ def parse_rss(source_slug: str, body: bytes) -> list[FeedItem]:
         link = _http_link(_child_text(node, "link", "guid"))
         if not title or link is None:
             continue
+        raw_image, credit = _rss_image(node)
+        image_url = safe_image_url(source_slug, raw_image, link)
         items.append(
             FeedItem(
                 source_slug=source_slug,
@@ -172,6 +228,8 @@ def parse_rss(source_slug: str, body: bytes) -> list[FeedItem]:
                 excerpt=excerpt(_child_text(node, "description", "encoded")),
                 link=link,
                 source_published_at=_rss_date(_child_text(node, "pubDate", "date")),
+                image_url=image_url,
+                image_credit=credit[:200] if credit and image_url else None,
             )
         )
     return items
@@ -194,6 +252,26 @@ def _ibge_date(raw: object) -> datetime | None:
     return moment.replace(tzinfo=BUSINESS_ZONE).astimezone(UTC)
 
 
+IBGE_IMAGE_BASE = "https://agenciadenoticias.ibge.gov.br/"
+
+
+def _ibge_image(raw: object) -> str | None:
+    """`imagens` chega como texto JSON (`{"image_intro": "images/..."}`), com caminho relativo."""
+    data: object = raw
+    if isinstance(raw, str):
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            return None
+    if not isinstance(data, dict):
+        return None
+    for key in ("image_intro", "image_fulltext"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def parse_ibge(source_slug: str, payload: object) -> list[FeedItem]:
     """Itens da API de notícias do IBGE: `{"items": [{"titulo", "introducao", ...}]}`."""
     rows = payload.get("items") if isinstance(payload, dict) else None
@@ -214,6 +292,9 @@ def parse_ibge(source_slug: str, payload: object) -> list[FeedItem]:
                 excerpt=excerpt(str(row.get("introducao") or "")),
                 link=link,
                 source_published_at=_ibge_date(row.get("data_publicacao")),
+                image_url=safe_image_url(
+                    source_slug, _ibge_image(row.get("imagens")), IBGE_IMAGE_BASE
+                ),
             )
         )
     return items

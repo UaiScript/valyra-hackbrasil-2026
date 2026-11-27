@@ -59,6 +59,8 @@ def get_weekly_news(
                         published_at=item.published_at,
                         ingested_at=item.ingested_at,
                         tickers=list(item.tickers),
+                        image_url=item.image_url,
+                        image_credit=item.image_credit,
                     )
                     for item in view.items
                 ],

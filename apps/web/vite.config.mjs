@@ -20,8 +20,11 @@ export default defineConfig(({ mode, command }) => {
       name: 'landing-production-policy',
       transformIndexHtml(html) {
         if (command !== 'build') return html;
+        // Fotos do relatório semanal vêm das próprias fontes das notícias (EBC, IBGE e BCB);
+        // a API já recusa qualquer outro domínio, e a CSP repete a mesma lista no navegador.
+        const newsImages = 'https://*.ebc.com.br https://*.ibge.gov.br https://*.bcb.gov.br';
         return html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src ${apiConfig.connectSrc}; base-uri 'none'; form-action 'none'; object-src 'none'" />`);
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' ${newsImages}; font-src 'self'; connect-src ${apiConfig.connectSrc}; base-uri 'none'; form-action 'none'; object-src 'none'" />`);
       },
     }],
     define: { __DESTINATION__: JSON.stringify(destination) },

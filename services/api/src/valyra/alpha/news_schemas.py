@@ -20,6 +20,10 @@ class NewsItemOut(BaseModel):
     ingested_at: datetime
     # Tickers do radar Alpha citados pelo nome da empresa; liga a manchete à cotação.
     tickers: list[str]
+    # Imagem hospedada pela própria fonte (https, domínio da fonte); null sem imagem no feed.
+    image_url: str | None
+    # Crédito informado no feed; sem ele, a tela credita a fonte.
+    image_credit: str | None
 
 
 class NewsThemeOut(BaseModel):

@@ -1271,6 +1271,28 @@
       },
       "NewsItemOut": {
         "properties": {
+          "image_credit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Credit"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
           "ingested_at": {
             "format": "date-time",
             "title": "Ingested At",
@@ -1322,7 +1344,9 @@
           "observation_date",
           "published_at",
           "ingested_at",
-          "tickers"
+          "tickers",
+          "image_url",
+          "image_credit"
         ],
         "title": "NewsItemOut",
         "type": "object"

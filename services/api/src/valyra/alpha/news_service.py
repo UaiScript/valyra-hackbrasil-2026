@@ -62,6 +62,9 @@ def record_news(session: Session, item: FeedItem, *, ingested_at: datetime) -> b
                 "source_published_at": (
                     item.source_published_at.isoformat() if item.source_published_at else None
                 ),
+                # Só o endereço da imagem da própria fonte; a Valyra não copia o arquivo.
+                "image_url": item.image_url,
+                "image_credit": item.image_credit,
             },
             published_at=published_at,
             published_at_estimated=False,
@@ -70,6 +73,11 @@ def record_news(session: Session, item: FeedItem, *, ingested_at: datetime) -> b
         ),
     )
     return True
+
+
+def _payload_text(payload: object, key: str) -> str | None:
+    value = payload.get(key) if isinstance(payload, dict) else None
+    return value if isinstance(value, str) and value else None
 
 
 @dataclass(frozen=True)
@@ -86,6 +94,8 @@ class NewsView:
     source: Source
     # Ações do radar citadas pelo nome da empresa (regra de nomes de news.TICKER_ALIASES).
     tickers: tuple[str, ...] = ()
+    image_url: str | None = None
+    image_credit: str | None = None
 
 
 @dataclass(frozen=True)
@@ -121,6 +131,8 @@ def get_weekly_report(session: Session, as_of: datetime, *, per_theme: int = 4) 
             ingested_at=signal.ingested_at,
             source=source,
             tickers=tickers_for(signal.title, signal.summary),
+            image_url=_payload_text(signal.payload, "image_url"),
+            image_credit=_payload_text(signal.payload, "image_credit"),
         )
         for signal, source in rows
     ]

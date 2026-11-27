@@ -253,6 +253,8 @@ export type MoneyValue = {
 };
 
 export type NewsItemOut = {
+  image_credit: string | null;
+  image_url: string | null;
   /** date-time */ ingested_at: string;
   /** date */ observation_date: string;
   /** date-time */ published_at: string;

@@ -118,8 +118,31 @@ const RadarContext: FC<{ readings: Reading[]; theme: string }> = ({ readings, th
   </div>
 );
 
-const Headline: FC<{ n: NewsItemOut; theme: string }> = ({ n, theme }) => (
-  <li className="nx-headline">
+/**
+ * Foto da manchete principal, servida pela própria fonte (a API só aceita https do domínio
+ * dela). Carrega sob demanda, sem enviar de onde veio o clique; sem foto, ou se ela falhar,
+ * entra um visual do tema feito só com CSS, sem arquivo extra para baixar.
+ */
+const NewsMedia: FC<{ n: NewsItemOut; themeKey: string; Icon: typeof Fuel }> = ({ n, themeKey, Icon }) => {
+  const [failed, setFailed] = useState(false);
+  const photo = n.image_url && !failed ? n.image_url : null;
+  return (
+    <a className={`nx-media nx-media--${themeKey}`} href={n.url} target="_blank" rel="noreferrer" tabIndex={-1} aria-hidden="true">
+      {photo ? (
+        <>
+          <img src={photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" width={640} height={360} onError={() => setFailed(true)} />
+          <small className="nx-media__credit">Foto: {n.image_credit ?? n.source.name}</small>
+        </>
+      ) : (
+        <span className="nx-media__art"><Icon size={40} strokeWidth={1.4} /></span>
+      )}
+    </a>
+  );
+};
+
+const Headline: FC<{ n: NewsItemOut; theme: string; themeKey: string; Icon: typeof Fuel; lead?: boolean }> = ({ n, theme, themeKey, Icon, lead }) => (
+  <li className={`nx-headline${lead ? ' nx-headline--lead' : ''}`}>
+    {lead && <NewsMedia n={n} themeKey={themeKey} Icon={Icon} />}
     {n.tickers.length > 0 && (
       <span className="nx-tickers">{n.tickers.map((tk) => <i key={tk}>{tk}</i>)}</span>
     )}
@@ -131,6 +154,11 @@ const Headline: FC<{ n: NewsItemOut; theme: string }> = ({ n, theme }) => (
       <span>{n.source.name}</span>
       <span aria-hidden="true">·</span>
       <time dateTime={n.published_at}>publicado em {formatInstant(n.published_at)}</time>
+    </div>
+    <div className="nx-headline__actions">
+      <a className="nx-source-btn" href={n.url} target="_blank" rel="noreferrer" aria-label={`Ler na fonte: ${n.title} (abre em nova aba)`}>
+        Ler na fonte<ExternalLink size={12} aria-hidden="true" />
+      </a>
       <a className="cx-why" href={askHref(`A notícia "${n.title}" (${n.source.name}) pode afetar meu orçamento em ${theme.toLowerCase()}?`)}>
         <Sparkles size={11} aria-hidden="true" />Por quê?
       </a>
@@ -159,7 +187,9 @@ const ThemeCard: FC<{ t: NewsThemeOut; categories: Map<string, CategoryStatus>; 
         </div>
       )}
       {readings.length > 0 && t.radar_theme && <RadarContext readings={readings} theme={t.radar_theme} />}
-      <ul className="nx-headlines">{t.items.map((n) => <Headline key={n.signal_key} n={n} theme={t.title} />)}</ul>
+      <ul className="nx-headlines">
+        {t.items.map((n, i) => <Headline key={n.signal_key} n={n} theme={t.title} themeKey={t.key} Icon={Icon} lead={i === 0} />)}
+      </ul>
     </article>
   );
 };

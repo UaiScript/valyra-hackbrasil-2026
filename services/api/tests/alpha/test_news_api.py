@@ -68,6 +68,8 @@ def test_relatorio_agrupa_por_tema_com_fonte_e_respeita_corte(client, db_session
     assert selic["source"]["slug"] == "agencia-brasil"
     assert selic["url"] == "https://agenciabrasil.ebc.com.br/economia/noticia/teste-copom"
     assert selic["published_at"].startswith("2026-11-26T00:30:00")
+    assert selic["image_url"] == "https://imagens.ebc.com.br/teste/copom.jpg"
+    assert selic["image_credit"] == "Fotógrafo/Agência Brasil"
     assert body["last_ingested_at"].startswith("2026-11-26T12:00:00")
 
     # Antes da reunião do Copom ser publicada, a manchete não existe para o relatório.

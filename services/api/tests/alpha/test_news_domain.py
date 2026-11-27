@@ -17,6 +17,7 @@ from valyra.alpha.news import (
     parse_ibge,
     parse_rss,
     publication_instant,
+    safe_image_url,
     themes_for,
     tickers_for,
 )
@@ -35,6 +36,10 @@ def test_rss_le_titulo_trecho_link_e_data_com_fuso():
     assert first.excerpt == "Comitê de Política Monetária & o comunicado da reunião."
     assert first.source_published_at == datetime(2026, 11, 26, 0, 30, tzinfo=UTC)
     assert first.link.startswith("https://agenciabrasil.ebc.com.br/")
+    assert first.image_url == "https://imagens.ebc.com.br/teste/copom.jpg"
+    assert first.image_credit == "Fotógrafo/Agência Brasil"
+    # Imagem de outro domínio (pixel de rastreio) não entra.
+    assert items[1].image_url is None and items[1].image_credit is None
 
 
 @pytest.mark.parametrize(
@@ -66,6 +71,7 @@ def test_ibge_le_data_brasileira_como_horario_de_brasilia():
                 "introducao": "<b>Inflação</b> oficial do mês.",
                 "link": "https://agenciadenoticias.ibge.gov.br/teste-ipca",
                 "data_publicacao": "10/11/2026 09:00:00",
+                "imagens": '{"image_intro":"images/agenciadenoticias/teste/ipca.jpg"}',
             },
             {"titulo": "Sem link", "link": ""},
         ]
@@ -73,6 +79,9 @@ def test_ibge_le_data_brasileira_como_horario_de_brasilia():
     [item] = parse_ibge("ibge-noticias", payload)
     assert item.source_published_at == datetime(2026, 11, 10, 12, tzinfo=UTC)
     assert item.excerpt == "Inflação oficial do mês."
+    assert item.image_url == (
+        "https://agenciadenoticias.ibge.gov.br/images/agenciadenoticias/teste/ipca.jpg"
+    )
     with pytest.raises(FeedFormatError):
         parse_ibge("ibge-noticias", ["x"])
 
@@ -159,3 +168,17 @@ def test_relatorio_da_semana_respeita_corte_e_agrupa_por_tema():
 )
 def test_acoes_do_radar_pelo_nome_da_empresa(title, expected):
     assert tickers_for(title, "") == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("https://imagens.ebc.com.br/a.jpg", "https://imagens.ebc.com.br/a.jpg"),
+        ("http://imagens.ebc.com.br/a.jpg", None),
+        ("https://ebc.com.br.malicioso.test/a.jpg", None),
+        ("javascript:alert(1)", None),
+        ("", None),
+    ],
+)
+def test_imagem_so_https_e_do_dominio_da_fonte(raw, expected):
+    assert safe_image_url("agencia-brasil", raw) == expected
