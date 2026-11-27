@@ -389,3 +389,17 @@ def budget_status(spent_cents: int, limit_cents: int) -> str:
     if spent_cents * 100 >= limit_cents * BUDGET_WARNING_PERCENT:
         return "warning"
     return "ok"
+
+
+def daily_allowance(
+    limit_cents: int, spent_cents: int, today: date, first: date, last: date
+) -> tuple[int, int | None]:
+    """Dias restantes do mês (hoje incluso) e quanto do teto ainda cabe por dia.
+
+    Divisão inteira para baixo: arredondar para cima prometeria centavos que não existem.
+    Mês já encerrado não tem dia restante, então não há valor diário (None).
+    """
+    if today > last:
+        return 0, None
+    days_left = (last - max(today, first)).days + 1
+    return days_left, max(0, limit_cents - spent_cents) // days_left

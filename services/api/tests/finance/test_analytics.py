@@ -462,3 +462,15 @@ def test_budget_status_limites():
     assert budget_status(10001, 10000) == "over"
     assert budget_spent_cents(-4500) == 4500
     assert budget_spent_cents(1200) == 0
+
+
+def test_daily_allowance_arredonda_para_baixo_e_ignora_estouro():
+    from valyra.finance.analytics import daily_allowance
+
+    first, last = date(2026, 11, 1), date(2026, 11, 30)
+    assert daily_allowance(1000, 0, date(2026, 11, 30), first, last) == (1, 1000)
+    assert daily_allowance(1001, 0, date(2026, 11, 29), first, last) == (2, 500)
+    assert daily_allowance(1000, 1500, date(2026, 11, 10), first, last) == (21, 0)
+    assert daily_allowance(1000, 0, date(2026, 12, 1), first, last) == (0, None)
+    # Mês futuro conta todos os dias dele, não os dias a partir de hoje.
+    assert daily_allowance(3000, 0, date(2026, 10, 20), first, last) == (30, 100)

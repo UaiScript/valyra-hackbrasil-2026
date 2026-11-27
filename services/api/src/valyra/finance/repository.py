@@ -1,7 +1,7 @@
 """Acesso a dados do Finance; não faz commit, quem controla a transação é o service."""
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -265,3 +265,29 @@ def delete_budget(session: Session, user_id: UUID, category_id: UUID) -> bool:
         return False
     session.delete(budget)
     return True
+
+
+def list_completed_batches(session: Session, account_id: UUID) -> list[tuple[UUID, datetime]]:
+    rows = session.execute(
+        select(ImportBatch.id, ImportBatch.completed_at)
+        .where(ImportBatch.account_id == account_id, ImportBatch.status == "completed")
+        .order_by(ImportBatch.created_at, ImportBatch.id)
+    )
+    return [(row[0], row[1]) for row in rows]
+
+
+def last_change_at(session: Session, user_id: UUID, account_id: UUID) -> datetime | None:
+    """Instante mais recente que pode alterar os cálculos da conta (linhas, lotes e tetos)."""
+    instants = [
+        session.scalar(
+            select(func.max(Transaction.updated_at)).where(Transaction.account_id == account_id)
+        ),
+        session.scalar(
+            select(func.max(func.coalesce(ImportBatch.completed_at, ImportBatch.created_at))).where(
+                ImportBatch.account_id == account_id
+            )
+        ),
+        session.scalar(select(func.max(Budget.updated_at)).where(Budget.user_id == user_id)),
+    ]
+    present = [value for value in instants if value is not None]
+    return max(present) if present else None

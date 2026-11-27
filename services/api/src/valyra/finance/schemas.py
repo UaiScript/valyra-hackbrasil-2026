@@ -232,3 +232,8 @@ class BudgetReportOut(BaseModel):
     items: list[BudgetOut]
     total_limit_cents: int
     total_spent_cents: int
+    # Dias do mês a partir de hoje, inclusive; 0 quando o mês consultado já terminou.
+    days_left: int
+    # Quanto do teto total ainda cabe por dia, arredondado para baixo; null sem tetos
+    # ou em mês encerrado. Estouro vira 0, não valor negativo.
+    daily_allowance_cents: int | None

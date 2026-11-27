@@ -39,6 +39,7 @@ def test_sem_limites_devolve_lista_vazia(client, seed):
     assert body["items"] == []
     assert body["total_limit_cents"] == 0
     assert body["total_spent_cents"] == 0
+    assert body["daily_allowance_cents"] is None
 
 
 def test_define_limite_e_calcula_consumo_e_status(client, gastos):
@@ -115,3 +116,19 @@ def test_remove_limite(client, seed):
     r = client.delete(f"{URL}/{mercado}")
     assert r.status_code == 404
     assert r.json()["error"]["code"] == "BUDGET_NOT_FOUND"
+
+
+def test_quanto_cabe_por_dia_divide_o_restante_pelos_dias_do_mes(client, gastos):
+    client.put(f"{URL}/{categoria(client, 'mercado')}", json={"limit_cents": 100001})
+    body = client.get(URL).json()
+    # 7/11 a 30/11 são 24 dias; (100001 - 45000) // 24 = 2291, arredondado para baixo.
+    assert (body["days_left"], body["daily_allowance_cents"]) == (24, 2291)
+
+
+def test_orcamento_estourado_cabe_zero_e_mes_encerrado_nao_tem_valor(client, gastos):
+    client.put(f"{URL}/{categoria(client, 'mercado')}", json={"limit_cents": 40000})
+    assert client.get(URL).json()["daily_allowance_cents"] == 0
+    passado = client.get(URL, params={"month": "2026-10"}).json()
+    assert (passado["days_left"], passado["daily_allowance_cents"]) == (0, None)
+    futuro = client.get(URL, params={"month": "2026-12"}).json()
+    assert (futuro["days_left"], futuro["daily_allowance_cents"]) == (31, 40000 // 31)
