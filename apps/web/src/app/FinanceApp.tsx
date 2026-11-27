@@ -66,7 +66,7 @@ const ApiStatus: FC<{ route: AppRoute }> = ({ route }) => {
   const label = pending ? 'Verificando API…' : shownOk ? 'API conectada' : 'API indisponível, tentando de novo';
   return (
     <span className={`app-health app-health--${pending ? 'pending' : shownOk ? 'ok' : 'down'}`} role="status">
-      <span className="app-health__dot" aria-hidden="true" />{label}
+      <span className="app-health__dot" aria-hidden="true" /><span className="app-health__label">{label}</span>
     </span>
   );
 };

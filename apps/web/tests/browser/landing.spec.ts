@@ -45,7 +45,7 @@ test('demo buttons open the Finance app inside the same build', async ({ page })
   for (const link of await demo.all()) await expect(link).toHaveAttribute('href', '#/app');
   await page.locator('header [data-demo-cta]').click();
   await expect(page).toHaveURL(/#\/app$/);
-  await expect(page.getByRole('heading', { level: 1, name: 'Visão geral' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Central' })).toBeVisible();
 });
 
 test('language switch persists and updates document language', async ({ page }) => {

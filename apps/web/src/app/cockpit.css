@@ -451,7 +451,9 @@ a.cx-kpi:hover { border-color: var(--cx-hairline-strong); transform: translateY(
 @media (max-width: 900px) {
   .cx .app-sidebar { background: rgb(7 11 19 / 0.97); }
   .cx-grid > * { grid-column: 1 / -1; }
-  .cx .app-health { padding: 0.3rem; border: 0; font-size: 0; gap: 0; }
+  .cx .app-health { padding: 0.3rem; border: 0; gap: 0; }
+  /* No celular só o ponto aparece; o texto continua para leitores de tela. */
+  .cx .app-health__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .cx-command kbd { display: none; }
 }
 @media (max-width: 560px) {

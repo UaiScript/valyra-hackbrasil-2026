@@ -43,6 +43,10 @@ const ALERT = {
   evidence: { days: 30, today: '2026-11-07', start_balance_cents: 145410, min_balance_cents: -124894, min_balance_date: '2026-12-03' },
   account_id: ACCOUNT.id, created_at: '2026-11-07T12:00:00Z', read_at: null,
 };
+const BUDGETS = {
+  month: '2026-11', today: '2026-11-07', total_limit_cents: 200000, total_spent_cents: 180000,
+  items: [{ category: { ...CATEGORIES[0] }, limit_cents: 150000, spent_cents: 180000, remaining_cents: -30000, status: 'over' }],
+};
 const page1 = <T,>(items: T[]) => ({ items, total: items.length, limit: 50, offset: 0 });
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
@@ -66,6 +70,8 @@ async function mockApi(page: Page) {
     if (url.pathname.endsWith('/transactions')) return json(route, page1([TX, TX_FLAGS]));
     if (url.pathname.endsWith('/summary')) return json(route, SUMMARY);
     if (url.pathname.endsWith('/projection')) return json(route, PROJECTION);
+    if (url.pathname.endsWith('/budgets')) return json(route, BUDGETS);
+    if (url.pathname.includes('/budgets/') && req.method() === 'PUT') return json(route, BUDGETS);
     if (url.pathname.endsWith('/transactions/t-1') && req.method() === 'PATCH') {
       return json(route, { ...TX, category: { id: 'c-lazer', slug: 'lazer', name: 'Lazer' }, category_source: 'user' });
     }
@@ -81,13 +87,13 @@ async function mockApi(page: Page) {
   return calls;
 }
 
-test('visão geral mostra saldo em centavos formatado e status da API', async ({ page }) => {
+test('central mostra saldo em centavos formatado e status da API', async ({ page }) => {
   await mockApi(page);
   await page.goto('/#/app');
-  await expect(page.getByRole('heading', { level: 1, name: 'Visão geral' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Central' })).toBeVisible();
   await expect(page.getByText('R$ 5.000,00')).toBeVisible();
   await expect(page.getByText('API conectada')).toBeVisible();
-  await expect(page.getByText('-R$ 89,90')).toBeVisible();
+  await expect(page.getByText('-R$ 89,90', { exact: true })).toBeVisible();
 });
 
 test('correção de categoria envia PATCH e só oferece categorias do mesmo tipo', async ({ page }) => {
@@ -119,12 +125,33 @@ test('importação mostra contadores e linhas rejeitadas', async ({ page }) => {
   await expect(page.getByText('A importação gerou 1 alerta de pressão de caixa.')).toBeVisible();
 });
 
-test('visão geral separa saldo realizado de hoje e projeção dos próximos 30 dias', async ({ page }) => {
+test('central separa saldo realizado de hoje e projeção dos próximos 30 dias', async ({ page }) => {
   await mockApi(page);
   await page.goto('/#/app');
-  await expect(page.getByText('R$ 4.870,10')).toBeVisible();
-  await expect(page.getByText('Próximos 30 dias, previsto')).toBeVisible();
+  await expect(page.getByText('R$ 4.870,10', { exact: true })).toBeVisible();
+  await expect(page.getByText('Saldo realizado · 07/11/2026')).toBeVisible();
+  await expect(page.getByText('Fluxo de caixa previsto · 30 dias')).toBeVisible();
   await expect(page.getByText('Saldo previsto negativo')).toBeVisible();
+});
+
+test('orçamento mostra consumo, status e envia limite em centavos', async ({ page }) => {
+  const calls = await mockApi(page);
+  await page.goto('/#/app/orcamento');
+  await expect(page.getByText('R$ 1.800,00 / R$ 1.500,00')).toBeVisible();
+  await expect(page.getByText('Passou R$ 300,00 do limite.')).toBeVisible();
+  await page.getByRole('button', { name: 'Definir limite' }).click();
+  await page.getByLabel('Limite mensal em reais').fill('600,50');
+  await page.getByRole('button', { name: 'Salvar' }).click();
+  await expect.poll(() => calls.find((c) => c.method === 'PUT')?.url).toBe('/api/v1/finance/budgets/c-lazer');
+  expect(JSON.parse(calls.find((c) => c.method === 'PUT')?.body ?? '{}')).toEqual({ limit_cents: 60050 });
+});
+
+test('Pergunte ao Valyra avisa quando a rota de IA não existe na API', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/v1/ai/explain', (r) => r.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"Not Found"}' }));
+  await page.goto('/#/app/valyra-ai');
+  await page.getByRole('button', { name: 'Onde estou gastando mais neste mês?' }).click();
+  await expect(page.getByText('A explicação por IA ainda não está publicada nesta API.')).toBeVisible();
 });
 
 test('resumo do mês mostra totais, categorias e navega para o mês anterior', async ({ page }) => {
