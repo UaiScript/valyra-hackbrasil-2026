@@ -17,10 +17,12 @@ def exists(session: Session, key: str) -> bool:
 def list_published_between(
     session: Session, start: datetime, as_of: datetime, limit: int
 ) -> list[tuple[Signal, Source]]:
-    """Notícias publicadas na janela e já visíveis no corte, da mais recente para a mais antiga.
+    """Notícias publicadas na janela e já coletadas no corte, da mais recente para a mais antiga.
 
+    A janela usa `published_at` (data da fonte); o corte exige também `ingested_at`: uma
+    matéria publicada antes do corte mas coletada depois ainda não era conhecida pela Valyra.
     Notícia não tem revisão de valor (é gravada uma vez por chave), então não precisa do
-    DISTINCT ON do radar: o filtro por `published_at` já é o corte sem data leakage.
+    DISTINCT ON do radar.
     """
     rows = session.execute(
         select(Signal, Source)
@@ -29,6 +31,7 @@ def list_published_between(
             Signal.kind == NEWS_KIND,
             Signal.published_at >= start,
             Signal.published_at <= as_of,
+            Signal.ingested_at <= as_of,
         )
         .order_by(Signal.published_at.desc(), Signal.signal_key)
         .limit(limit)

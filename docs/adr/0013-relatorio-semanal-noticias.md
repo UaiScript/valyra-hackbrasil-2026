@@ -26,7 +26,8 @@ Proposta para o time aprovar:
    matéria e fonte. Nenhuma matéria é copiada inteira; a tela sempre leva ao original.
 2. Regras temporais: `published_at` é a data da fonte limitada ao instante da coleta
    (nunca depois dela; sem data, a própria coleta), `ingested_at` é a coleta e a data da
-   fonte fica no `payload`. O relatório da semana mostra só o publicado até o corte.
+   fonte fica no `payload`. O relatório da semana mostra só o que foi publicado e também
+   coletado até o corte: matéria coletada depois do corte ainda não era conhecida.
 3. Ligação com o orçamento por regra determinística e versionada (`news_theme_v2`):
    palavras-chave inteiras levam a manchete a um tema e o tema aponta categorias Finance.
    É um "pode mexer em", nunca causa nem previsão. Os temas são calculados na leitura,

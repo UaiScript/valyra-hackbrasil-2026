@@ -29,6 +29,8 @@ WEEK = timedelta(days=7)
 MAX_FEED_BYTES = 2_000_000
 # Trecho curto: a Valyra mostra título, trecho e link, nunca a matéria inteira.
 EXCERPT_CHARS = 240
+# Título é texto de terceiros que chega ao LLM como evidência: comprimento limitado.
+TITLE_CHARS = 200
 
 FeedFormat = Literal["rss", "ibge_json"]
 
@@ -215,7 +217,7 @@ def parse_rss(source_slug: str, body: bytes) -> list[FeedItem]:
     for node in root.iter():
         if _local_name(node.tag) != "item":
             continue
-        title = clean_text(_child_text(node, "title"))
+        title = excerpt(_child_text(node, "title"), TITLE_CHARS)
         link = _http_link(_child_text(node, "link", "guid"))
         if not title or link is None:
             continue
@@ -281,7 +283,7 @@ def parse_ibge(source_slug: str, payload: object) -> list[FeedItem]:
     for row in rows:
         if not isinstance(row, dict):
             continue
-        title = clean_text(str(row.get("titulo") or ""))
+        title = excerpt(str(row.get("titulo") or ""), TITLE_CHARS)
         link = _http_link(str(row.get("link") or ""))
         if not title or link is None:
             continue
@@ -404,7 +406,6 @@ THEMES: tuple[Theme, ...] = (
             "tarifa de agua",
             "saneamento",
             "telefonia",
-            "internet",
         ),  # fmt: skip
         category_slugs=("contas-e-servicos",),
     ),
@@ -445,7 +446,6 @@ THEMES: tuple[Theme, ...] = (
             "emprestimo",
             "credito consignado",
             "desenrola",
-            "pix",
         ),  # fmt: skip
         category_slugs=(),
     ),
