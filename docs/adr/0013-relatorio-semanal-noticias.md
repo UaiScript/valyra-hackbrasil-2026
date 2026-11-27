@@ -19,7 +19,7 @@ não puderam ser chamadas do ambiente de nuvem usado na análise:
 
 ## Decisão
 
-Proposta para o time aprovar:
+Decidido:
 
 1. Guardar cada manchete como sinal `news_event` (o `kind` já existe na migração
    `0004_alpha`), sem valor numérico, com título, trecho de até 240 caracteres, link da
@@ -65,5 +65,6 @@ Proposta para o time aprovar:
 
 ## Status
 
-Proposta em 27/11/2026, com protótipo em PR para avaliação do time. Não aceita.
+Aceita em 27/11/2026 por Willian, no thread do projeto, depois da avaliação do protótipo
+pelo time. Proposta registrada no mesmo dia.
 Ainda não verificados: os três endereços de feed a partir de uma rede com acesso.
