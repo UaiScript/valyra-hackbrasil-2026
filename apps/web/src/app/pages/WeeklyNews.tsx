@@ -18,7 +18,7 @@ import './news.css';
 
 /*
  * Relatório semanal de notícias do Alternative Alpha (proposta da ADR-0013). A ligação
- * notícia → tema → categoria vem de uma regra versionada na API (news_theme_v2): é um
+ * notícia → tema → categoria vem de uma regra versionada na API (news_theme_v3): é um
  * "pode mexer em", nunca causa ou previsão. Os valores do orçamento são os mesmos cálculos
  * Finance das outras telas, em centavos; esta tela não faz conta de dinheiro.
  */

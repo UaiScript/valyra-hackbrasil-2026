@@ -59,7 +59,7 @@ def test_coleta_tolera_fonte_fora_do_ar_e_nao_duplica(db_session, test_engine):
 def test_relatorio_agrupa_por_tema_com_fonte_e_respeita_corte(client, db_session, test_engine):
     _ingest(test_engine)
     body = client.get(URL, params={"as_of": COLLECTED.isoformat()}).json()
-    assert body["rule"] == "news_theme_v2"
+    assert body["rule"] == "news_theme_v3"
     assert body["total_items"] == 4 and body["unmatched_items"] == 1
     themes = {theme["key"]: theme for theme in body["themes"]}
     assert set(themes) == {"juros", "inflacao", "combustiveis"}
@@ -124,6 +124,15 @@ def test_redirecionamento_para_outro_dominio_e_feed_grande_sao_recusados():
             ingest_news.fetch(http, source)
 
 
+@pytest.mark.parametrize("slug", ["agencia-brasil", "bcb-notas", "ibge-noticias"])
+def test_host_real_de_cada_feed_e_aceito(slug):
+    from valyra.alpha.news import SOURCES_BY_SLUG
+
+    source = SOURCES_BY_SLUG[slug]
+    assert ingest_news._same_source(source, httpx.URL(source.feed_url).host)
+    assert not ingest_news._same_source(source, f"{source.domain}.exemplo.test")
+
+
 def test_falha_de_banco_numa_fonte_nao_interrompe_as_outras(test_engine, monkeypatch):
     from sqlalchemy.exc import OperationalError
 
@@ -136,8 +145,10 @@ def test_falha_de_banco_numa_fonte_nao_interrompe_as_outras(test_engine, monkeyp
 
     monkeypatch.setattr(ingest_news.news_service, "record_news", flaky)
     report = _ingest(test_engine)
-    assert report["agencia-brasil"] == "erro: OperationalError"
+    assert report["agencia-brasil"] == "erro de banco: OperationalError"
     assert report["ibge-noticias"] == 1
+    # Erro de banco é nosso, não da fonte: o job fica vermelho mesmo com outras gravadas.
+    assert ingest_news.exit_code(report) == 1
 
 
 def test_as_of_sem_fuso_e_recusado(client):

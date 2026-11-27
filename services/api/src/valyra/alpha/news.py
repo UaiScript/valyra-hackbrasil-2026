@@ -23,7 +23,7 @@ from urllib.parse import urljoin, urlsplit
 from zoneinfo import ZoneInfo
 
 BUSINESS_ZONE = ZoneInfo("America/Sao_Paulo")
-THEME_RULE = "news_theme_v2"
+THEME_RULE = "news_theme_v3"
 WEEK = timedelta(days=7)
 # Teto do corpo do feed: um RSS de economia tem dezenas de KB; acima disso algo está errado.
 MAX_FEED_BYTES = 2_000_000
@@ -43,6 +43,8 @@ class NewsSource:
     site_url: str
     license: str
     format: FeedFormat
+    # Domínio da fonte: o feed só é aceito se a resposta final vier dele ou de um subdomínio.
+    domain: str
     # Domínios de onde a imagem da notícia pode vir: só a própria fonte, nunca terceiros
     # (pixel de rastreio, conteúdo de agência parceira com reprodução proibida).
     image_hosts: tuple[str, ...] = ()
@@ -56,6 +58,7 @@ NEWS_SOURCES: tuple[NewsSource, ...] = (
         site_url="https://agenciabrasil.ebc.com.br/economia",
         license="Reprodução permitida com citação da Agência Brasil; aqui só título, trecho e link",
         format="rss",
+        domain="ebc.com.br",
         image_hosts=("ebc.com.br",),
     ),
     NewsSource(
@@ -65,6 +68,7 @@ NEWS_SOURCES: tuple[NewsSource, ...] = (
         site_url="https://www.bcb.gov.br/detalhenoticia",
         license="Conteúdo público do Banco Central; citar a fonte",
         format="rss",
+        domain="bcb.gov.br",
         image_hosts=("bcb.gov.br",),
     ),
     NewsSource(
@@ -74,6 +78,7 @@ NEWS_SOURCES: tuple[NewsSource, ...] = (
         site_url="https://agenciadenoticias.ibge.gov.br/",
         license="Conteúdo público do IBGE; citar a fonte",
         format="ibge_json",
+        domain="ibge.gov.br",
         image_hosts=("ibge.gov.br",),
     ),
 )
@@ -313,7 +318,7 @@ def publication_instant(item: FeedItem, ingested_at: datetime) -> datetime:
     return min(item.source_published_at, ingested_at)
 
 
-# ---------- Temas do orçamento (regra news_theme_v2) ----------
+# ---------- Temas do orçamento (regra news_theme_v3) ----------
 # Ordem importa: temas específicos vêm antes dos genéricos (juros, inflação), porque a
 # notícia entra no primeiro tema que casar e "preço" aparece em quase toda matéria.
 

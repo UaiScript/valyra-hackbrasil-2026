@@ -378,4 +378,4 @@ def test_manchetes_da_semana_viram_evidencia_textual_com_fonte(
     assert news.metric_key == "alpha.news.combustiveis"
     assert news.value.value_text == "Gasolina sobe nos postos"
     assert str(news.source.source_url) == link
-    assert any("news_theme_v2" in text for text in response.limitations)
+    assert any("news_theme_v3" in text for text in response.limitations)

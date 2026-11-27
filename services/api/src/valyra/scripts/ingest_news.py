@@ -37,10 +37,15 @@ TIMEOUT = httpx.Timeout(20.0)
 IBGE_PARAMS = {"qtd": "40"}
 
 
+DB_ERROR = "erro de banco"
+
+
 def _same_source(source: NewsSource, host: str) -> bool:
     # Redirecionamento só vale dentro do domínio da própria fonte (http→https, www).
+    # Confere só a resposta final: saltos intermediários já foram requisitados, o que é
+    # aceitável porque as URLs de feed são fixas no código, não vêm de usuário.
     host = host.lower()
-    return any(host == domain or host.endswith(f".{domain}") for domain in source.image_hosts)
+    return host == source.domain or host.endswith(f".{source.domain}")
 
 
 def fetch(client: httpx.Client, source: NewsSource) -> list[FeedItem]:
@@ -94,7 +99,7 @@ def ingest(
                 # Falha de banco numa fonte não impede as próximas; o relatório registra o erro.
                 session.rollback()
                 logger.warning("Falha ao gravar %s: %s", source.slug, type(error).__name__)
-                report[source.slug] = f"erro: {type(error).__name__}"
+                report[source.slug] = f"{DB_ERROR}: {type(error).__name__}"
                 continue
             except BaseException:
                 session.rollback()
@@ -104,8 +109,14 @@ def ingest(
 
 
 def exit_code(report: dict[str, int | str]) -> int:
-    """1 só quando todas as fontes falharam: uma fonte fora do ar não deixa o job vermelho."""
-    return 1 if report and all(isinstance(result, str) for result in report.values()) else 0
+    """1 quando todas as fontes falharam ou o banco falhou em alguma.
+
+    Uma fonte fora do ar não deixa o job vermelho; erro de banco é nosso e precisa de alerta.
+    """
+    results = list(report.values())
+    if any(isinstance(result, str) and result.startswith(DB_ERROR) for result in results):
+        return 1
+    return 1 if results and all(isinstance(result, str) for result in results) else 0
 
 
 def main(argv: list[str] | None = None) -> int:

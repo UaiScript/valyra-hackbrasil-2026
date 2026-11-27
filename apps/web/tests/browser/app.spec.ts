@@ -106,7 +106,7 @@ const news = (key: string, title: string, summary: string, source: typeof AB, pu
 // Imagem sintética servida pelo próprio teste: nenhum arquivo real da fonte é baixado.
 const PHOTO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1d6b3a"/><stop offset="1" stop-color="#e3b341"/></linearGradient></defs><rect width="640" height="360" fill="url(#g)"/><circle cx="520" cy="80" r="46" fill="#ffe9a8" opacity=".8"/><path d="M0 280 Q160 220 320 270 T640 250 V360 H0Z" fill="#14532d" opacity=".75"/></svg>`;
 const WEEKLY = {
-  as_of: '2026-11-27T18:00:00Z', week_start: '2026-11-20T18:00:00Z', rule: 'news_theme_v2',
+  as_of: '2026-11-27T18:00:00Z', week_start: '2026-11-20T18:00:00Z', rule: 'news_theme_v3',
   total_items: 9, unmatched_items: 2, last_ingested_at: '2026-11-27T14:17:00Z', sources: [AB, IBGE],
   themes: [
     {
@@ -425,7 +425,7 @@ test('relatório da semana liga manchetes ao orçamento com fonte, data e IA', a
   await expect(food).toContainText('publicado em 26/11/2026, 10:20');
   await expect(page.getByRole('article', { name: 'Renda, emprego e impostos' }).locator('.nx-chip')).toContainText('recebidos no mês');
   await expect(page.getByRole('link', { name: 'Conversar sobre a semana' })).toHaveAttribute('href', /#\/app\/valyra-ai\?q=/);
-  await expect(page.getByText('news_theme_v2')).toBeVisible();
+  await expect(page.getByText('news_theme_v3')).toBeVisible();
   const fits = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
   expect(fits).toBe(true);
 });
