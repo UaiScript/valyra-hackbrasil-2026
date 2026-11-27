@@ -12,7 +12,7 @@ Este pacote serve duas coisas: a **landing** em `/` (estática, dados sintético
 | Projeção de caixa | `#/app/projecao` | `finance_get_projection` (30, 60 ou 90 dias), `finance_list_accounts` |
 | Transações | `#/app/transacoes` | `finance_list_transactions` (filtros de conta, categoria, período, recorrente e atípico), `finance_list_categories`, `finance_update_transaction` |
 | Alertas | `#/app/alertas` | `alerts_list`, `alerts_update` (marcar como lido) |
-| Pergunte ao Valyra | `#/app/valyra-ai` | `POST /api/v1/ai/explain` (contrato da ADR-0011, ainda fora do OpenAPI da main: tipos à mão em `src/app/api/ai.ts`); aceita `?q=` com a pergunta pronta, usado pelo botão “Por quê?” do selo atípico |
+| Pergunte ao Valyra | `#/app/valyra-ai` | `ai_explain` (`POST /api/v1/ai/explain`, ADR-0011; se a API publicada não tiver a rota, a tela avisa); aceita `?q=` com a pergunta pronta, usado pelo botão “Por quê?” do selo atípico |
 | Importar CSV | `#/app/importar` | `finance_create_import_batch` (inclui `alerts_created`), `finance_list_import_batches` |
 
 Todas as operações do contrato atual têm tela. Valores previstos (projeção, evidências de alerta) aparecem sempre rotulados como previstos, separados do saldo realizado. O score de gasto atípico é exibido como indicador (ADR-0010), sem porcentagem nem causa.

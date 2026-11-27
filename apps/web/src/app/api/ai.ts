@@ -1,58 +1,37 @@
-// Contrato de POST /api/v1/ai/explain (ADR-0011, branch breno/infra_IA-ML). Só os campos
-// que a tela exibe. Quando a rota entrar no OpenAPI da main, trocar por tipos gerados
-// em src/lib/api/schema.ts e mover a chamada para client.ts.
-import { ApiError } from './client';
+// Apoio da tela Pergunte ao Valyra. Tipos vêm do OpenAPI gerado (operação ai_explain,
+// ADR-0011); a chamada fica aqui para tratar a API publicada que ainda não tem a rota.
+import type { DecimalValue, EvidenceItem, ExplainResponse, IntegerValue, MoneyValue, TextValue } from '../../lib/api/schema';
 import { ROUTES } from '../router';
+import { formatCents } from '../money';
+import { ApiError, api } from './client';
 
-export type EvidenceValue =
-  | { kind: 'money'; amount_cents: number; currency: 'BRL' }
-  | { kind: 'integer'; value_int: number; unit: 'count' }
-  | { kind: 'decimal'; value_decimal: string; unit: string }
-  | { kind: 'text'; value_text: string };
-
-export type EvidenceItem = {
-  evidence_id: string;
-  metric_key: string;
-  label: string;
-  basis: 'reference' | 'observed' | 'projected';
-  value: EvidenceValue;
-  period: { start: string; end: string };
-  source: { kind: 'finance_record' | 'calculation' | 'alpha_signal'; method_key?: string; record_type?: string };
-};
-
-export type ExplainResponse = {
-  answer: string;
-  as_of: string;
-  evidences: EvidenceItem[];
-  uncertainty: 'baixa' | 'média' | 'alta';
-  limitations: string[];
-};
-
-const BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+export type { EvidenceItem, ExplainResponse };
 
 export async function explain(accountId: string, question: string, signal?: AbortSignal): Promise<ExplainResponse> {
-  let response: Response;
   try {
-    response = await fetch(`${BASE_URL}/api/v1/ai/explain`, {
-      method: 'POST',
-      signal,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ account_id: accountId, question }),
-    });
-  } catch (error) {
-    if ((error as Error).name === 'AbortError') throw error;
-    throw new ApiError(0, 'NETWORK_ERROR', 'Não foi possível falar com a API. Ela está rodando?');
+    return await api.explain({ account_id: accountId, question }, signal);
+  } catch (err) {
+    // 404 sem envelope: a API publicada ainda não tem a rota de IA (o 404 conhecido usa ACCOUNT_NOT_FOUND).
+    if (err instanceof ApiError && err.status === 404 && err.code === 'HTTP_ERROR') {
+      throw new ApiError(404, 'AI_NOT_DEPLOYED', 'A explicação por IA ainda não está publicada nesta API.');
+    }
+    throw err;
   }
-  const text = await response.text();
-  let data: unknown = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
-  if (!response.ok) {
-    const err = (data as { error?: { code?: string; message?: string } } | null)?.error;
-    // 404 sem envelope: a API publicada ainda não tem a rota de IA.
-    if (response.status === 404 && !err) throw new ApiError(404, 'AI_NOT_DEPLOYED', 'A explicação por IA ainda não está publicada nesta API.');
-    throw new ApiError(response.status, err?.code ?? 'HTTP_ERROR', err?.message ?? `Erro HTTP ${response.status}`);
-  }
-  return data as ExplainResponse;
+}
+
+/**
+ * O OpenAPI gerado descreve `value` como união discriminada que o gerador não expande;
+ * o formato real é um dos quatro abaixo, reconhecido pelo campo presente. Valores chegam
+ * prontos do servidor: dinheiro em centavos inteiros e decimal como texto.
+ */
+export function formatEvidenceValue(value: unknown): string {
+  const v = value as Partial<MoneyValue & IntegerValue & DecimalValue & TextValue> | null;
+  if (!v) return '—';
+  if (typeof v.amount_cents === 'number') return formatCents(v.amount_cents);
+  if (typeof v.value_int === 'number') return String(v.value_int);
+  if (typeof v.value_decimal === 'string') return `${v.value_decimal.replace('.', ',')} ${v.unit ?? ''}`.trim();
+  if (typeof v.value_text === 'string') return v.value_text;
+  return '—';
 }
 
 /** Link para a tela da IA com a pergunta já preenchida. */

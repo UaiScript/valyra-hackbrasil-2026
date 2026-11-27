@@ -32,6 +32,19 @@ export type AlertUpdate = {
   status: string;
 };
 
+export type AlphaSignalSource = {
+  /** date-time */ ingested_at: string;
+  kind?: string;
+  /** date */ observation_date: string;
+  /** date-time */ published_at: string;
+  published_at_estimated: boolean;
+  revision_id: number;
+  /** uuid */ signal_id: string;
+  signal_key: string;
+  /** uuid */ source_id: string;
+  /** uri */ source_url: string;
+};
+
 export type Body_finance_create_import_batch = {
   file: string;
 };
@@ -58,6 +71,23 @@ export type BudgetUpsert = {
   limit_cents: number;
 };
 
+export type CalculationInputScope = {
+  account_id?: string | null;
+  import_batch_ids?: string[];
+  period: EvidencePeriod;
+  record_ids?: string[];
+};
+
+export type CalculationSource = {
+  /** date-time */ computed_at: string;
+  input_evidence_ids?: string[];
+  input_scope: CalculationInputScope;
+  kind?: string;
+  method_key: string;
+  method_version: string;
+  module: "finance" | "alpha";
+};
+
 /** Snapshot da projeção que gerou o alerta; valores previstos, não realizados. */
 export type CashPressureEvidenceOut = {
   days: number;
@@ -80,6 +110,12 @@ export type CategoryTotalOut = {
   total_cents: number;
 };
 
+export type DecimalValue = {
+  kind?: string;
+  unit: "%" | "pp" | "fraction" | "count" | "t" | "kg" | "ha" | "kg/ha" | "t/ha" | "mm" | "°C" | "index";
+  value_decimal: string;
+};
+
 export type ErrorBody = {
   code: string;
   details: Record<string, unknown>;
@@ -89,6 +125,44 @@ export type ErrorBody = {
 /** Forma única de toda resposta de erro; declarada no OpenAPI por error_responses(). */
 export type ErrorResponse = {
   error: ErrorBody;
+};
+
+export type EvidenceItem = {
+  basis: "reference" | "observed" | "projected";
+  evidence_id: string;
+  label: string;
+  metric_key: string;
+  period: EvidencePeriod;
+  source: unknown;
+  value: unknown;
+};
+
+export type EvidencePeriod = {
+  /** date */ end: string;
+  /** date */ start: string;
+};
+
+/** Entrada HTTP: contexto e identidade do usuário não vêm do navegador. */
+export type ExplainRequest = {
+  /** uuid */ account_id: string;
+  question: string;
+};
+
+/** Resposta HTTP montada com as evidências originais do servidor. */
+export type ExplainResponse = {
+  answer: string;
+  /** date-time */ as_of: string;
+  evidences: EvidenceItem[];
+  limitations: string[];
+  uncertainty: "baixa" | "média" | "alta";
+};
+
+export type FinanceRecordSource = {
+  import_batch_id?: string | null;
+  kind?: string;
+  /** uuid */ record_id: string;
+  record_type: "account" | "transaction";
+  /** date-time */ recorded_at: string;
 };
 
 export type HealthResponse = {
@@ -130,6 +204,18 @@ export type ImportRejectionOut = {
   line_number: number;
   raw_line: string;
   reason: string;
+};
+
+export type IntegerValue = {
+  kind?: string;
+  unit?: string;
+  value_int: number;
+};
+
+export type MoneyValue = {
+  amount_cents: number;
+  currency?: string;
+  kind?: string;
 };
 
 export type PageAccountOut = {
@@ -204,6 +290,11 @@ export type SummaryOut = {
   /** date */ today: string;
 };
 
+export type TextValue = {
+  kind?: string;
+  value_text: string;
+};
+
 export type TransactionCategoryOut = {
   /** uuid */ id: string;
   name: string;
@@ -274,6 +365,7 @@ export type FinanceListTransactionsQuery = {
 };
 
 export const OPERATIONS = {
+  ai_explain: { method: 'POST', path: '/api/v1/ai/explain' },
   alerts_list: { method: 'GET', path: '/api/v1/alerts' },
   alerts_update: { method: 'PATCH', path: '/api/v1/alerts/{id}' },
   finance_list_accounts: { method: 'GET', path: '/api/v1/finance/accounts' },

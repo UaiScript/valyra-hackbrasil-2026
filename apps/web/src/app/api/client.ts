@@ -12,6 +12,8 @@ import type {
   SummaryOut,
   AccountUpdate,
   ErrorResponse,
+  ExplainRequest,
+  ExplainResponse,
   FinanceListTransactionsQuery,
   HealthResponse,
   ImportBatchOut,
@@ -126,6 +128,9 @@ export const api = {
 
   listAlerts: (signal?: AbortSignal) =>
     request<PageAlertOut>('GET', '/api/v1/alerts', { query: { limit: 200 }, signal }),
+
+  explain: (body: ExplainRequest, signal?: AbortSignal) =>
+    request<ExplainResponse>('POST', '/api/v1/ai/explain', { json: body, signal }),
 
   markAlertRead: (alertId: string) =>
     request<AlertOut>('PATCH', `/api/v1/alerts/${id(alertId)}`, { json: { status: 'read' } }),

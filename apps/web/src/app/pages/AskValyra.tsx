@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import type { FC, FormEvent } from 'react';
 import { ArrowUp, Bot, CircleHelp, Loader2, ShieldCheck, Sparkles, TriangleAlert, User } from 'lucide-react';
 import { api, ApiError, describeError } from '../api/client';
-import { AI_MESSAGES, explain } from '../api/ai';
-import type { EvidenceItem, EvidenceValue, ExplainResponse } from '../api/ai';
-import { formatCents, formatIsoDate } from '../money';
+import { AI_MESSAGES, explain, formatEvidenceValue } from '../api/ai';
+import type { EvidenceItem, ExplainResponse } from '../api/ai';
+import { formatIsoDate } from '../money';
 import { useApi } from '../useApi';
 
 const SUGGESTIONS = [
@@ -19,16 +19,6 @@ const BASIS_LABEL: Record<EvidenceItem['basis'], string> = {
   projected: 'Previsto',
   reference: 'Referência',
 };
-
-// Valores chegam prontos do servidor: dinheiro em centavos inteiros e decimal como texto.
-function formatValue(v: EvidenceValue): string {
-  switch (v.kind) {
-    case 'money': return formatCents(v.amount_cents);
-    case 'integer': return String(v.value_int);
-    case 'decimal': return `${v.value_decimal.replace('.', ',')} ${v.unit}`;
-    case 'text': return v.value_text;
-  }
-}
 
 function formatPeriod(p: EvidenceItem['period']): string {
   return p.start === p.end ? formatIsoDate(p.start) : `${formatIsoDate(p.start)} a ${formatIsoDate(p.end)}`;
@@ -61,7 +51,7 @@ const Answer: FC<{ r: ExplainResponse }> = ({ r }) => (
             <li key={e.evidence_id}>
               <span className={`cx-basis cx-basis--${e.basis}`}>{BASIS_LABEL[e.basis]}</span>
               <span className="cx-evidence__label">{e.label}<small>{formatPeriod(e.period)}</small></span>
-              <strong className="cx-evidence__value">{formatValue(e.value)}</strong>
+              <strong className="cx-evidence__value">{formatEvidenceValue(e.value)}</strong>
             </li>
           ))}
         </ul>

@@ -691,6 +691,13 @@ Regras:
 | `published_at` | TIMESTAMPTZ NULL | |
 | `signal_id` | UUID NULL | FK `signals`; revisão exata usada |
 
+**Complemento de 17/11/2026 — ADR-0011:** o contrato IA em memória passa a usar
+valores tipados e citações por ID, conforme a [decisão aprovada](adr/0011-contrato-evidencias-ia.md).
+Dinheiro Finance nesse contrato usa centavos de BRL na faixa exata do JavaScript;
+indicadores Alpha não monetários preservam decimal textual e unidade registrada.
+Essa decisão não implementa as tabelas IA abaixo nem define persistência de dinheiro
+ou preços monetários Alpha. As pendências de armazenamento continuam abertas.
+
 `value` textual é mantido como desenho de evidências genéricas não monetárias. Ele não define serialização monetária válida para a API. A representação persistida de dinheiro e métricas de precisão variável nessas evidências permanece pendente, junto com o contrato citado na seção 6.
 
 Regras:
