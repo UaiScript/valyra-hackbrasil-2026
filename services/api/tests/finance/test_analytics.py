@@ -472,3 +472,5 @@ def test_daily_allowance_arredonda_para_baixo_e_ignora_estouro():
     assert daily_allowance(1001, 0, date(2026, 11, 29), first, last) == (2, 500)
     assert daily_allowance(1000, 1500, date(2026, 11, 10), first, last) == (21, 0)
     assert daily_allowance(1000, 0, date(2026, 12, 1), first, last) == (0, None)
+    # Mês futuro conta todos os dias dele, não os dias a partir de hoje.
+    assert daily_allowance(3000, 0, date(2026, 10, 20), first, last) == (30, 100)

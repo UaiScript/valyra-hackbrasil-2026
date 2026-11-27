@@ -42,6 +42,13 @@ _FUTURE_BUSINESS_DAY = (
     "A data de negócio do Finance é posterior ao corte; cálculos do Finance omitidos."
 )
 _NO_PROJECTION = "Projeção de caixa indisponível para esta conta."
+_CHANGED_AFTER_CUTOFF = (
+    "Houve alterações no Finance depois do corte; cálculos omitidos para não antecipar dados."
+)
+_BUDGET_TRIMMED = "Orçamento parcial: só as categorias mais pressionadas entram no contexto."
+# Três evidências por categoria orçada: oito categorias mantêm o contexto abaixo de 100 itens.
+_BUDGET_LIMIT = 8
+_BUDGET_PRIORITY = {"over": 0, "warning": 1, "ok": 2}
 # Poucas categorias bastam para explicar o mês sem estourar o teto de 100 evidências.
 _CATEGORY_LIMIT = 8
 _PROJECTION_DAYS = 30
@@ -268,6 +275,12 @@ def _calculation_evidences(
     if not batches:
         limitations.append(_NO_CALCULATIONS)
         return []
+    # Os services do Finance leem o estado corrente; se algo mudou após o corte, os totais
+    # já incluiriam essa mudança. Omitir é a única forma de não vazar dados futuros.
+    last_change = finance_service.get_last_change_at(session, user_id, account.id)
+    if last_change is not None and _aware(last_change) > as_of:
+        limitations.append(_CHANGED_AFTER_CUTOFF)
+        return []
     summary = finance_service.get_summary(session, user_id, account.id, None)
     if summary.today > cutoff_day:
         # Um DEMO_TODAY no futuro anteciparia dados que o corte ainda não conhece.
@@ -281,7 +294,10 @@ def _calculation_evidences(
         projection = finance_service.get_projection(
             session, user_id, account.id, _PROJECTION_DAYS
         ).projection
-    except AppError:
+    except AppError as error:
+        # Só a ausência esperada de saldo de partida vira limitação; o resto propaga.
+        if error.code != "BALANCE_UNAVAILABLE":
+            raise
         projection = None
     computed_at = _aware(clock())
     items: list[EvidenceItem] = []
@@ -382,7 +398,13 @@ def _calculation_evidences(
                 total.total_cents,
             )
 
-    for line in budget.lines:
+    lines = sorted(
+        budget.lines,
+        key=lambda line: (_BUDGET_PRIORITY[line.status], -line.spent_cents, line.category.name),
+    )
+    if len(lines) > _BUDGET_LIMIT:
+        limitations.append(_BUDGET_TRIMMED)
+    for line in lines[:_BUDGET_LIMIT]:
         hex_id = line.category.id.hex
         name = line.category.name
         add(

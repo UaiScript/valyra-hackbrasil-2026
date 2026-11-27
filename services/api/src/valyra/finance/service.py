@@ -475,3 +475,12 @@ def list_completed_import_batches(
 def is_anomalous(transaction: Transaction) -> bool:
     """Mesmo limiar do filtro `is_anomaly` das rotas, exposto para outros módulos."""
     return is_anomaly(transaction.anomaly_score)
+
+
+def get_last_change_at(session: Session, user_id: UUID, account_id: UUID) -> datetime | None:
+    """Última alteração conhecida que afeta os cálculos da conta; base do corte da IA.
+
+    Exclusão de orçamento não deixa rastro e, por isso, não aparece aqui.
+    """
+    account = get_account_for_user(session, user_id, account_id)
+    return repository.last_change_at(session, user_id, account.id)

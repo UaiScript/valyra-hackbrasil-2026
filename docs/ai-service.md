@@ -66,8 +66,13 @@ aponta os lotes concluídos em `input_scope.import_batch_ids`.
 
 Regras de corte:
 
-- Lotes concluídos depois do corte não entram no escopo; sem lote concluído, os
-  cálculos são omitidos com limitação.
+- Sem lote concluído até o corte, os cálculos são omitidos com limitação.
+- Os services do Finance leem o estado corrente. Se qualquer transação, lote ou
+  teto de orçamento mudou depois do corte (`get_last_change_at`), todos os
+  cálculos são omitidos com limitação. Exclusão de teto não deixa rastro.
+- O orçamento entra com no máximo 8 categorias, priorizando estourado, depois
+  atenção e maior gasto; o corte é declarado como limitação.
+- Só `BALANCE_UNAVAILABLE` na projeção vira limitação; outros erros propagam.
 - Se a data de negócio do Finance (`DEMO_TODAY` ou relógio) for posterior à
   data do corte, todos os cálculos são omitidos: seria antecipar dados.
 - Com `DEMO_TODAY` anterior ao corte, só dias da projeção posteriores à data do
