@@ -21,6 +21,7 @@ from valyra.alpha.news import (
     build_digest,
     news_key,
     publication_instant,
+    tickers_for,
     week_start,
 )
 
@@ -83,6 +84,8 @@ class NewsView:
     published_at: datetime
     ingested_at: datetime
     source: Source
+    # Ações do radar citadas pelo nome da empresa (regra de nomes de news.TICKER_ALIASES).
+    tickers: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -117,6 +120,7 @@ def get_weekly_report(session: Session, as_of: datetime, *, per_theme: int = 4) 
             published_at=signal.published_at,
             ingested_at=signal.ingested_at,
             source=source,
+            tickers=tickers_for(signal.title, signal.summary),
         )
         for signal, source in rows
     ]

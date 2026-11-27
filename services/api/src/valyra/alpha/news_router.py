@@ -47,6 +47,7 @@ def get_weekly_news(
                 title=view.theme.title,
                 why=view.theme.why,
                 category_slugs=list(view.theme.category_slugs),
+                radar_theme=view.theme.radar_theme,
                 items=[
                     NewsItemOut(
                         signal_key=item.signal_key,
@@ -57,6 +58,7 @@ def get_weekly_news(
                         observation_date=item.observation_date,
                         published_at=item.published_at,
                         ingested_at=item.ingested_at,
+                        tickers=list(item.tickers),
                     )
                     for item in view.items
                 ],

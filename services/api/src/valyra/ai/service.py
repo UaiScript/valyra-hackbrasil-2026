@@ -325,7 +325,7 @@ def _alpha_evidences(
 _NEWS_LIMIT = 8
 _NEWS_RULE = (
     "Notícias entram só como manchete, com fonte e data; o tema ligado ao orçamento vem da "
-    "regra news_theme_v1 e indica o que pode mudar, não causa nem previsão."
+    "regra news_theme_v2 e indica o que pode mudar, não causa nem previsão."
 )
 
 
@@ -346,7 +346,10 @@ def _news_evidences(
         EvidenceItem(
             evidence_id=f"news_{item.signal_id.hex}",
             metric_key=f"alpha.news.{theme.key}",
-            label=f"Manchete sobre {theme.title.lower()}, de {item.source.name}",
+            label=(
+                f"Manchete sobre {theme.title.lower()}, de {item.source.name}"
+                + (f", cita {', '.join(item.tickers)}" if item.tickers else "")
+            ),
             basis="observed",
             source={
                 "kind": "alpha_signal",

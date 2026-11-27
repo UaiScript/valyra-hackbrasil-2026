@@ -259,6 +259,7 @@ export type NewsItemOut = {
   signal_key: string;
   source: SourceOut;
   summary: string;
+  tickers: string[];
   title: string;
   url: string;
 };
@@ -267,6 +268,7 @@ export type NewsThemeOut = {
   category_slugs: string[];
   items: NewsItemOut[];
   key: string;
+  radar_theme: string | null;
   title: string;
   why: string;
 };

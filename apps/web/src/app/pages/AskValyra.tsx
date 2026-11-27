@@ -38,7 +38,7 @@ type Turn =
   | { id: number; question: string; status: 'done'; response: ExplainResponse }
   | { id: number; question: string; status: 'error'; message: string };
 
-const Answer: FC<{ r: ExplainResponse }> = ({ r }) => (
+export const Answer: FC<{ r: ExplainResponse }> = ({ r }) => (
   <div className="cx-answer">
     <div className="cx-answer__meta">
       <span className={`cx-uncertainty cx-uncertainty--${r.uncertainty === 'média' ? 'media' : r.uncertainty}`}>Incerteza {r.uncertainty}</span>

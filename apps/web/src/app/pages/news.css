@@ -133,3 +133,29 @@
   .nx-theme { transition: none; }
   .nx-theme:hover { transform: none; }
 }
+
+/* Tickers citados e "o que os dados dizem": a manchete ao lado do dado observado. */
+.nx-tickers { display: flex; flex-wrap: wrap; gap: 6px; }
+.nx-tickers i { padding: 1px 8px; border-radius: 999px; background: rgb(47 134 255 / 0.16); color: var(--cx-sky); font-size: 0.68rem; font-style: normal; font-weight: 700; letter-spacing: 0.04em; }
+.nx-radar { padding: 12px 14px; border: 1px solid rgb(47 134 255 / 0.22); border-radius: 14px; background: linear-gradient(135deg, rgb(47 134 255 / 0.1), rgb(94 234 212 / 0.05)); }
+.nx-radar .nx-label { display: inline-flex; align-items: center; gap: 6px; color: var(--cx-sky); }
+.nx-radar ul { display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
+.nx-radar li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 0.82rem; line-height: 1.4; }
+.nx-radar li b { flex: none; font-family: var(--cx-display); font-weight: 600; font-variant-numeric: tabular-nums; }
+.nx-tone--up { color: var(--cx-lime); }
+.nx-tone--down { color: var(--cx-coral); }
+.nx-radar__link { color: var(--cx-sky); font-size: 0.75rem; font-weight: 600; text-decoration: none; }
+.nx-radar__link:hover { text-decoration: underline; }
+
+/* Resumo da Valyra AI na própria tela. */
+.nx-digest { display: flex; flex-direction: column; gap: 16px; padding: 22px; border: 1px solid rgb(82 212 255 / 0.22); border-radius: var(--cx-radius); background: radial-gradient(120% 160% at 0% 0%, rgb(10 63 224 / 0.22), transparent 60%), var(--cx-glass); }
+.nx-digest > header { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; }
+.nx-digest > header > div { flex: 1 1 18rem; min-width: 0; }
+.nx-digest h3 { margin: 0 0 4px; font-size: 1.05rem; font-weight: 600; }
+.nx-digest p { margin: 0; font-size: 0.85rem; }
+.nx-digest .button { display: inline-flex; align-items: center; gap: 8px; }
+.nx-digest__orb { display: grid; flex: none; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 50%; background: radial-gradient(circle at 30% 30%, var(--cx-cyan), var(--cx-royal)); box-shadow: 0 0 26px rgb(82 212 255 / 0.35); color: #fff; }
+.nx-digest__error { color: #ffb08f; }
+.nx-spin { animation: nx-spin 1s linear infinite; }
+@keyframes nx-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .nx-spin { animation: none; } }

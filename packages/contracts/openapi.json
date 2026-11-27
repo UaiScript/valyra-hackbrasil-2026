@@ -1297,6 +1297,13 @@
             "title": "Summary",
             "type": "string"
           },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tickers",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -1314,7 +1321,8 @@
           "source",
           "observation_date",
           "published_at",
-          "ingested_at"
+          "ingested_at",
+          "tickers"
         ],
         "title": "NewsItemOut",
         "type": "object"
@@ -1339,6 +1347,17 @@
             "title": "Key",
             "type": "string"
           },
+          "radar_theme": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radar Theme"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -1353,6 +1372,7 @@
           "title",
           "why",
           "category_slugs",
+          "radar_theme",
           "items"
         ],
         "title": "NewsThemeOut",

@@ -59,7 +59,7 @@ def test_coleta_tolera_fonte_fora_do_ar_e_nao_duplica(db_session, test_engine):
 def test_relatorio_agrupa_por_tema_com_fonte_e_respeita_corte(client, db_session, test_engine):
     _ingest(test_engine)
     body = client.get(URL, params={"as_of": COLLECTED.isoformat()}).json()
-    assert body["rule"] == "news_theme_v1"
+    assert body["rule"] == "news_theme_v2"
     assert body["total_items"] == 4 and body["unmatched_items"] == 1
     themes = {theme["key"]: theme for theme in body["themes"]}
     assert set(themes) == {"juros", "inflacao", "combustiveis"}

@@ -1,24 +1,31 @@
+import { useState } from 'react';
 import type { FC } from 'react';
 import {
-  CreditCard, ExternalLink, Fuel, House, Landmark, Newspaper, ShoppingBasket, Sparkles, TrendingUp, Wallet, Zap,
+  Activity, CloudRain, CreditCard, ExternalLink, Fuel, House, Landmark, LineChart, Loader2, Newspaper, ShoppingBasket, Sparkles, Sprout,
+  TrendingUp, Wallet, Zap,
 } from 'lucide-react';
-import { api } from '../api/client';
-import { askHref } from '../api/ai';
-import type { BudgetReportOut, NewsItemOut, NewsThemeOut, SummaryOut, WeeklyNewsOut } from '../../lib/api/schema';
+import { ApiError, api, describeError } from '../api/client';
+import { AI_MESSAGES, askHref, explain } from '../api/ai';
+import type { ExplainResponse } from '../api/ai';
+import type { BudgetReportOut, NewsItemOut, NewsThemeOut, RadarOut, SummaryOut, WeeklyNewsOut } from '../../lib/api/schema';
+import { ROUTES } from '../router';
+import { Answer } from './AskValyra';
 import { BUDGET_STATUS_LABEL, usedPercent } from '../Budget';
-import { formatCents, formatInstant } from '../money';
+import { compareDecimal, formatCents, formatDecimal, formatInstant } from '../money';
 import { Async, Empty } from '../ui';
 import { useApi } from '../useApi';
 import './news.css';
 
 /*
  * Relatório semanal de notícias do Alternative Alpha (proposta da ADR-0013). A ligação
- * notícia → tema → categoria vem de uma regra versionada na API (news_theme_v1): é um
+ * notícia → tema → categoria vem de uma regra versionada na API (news_theme_v2): é um
  * "pode mexer em", nunca causa ou previsão. Os valores do orçamento são os mesmos cálculos
  * Finance das outras telas, em centavos; esta tela não faz conta de dinheiro.
  */
 
 const THEME_ICON: Record<string, typeof Fuel> = {
+  acoes: LineChart,
+  agro: Sprout,
   combustiveis: Fuel,
   contas: Zap,
   alimentos: ShoppingBasket,
@@ -66,8 +73,56 @@ const CategoryChip: FC<{ c: CategoryStatus }> = ({ c }) => (
   </li>
 );
 
+/*
+ * "O que os dados dizem": o dado observado do radar Alpha ao lado da manchete. Para ações,
+ * a variação do dia dos tickers citados; para os outros temas, os sinais por regra do radar
+ * e, sem sinal, o último valor de cada série. Nenhuma conta nem previsão é feita aqui.
+ */
+type Reading = { key: string; label: string; value?: string; tone?: 'up' | 'down' | 'flat' };
+
+function radarReadings(t: NewsThemeOut, radar?: RadarOut): Reading[] {
+  if (!radar || !t.radar_theme) return [];
+  if (t.radar_theme === 'acoes') {
+    const tickers = [...new Set(t.items.flatMap((n) => n.tickers))];
+    return tickers.flatMap((ticker) => {
+      const i = radar.indicators.find((ind) => ind.key === `brapi:${ticker}:change_pct`);
+      if (!i) return [];
+      const v = i.latest.value;
+      const tone = compareDecimal(v, '0') > 0 ? 'up' : compareDecimal(v, '0') < 0 ? 'down' : 'flat';
+      return [{ key: i.key, label: `${ticker} no dia`, value: `${formatDecimal(v)}%`, tone }];
+    });
+  }
+  const signals = radar.signals.filter((sg) => sg.theme === t.radar_theme).slice(0, 2);
+  if (signals.length) return signals.map((sg) => ({ key: sg.key, label: sg.title }));
+  return radar.indicators
+    .filter((i) => i.theme === t.radar_theme)
+    .slice(0, 2)
+    .map((i) => ({ key: i.key, label: i.title, value: `${formatDecimal(i.latest.value)} ${i.unit_label}` }));
+}
+
+const RadarContext: FC<{ readings: Reading[]; theme: string }> = ({ readings, theme }) => (
+  <div className="nx-radar">
+    <span className="nx-label">
+      {theme === 'clima' ? <CloudRain size={12} aria-hidden="true" /> : <Activity size={12} aria-hidden="true" />}
+      O que os dados dizem
+    </span>
+    <ul>
+      {readings.map((r) => (
+        <li key={r.key}>
+          <span>{r.label}</span>
+          {r.value && <b className={r.tone ? `nx-tone--${r.tone}` : undefined}>{r.value}</b>}
+        </li>
+      ))}
+    </ul>
+    <a className="nx-radar__link" href={ROUTES.alpha}>Ver no radar econômico</a>
+  </div>
+);
+
 const Headline: FC<{ n: NewsItemOut; theme: string }> = ({ n, theme }) => (
   <li className="nx-headline">
+    {n.tickers.length > 0 && (
+      <span className="nx-tickers">{n.tickers.map((tk) => <i key={tk}>{tk}</i>)}</span>
+    )}
     <a className="nx-headline__title" href={n.url} target="_blank" rel="noreferrer">
       {n.title}<ExternalLink size={12} aria-hidden="true" />
     </a>
@@ -83,8 +138,9 @@ const Headline: FC<{ n: NewsItemOut; theme: string }> = ({ n, theme }) => (
   </li>
 );
 
-const ThemeCard: FC<{ t: NewsThemeOut; categories: Map<string, CategoryStatus> }> = ({ t, categories }) => {
+const ThemeCard: FC<{ t: NewsThemeOut; categories: Map<string, CategoryStatus>; radar?: RadarOut }> = ({ t, categories, radar }) => {
   const Icon = THEME_ICON[t.key] ?? Newspaper;
+  const readings = radarReadings(t, radar);
   const linked = t.category_slugs.map((slug) => categories.get(slug)).filter((c): c is CategoryStatus => Boolean(c));
   return (
     <article className={`nx-theme nx-theme--${t.key}`} aria-label={t.title}>
@@ -102,12 +158,48 @@ const ThemeCard: FC<{ t: NewsThemeOut; categories: Map<string, CategoryStatus> }
           <ul className="nx-chips">{linked.map((c) => <CategoryChip key={c.slug} c={c} />)}</ul>
         </div>
       )}
+      {readings.length > 0 && t.radar_theme && <RadarContext readings={readings} theme={t.radar_theme} />}
       <ul className="nx-headlines">{t.items.map((n) => <Headline key={n.signal_key} n={n} theme={t.title} />)}</ul>
     </article>
   );
 };
 
-const Report: FC<{ r: WeeklyNewsOut; categories: Map<string, CategoryStatus> }> = ({ r, categories }) => {
+type Digest = { status: 'idle' } | { status: 'loading' } | { status: 'done'; response: ExplainResponse } | { status: 'error'; message: string };
+
+/** Resumo da semana pela Valyra AI direto na tela, com as evidências citadas. */
+const AiDigest: FC<{ accountId?: string }> = ({ accountId }) => {
+  const [state, setState] = useState<Digest>({ status: 'idle' });
+  async function run() {
+    if (!accountId) return;
+    setState({ status: 'loading' });
+    try {
+      setState({ status: 'done', response: await explain(accountId, SUMMARY_QUESTION) });
+    } catch (err) {
+      const message = err instanceof ApiError ? AI_MESSAGES[err.code] ?? describeError(err) : describeError(err);
+      setState({ status: 'error', message });
+    }
+  }
+  return (
+    <section className="nx-digest" aria-label="Resumo da semana pela Valyra AI">
+      <header>
+        <span className="nx-digest__orb" aria-hidden="true"><Sparkles size={18} /></span>
+        <div>
+          <h3>Resumo da semana pela Valyra AI</h3>
+          <p className="app-muted">Lê as manchetes e o seu orçamento como evidências e explica o que pode pesar. Cada citação aparece com fonte e data.</p>
+        </div>
+        {state.status !== 'done' && (
+          <button type="button" className="button button--primary" onClick={run} disabled={!accountId || state.status === 'loading'}>
+            {state.status === 'loading' ? <><Loader2 size={15} className="nx-spin" aria-hidden="true" />Lendo a semana…</> : <><Sparkles size={15} aria-hidden="true" />Gerar resumo</>}
+          </button>
+        )}
+      </header>
+      {state.status === 'error' && <p className="nx-digest__error" role="alert">{state.message}</p>}
+      {state.status === 'done' && <Answer r={state.response} />}
+    </section>
+  );
+};
+
+const Report: FC<{ r: WeeklyNewsOut; categories: Map<string, CategoryStatus>; radar?: RadarOut; accountId?: string }> = ({ r, categories, radar, accountId }) => {
   const linked = r.total_items - r.unmatched_items;
   return (
     <>
@@ -119,8 +211,8 @@ const Report: FC<{ r: WeeklyNewsOut; categories: Map<string, CategoryStatus> }> 
             De {shortDay(r.week_start)} a {shortDay(r.as_of)}: as manchetes de fontes públicas que tocam o seu orçamento,
             cada uma com a fonte e a data. É contexto para decidir com calma, não recomendação de investimento.
           </p>
-          <a className="button button--primary nx-hero__cta" href={askHref(SUMMARY_QUESTION)}>
-            <Sparkles size={15} aria-hidden="true" />Resumir com a Valyra AI
+          <a className="button button--ghost nx-hero__cta" href={askHref(SUMMARY_QUESTION)}>
+            <Sparkles size={15} aria-hidden="true" />Conversar sobre a semana
           </a>
         </div>
         <dl className="nx-stats">
@@ -137,7 +229,10 @@ const Report: FC<{ r: WeeklyNewsOut; categories: Map<string, CategoryStatus> }> 
             : 'Nenhuma manchete da semana tocou os temas do seu orçamento.'}
         </Empty>
       ) : (
-        <div className="nx-grid">{r.themes.map((t) => <ThemeCard key={t.key} t={t} categories={categories} />)}</div>
+        <>
+          <AiDigest accountId={accountId} />
+          <div className="nx-grid">{r.themes.map((t) => <ThemeCard key={t.key} t={t} categories={categories} radar={radar} />)}</div>
+        </>
       )}
 
       <footer className="nx-foot">
@@ -169,13 +264,15 @@ export const WeeklyNews: FC = () => {
   const report = useApi((s) => api.getWeeklyNews(undefined, s), []);
   const budgets = useApi((s) => api.getBudgets({}, s), []);
   const summary = useApi((s) => api.getSummary({}, s), []);
-  // Orçamento é complemento: se falhar, o relatório aparece sem os chips de categoria.
+  const radar = useApi((s) => api.getAlphaRadar(undefined, s), []);
+  const accounts = useApi((s) => api.listAccounts(s), []);
+  // Orçamento e radar são complementos: se falharem, o relatório aparece sem chips nem dados.
   const categories = categoryIndex(budgets.state.data, summary.state.data);
 
   return (
     <div className="app-stack app-stack--loose nx">
       <Async state={report.state} onRetry={report.reload}>
-        {(r) => <Report r={r} categories={categories} />}
+        {(r) => <Report r={r} categories={categories} radar={radar.state.data} accountId={accounts.state.data?.items[0]?.id} />}
       </Async>
     </div>
   );

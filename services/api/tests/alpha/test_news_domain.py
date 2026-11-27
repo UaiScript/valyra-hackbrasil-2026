@@ -18,6 +18,7 @@ from valyra.alpha.news import (
     parse_rss,
     publication_instant,
     themes_for,
+    tickers_for,
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "news_rss.xml"
@@ -104,8 +105,11 @@ def test_chave_estavel_por_fonte_e_link():
         ("Copom mantém a Selic", ("juros",)),
         ("Conta de luz terá bandeira tarifária amarela", ("contas",)),
         ("Preço do café e da carne sobe no atacado", ("alimentos", "inflacao")),
-        ("Petrobras reduz o diesel", ("combustiveis",)),
+        ("Petrobras reduz o diesel", ("acoes", "combustiveis")),
         ("Salário mínimo de 2027 é anunciado", ("renda",)),
+        ("Colheita de soja avança em Mato Grosso", ("agro",)),
+        ("Estiagem preocupa produtores de milho", ("agro",)),
+        ("Mineradora Vale paga dividendos", ("acoes",)),
         ("Feira de tecnologia reúne startups", ()),
         # Palavra inteira: "cafeteria" não é "café", "internet" não casa com "inter".
         ("Nova cafeteria abre no centro", ()),
@@ -141,3 +145,17 @@ def test_relatorio_da_semana_respeita_corte_e_agrupa_por_tema():
     # Empate em quantidade segue a ordem de THEMES; cartão é crédito antes de ser juros.
     assert [group.theme.key for group in digest.groups] == ["combustiveis", "credito", "juros"]
     assert [row.signal_key for row in digest.groups[2].items] == ["k1"]
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        ("Petrobras e Itaú lideram negociações na bolsa", ("PETR4", "ITUB4")),
+        ("Mineradora Vale divulga produção do trimestre", ("VALE3",)),
+        ("Magalu abre novas lojas", ("MGLU3",)),
+        # "Vale" como verbo não é a empresa.
+        ("Vale a pena antecipar o 13º?", ()),
+    ],
+)
+def test_acoes_do_radar_pelo_nome_da_empresa(title, expected):
+    assert tickers_for(title, "") == expected

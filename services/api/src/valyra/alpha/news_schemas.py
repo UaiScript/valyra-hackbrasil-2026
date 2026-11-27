@@ -18,6 +18,8 @@ class NewsItemOut(BaseModel):
     # Publicação pela fonte, limitada ao instante da coleta (nunca depois dela).
     published_at: datetime
     ingested_at: datetime
+    # Tickers do radar Alpha citados pelo nome da empresa; liga a manchete à cotação.
+    tickers: list[str]
 
 
 class NewsThemeOut(BaseModel):
@@ -27,6 +29,8 @@ class NewsThemeOut(BaseModel):
     why: str
     # Slugs de categoria Finance ligados ao tema; vazio quando o tema não tem categoria própria.
     category_slugs: list[str]
+    # Tema do radar Alpha com os dados observados para ler junto (juros, inflacao, acoes, clima).
+    radar_theme: str | None
     items: list[NewsItemOut]
 
 

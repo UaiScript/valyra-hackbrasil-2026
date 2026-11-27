@@ -98,27 +98,37 @@ const RADAR = {
 // Manchetes sintéticas só para o teste; a coleta real lê Agência Brasil, BCB e IBGE.
 const AB = { slug: 'agencia-brasil', name: 'Agência Brasil (EBC) — Economia', url: 'https://agenciabrasil.ebc.com.br/economia', license: 'Reprodução permitida com citação da Agência Brasil; aqui só título, trecho e link' };
 const IBGE = { slug: 'ibge-noticias', name: 'Agência de Notícias do IBGE', url: 'https://agenciadenoticias.ibge.gov.br/', license: 'Conteúdo público do IBGE; citar a fonte' };
-const news = (key: string, title: string, summary: string, source: typeof AB, published: string) => ({
+const news = (key: string, title: string, summary: string, source: typeof AB, published: string, tickers: string[] = []) => ({
   signal_key: `news:${source.slug}:${key}`, title, summary, url: `${source.url}/noticia/${key}`, source,
-  observation_date: published.slice(0, 10), published_at: published, ingested_at: '2026-11-27T14:17:00Z',
+  observation_date: published.slice(0, 10), published_at: published, ingested_at: '2026-11-27T14:17:00Z', tickers,
 });
 const WEEKLY = {
-  as_of: '2026-11-27T18:00:00Z', week_start: '2026-11-20T18:00:00Z', rule: 'news_theme_v1',
-  total_items: 7, unmatched_items: 2, last_ingested_at: '2026-11-27T14:17:00Z', sources: [AB, IBGE],
+  as_of: '2026-11-27T18:00:00Z', week_start: '2026-11-20T18:00:00Z', rule: 'news_theme_v2',
+  total_items: 9, unmatched_items: 2, last_ingested_at: '2026-11-27T14:17:00Z', sources: [AB, IBGE],
   themes: [
     {
-      key: 'alimentos', title: 'Alimentos', why: 'Alta ou queda de alimentos pesa na ida ao mercado.', category_slugs: ['mercado'],
+      key: 'acoes', title: 'Ações que você acompanha', why: 'Ajuda a ler o movimento das ações que você acompanha; o radar mostra a variação do dia, sem prever a próxima.',
+      category_slugs: [], radar_theme: 'acoes',
+      items: [news('petro', 'Petrobras anuncia redução no preço do diesel', 'Mudança vale a partir de sábado nas refinarias.', AB, '2026-11-26T18:00:00Z', ['PETR4'])],
+    },
+    {
+      key: 'agro', title: 'Agro e cadeia da soja', why: 'Safra e clima nos polos de grãos podem chegar ao preço de óleo, carnes e derivados no mercado.',
+      category_slugs: ['mercado'], radar_theme: 'clima',
+      items: [news('soja', 'Plantio de soja atrasa em Mato Grosso com chuva irregular', 'Levantamento acompanha o ritmo do plantio.', AB, '2026-11-25T16:00:00Z')],
+    },
+    {
+      key: 'alimentos', title: 'Alimentos', why: 'Alta ou queda de alimentos pesa na ida ao mercado.', category_slugs: ['mercado'], radar_theme: 'inflacao',
       items: [
         news('cafe', 'Preço do café no atacado volta a subir, aponta levantamento', 'Pesquisa semanal mostra alta do grão nas principais praças.', AB, '2026-11-26T13:20:00Z'),
         news('cesta', 'Cesta básica fica mais barata em 9 capitais', 'Queda puxada por tomate e batata.', AB, '2026-11-24T15:00:00Z'),
       ],
     },
     {
-      key: 'juros', title: 'Juros e Selic', why: 'Mexe no rendimento da reserva atrelada ao CDI e no custo de parcelamentos e cartão.', category_slugs: [],
+      key: 'juros', title: 'Juros e Selic', why: 'Mexe no rendimento da reserva atrelada ao CDI e no custo de parcelamentos e cartão.', category_slugs: [], radar_theme: 'juros',
       items: [news('copom', 'Copom divulga ata da última reunião', 'Documento detalha a avaliação do comitê sobre o cenário.', AB, '2026-11-25T11:00:00Z')],
     },
     {
-      key: 'renda', title: 'Renda, emprego e impostos', why: 'Salário mínimo, imposto de renda e emprego mudam quanto entra no mês.', category_slugs: ['salario'],
+      key: 'renda', title: 'Renda, emprego e impostos', why: 'Salário mínimo, imposto de renda e emprego mudam quanto entra no mês.', category_slugs: ['salario'], radar_theme: null,
       items: [news('pnad', 'Desemprego recua no trimestre, mostra Pnad', 'Taxa de desocupação cai na comparação trimestral.', IBGE, '2026-11-27T12:00:00Z')],
     },
   ],
@@ -410,8 +420,37 @@ test('relatório da semana liga manchetes ao orçamento com fonte, data e IA', a
   await expect(headline).toHaveAttribute('href', 'https://agenciabrasil.ebc.com.br/economia/noticia/cafe');
   await expect(food).toContainText('publicado em 26/11/2026, 10:20');
   await expect(page.getByRole('article', { name: 'Renda, emprego e impostos' }).locator('.nx-chip')).toContainText('recebidos no mês');
-  await expect(page.getByRole('link', { name: 'Resumir com a Valyra AI' })).toHaveAttribute('href', /#\/app\/valyra-ai\?q=/);
-  await expect(page.getByText('news_theme_v1')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Conversar sobre a semana' })).toHaveAttribute('href', /#\/app\/valyra-ai\?q=/);
+  await expect(page.getByText('news_theme_v2')).toBeVisible();
   const fits = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
   expect(fits).toBe(true);
+});
+
+test('relatório da semana mostra o dado do radar e gera o resumo da Valyra AI na tela', async ({ page }) => {
+  await mockApi(page);
+  let asked = '';
+  await page.route('**/api/v1/ai/explain', async (route) => {
+    asked = JSON.parse(route.request().postData() ?? '{}').question;
+    return json(route, {
+      answer: 'A manchete sobre o diesel cita a Petrobras; no radar, PETR4 teve -1,2345% no dia.',
+      as_of: '2026-11-27T18:00:00Z', uncertainty: 'média',
+      evidences: [{
+        evidence_id: 'news_1', metric_key: 'alpha.news.acoes', basis: 'observed',
+        label: 'Manchete sobre ações que você acompanha, de Agência Brasil (EBC) — Economia, cita PETR4',
+        period: { start: '2026-11-26', end: '2026-11-26' }, source: {}, value: { kind: 'text', value_text: 'Petrobras anuncia redução no preço do diesel' },
+      }],
+      limitations: ['Notícias entram só como manchete, com fonte e data.'],
+    });
+  });
+  await page.goto('/#/app/alpha/semana');
+  const stocks = page.getByRole('article', { name: 'Ações que você acompanha' });
+  await expect(stocks.locator('.nx-tickers')).toHaveText('PETR4');
+  // Variação do dia vem do radar, como texto decimal da API.
+  await expect(stocks.locator('.nx-radar')).toContainText('PETR4 no dia');
+  await expect(stocks.locator('.nx-radar')).toContainText('-1,2345%');
+  const agro = page.getByRole('article', { name: 'Agro e cadeia da soja' });
+  await expect(agro.locator('.nx-radar')).toContainText('Chuva em Sorriso (MT) 45,2% abaixo da média de 10 anos');
+  await page.getByRole('button', { name: 'Gerar resumo' }).click();
+  await expect(page.getByText('Evidências citadas (1)')).toBeVisible();
+  expect(asked).toContain('notícias desta semana');
 });

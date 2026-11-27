@@ -21,7 +21,7 @@ from typing import Literal, Protocol
 from zoneinfo import ZoneInfo
 
 BUSINESS_ZONE = ZoneInfo("America/Sao_Paulo")
-THEME_RULE = "news_theme_v1"
+THEME_RULE = "news_theme_v2"
 WEEK = timedelta(days=7)
 # Teto do corpo do feed: um RSS de economia tem dezenas de KB; acima disso algo está errado.
 MAX_FEED_BYTES = 2_000_000
@@ -230,7 +230,7 @@ def publication_instant(item: FeedItem, ingested_at: datetime) -> datetime:
     return min(item.source_published_at, ingested_at)
 
 
-# ---------- Temas do orçamento (regra news_theme_v1) ----------
+# ---------- Temas do orçamento (regra news_theme_v2) ----------
 # Ordem importa: temas específicos vêm antes dos genéricos (juros, inflação), porque a
 # notícia entra no primeiro tema que casar e "preço" aparece em quase toda matéria.
 
@@ -243,9 +243,57 @@ class Theme:
     why: str
     keywords: tuple[str, ...]
     category_slugs: tuple[str, ...]
+    # Tema do radar Alpha com os dados observados que dão contexto à manchete.
+    radar_theme: str | None = None
+
+
+# Ações acompanhadas no radar (brapi) e como aparecem nas manchetes. "Vale" sozinho é
+# palavra comum ("vale a pena"), então só entram formas que nomeiam a empresa.
+TICKER_ALIASES: dict[str, tuple[str, ...]] = {
+    "PETR4": ("petrobras", "petr4"),
+    "VALE3": ("vale3", "mineradora vale", "acoes da vale", "vale s.a"),
+    "ITUB4": ("itau", "itau unibanco", "itub4"),
+    "MGLU3": ("magazine luiza", "magalu", "mglu3"),
+}
 
 
 THEMES: tuple[Theme, ...] = (
+    Theme(
+        key="acoes",
+        title="Ações que você acompanha",
+        why=(
+            "Ajuda a ler o movimento das ações que você acompanha; o radar mostra a "
+            "variação do dia, sem prever a próxima."
+        ),
+        keywords=tuple(alias for aliases in TICKER_ALIASES.values() for alias in aliases),
+        category_slugs=(),
+        radar_theme="acoes",
+    ),
+    Theme(
+        key="agro",
+        title="Agro e cadeia da soja",
+        why=(
+            "Safra e clima nos polos de grãos podem chegar ao preço de óleo, carnes e "
+            "derivados no mercado."
+        ),
+        keywords=(
+            "soja",
+            "milho",
+            "safra",
+            "agronegocio",
+            "agro",
+            "colheita",
+            "plantio",
+            "estiagem",
+            "seca",
+            "conab",
+            "graos",
+            "el nino",
+            "la nina",
+        ),  # fmt: skip
+        category_slugs=("mercado",),
+        radar_theme="clima",
+    ),
     Theme(
         key="combustiveis",
         title="Combustíveis e transporte",
@@ -292,10 +340,10 @@ THEMES: tuple[Theme, ...] = (
             "cafe",
             "carne",
             "leite",
-            "safra",
             "hortifruti",
         ),  # fmt: skip
         category_slugs=("mercado",),
+        radar_theme="inflacao",
     ),
     Theme(
         key="moradia",
@@ -342,6 +390,7 @@ THEMES: tuple[Theme, ...] = (
         why="Mexe no rendimento da reserva atrelada ao CDI e no custo de parcelamentos e cartão.",
         keywords=("selic", "copom", "juros", "taxa basica", "cdi", "politica monetaria"),
         category_slugs=(),
+        radar_theme="juros",
     ),
     Theme(
         key="inflacao",
@@ -349,9 +398,20 @@ THEMES: tuple[Theme, ...] = (
         why="Preços em geral costumam aparecer primeiro no mercado e em restaurantes.",
         keywords=("ipca", "inflacao", "inpc", "custo de vida", "preco", "precos", "deflacao"),
         category_slugs=("mercado", "restaurantes"),
+        radar_theme="inflacao",
     ),
 )
 THEMES_BY_KEY = {theme.key: theme for theme in THEMES}
+
+
+def tickers_for(title: str, excerpt_text: str) -> tuple[str, ...]:
+    """Tickers do radar citados pelo nome da empresa na manchete ou no trecho."""
+    text = normalize(f"{title} {excerpt_text}")
+    return tuple(
+        ticker
+        for ticker, aliases in TICKER_ALIASES.items()
+        if any(re.search(rf"(?<!\w){re.escape(alias)}(?!\w)", text) for alias in aliases)
+    )
 
 
 def normalize(text: str) -> str:

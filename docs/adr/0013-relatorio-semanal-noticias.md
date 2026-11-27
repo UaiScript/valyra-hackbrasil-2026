@@ -27,10 +27,15 @@ Proposta para o time aprovar:
 2. Regras temporais: `published_at` é a data da fonte limitada ao instante da coleta
    (nunca depois dela; sem data, a própria coleta), `ingested_at` é a coleta e a data da
    fonte fica no `payload`. O relatório da semana mostra só o publicado até o corte.
-3. Ligação com o orçamento por regra determinística e versionada (`news_theme_v1`):
+3. Ligação com o orçamento por regra determinística e versionada (`news_theme_v2`):
    palavras-chave inteiras levam a manchete a um tema e o tema aponta categorias Finance.
    É um "pode mexer em", nunca causa nem previsão. Os temas são calculados na leitura,
    então trocar a regra não reescreve linhas somente inserção.
+   A versão 2 acrescenta "Ações que você acompanha" (nome da empresa → ticker do radar)
+   e "Agro e cadeia da soja", e cada tema aponta o tema do radar Alpha cujo dado observado
+   (variação do dia, Selic, IPCA, chuva) aparece ao lado das manchetes. Nenhum percentual
+   de "possibilidade de alta ou queda" é exibido: sem modelo validado, seria número sem
+   suporte verificável.
 4. A Valyra AI recebe até 8 manchetes da semana como evidência textual `alpha_signal`,
    com fonte e data, e só pode reproduzi-las literalmente (contrato da ADR-0011).
 5. Coleta por workflow agendado três vezes ao dia, com o mesmo interruptor e secret da
