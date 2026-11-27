@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FC } from 'react';
-import { ArrowLeft, Bell, ChartPie, ChartSpline, Command, Compass, LayoutDashboard, ListOrdered, Menu, Sparkles, Target, Upload, X } from 'lucide-react';
+import { ArrowLeft, Bell, ChartPie, ChartSpline, Command, Compass, LayoutDashboard, ListOrdered, Menu, Newspaper, Sparkles, Target, Upload, X } from 'lucide-react';
 import { api } from './api/client';
 import { ROUTES, routeFromHash, useHash } from './router';
 import type { AppRoute } from './router';
@@ -14,6 +14,7 @@ import { Alerts, ALERTS_CHANGED } from './pages/Alerts';
 import { Budgets } from './pages/Budgets';
 import { AskValyra } from './pages/AskValyra';
 import { Alpha } from './pages/Alpha';
+import { WeeklyNews } from './pages/WeeklyNews';
 import { LogoMark } from '../components/LogoMark';
 import { MODULES, ModuleBadge } from './modules';
 import type { ModuleId } from './modules';
@@ -39,7 +40,10 @@ const NAV_GROUPS: { module: ModuleId; items: NavItem[] }[] = [
   },
   {
     module: 'alpha',
-    items: [{ route: 'alpha', label: 'Radar econômico', icon: Compass }],
+    items: [
+      { route: 'alpha', label: 'Radar econômico', icon: Compass },
+      { route: 'news', label: 'Relatório da semana', icon: Newspaper },
+    ],
   },
   {
     module: 'ai',
@@ -161,10 +165,13 @@ export default function FinanceApp() {
           {route === 'alerts' && <Alerts />}
           {route === 'ai' && <AskValyra />}
           {route === 'alpha' && <Alpha />}
+          {route === 'news' && <WeeklyNews />}
           {route === 'import' && <ImportCsv />}
           <p className="cx-footnote" role="note">
             {route === 'alpha'
               ? 'Dados públicos do Banco Central e da brapi.dev, com fonte e instante de coleta. Contexto econômico, não recomendação de investimento.'
+              : route === 'news'
+              ? 'Manchetes da Agência Brasil, do Banco Central e do IBGE, com fonte e data e link para a matéria original. Contexto, não recomendação de investimento.'
               : 'Ambiente de demonstração: usuário demo e dados sintéticos, sem login. Todo número vem de um cálculo auditável da API.'}
           </p>
         </main>

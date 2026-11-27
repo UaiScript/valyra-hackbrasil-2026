@@ -132,6 +132,23 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "Domínio de notícias Alpha sem banco, HTTP, IA ou configuração"
+type = "forbidden"
+source_modules = ["valyra.alpha.news"]
+forbidden_modules = [
+    "sqlalchemy", "fastapi", "httpx", "requests", "openai", "google", "valyra.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "Camadas das notícias Alpha"
+type = "layers"
+layers = [
+    "valyra.alpha.news_router",
+    "valyra.alpha.news_service",
+    "valyra.alpha.news | valyra.alpha.news_repository",
+]
+
+[[tool.importlinter.contracts]]
 name = "Camadas do Alpha"
 type = "layers"
 layers = [

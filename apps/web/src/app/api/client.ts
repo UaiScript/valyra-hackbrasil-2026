@@ -22,6 +22,7 @@ import type {
   PageImportBatchSummaryOut,
   PageTransactionOut,
   RadarOut,
+  WeeklyNewsOut,
   TransactionOut,
 } from '../../lib/api/schema';
 
@@ -136,6 +137,10 @@ export const api = {
   // Sem as_of a API usa o instante atual; com as_of, só o publicado até ele (ADR-0012).
   getAlphaRadar: (asOf?: string, signal?: AbortSignal) =>
     request<RadarOut>('GET', '/api/v1/alpha/radar', { query: { as_of: asOf }, signal }),
+
+  // Relatório semanal de notícias (proposta da ADR-0013): 7 dias até o corte.
+  getWeeklyNews: (asOf?: string, signal?: AbortSignal) =>
+    request<WeeklyNewsOut>('GET', '/api/v1/alpha/news/weekly', { query: { as_of: asOf }, signal }),
 
   markAlertRead: (alertId: string) =>
     request<AlertOut>('PATCH', `/api/v1/alerts/${id(alertId)}`, { json: { status: 'read' } }),

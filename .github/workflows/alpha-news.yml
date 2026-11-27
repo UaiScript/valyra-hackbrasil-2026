@@ -1,0 +1,49 @@
+name: Coleta de notícias Alpha
+
+# Proposta da ADR-0013: manchetes do relatório semanal. Mesmo desenho da coleta Alpha
+# (ADR-0012): o Render Free dorme, então a coleta roda aqui e grava no Neon; a API só lê.
+on:
+  schedule:
+    # Três vezes ao dia (8h, 14h e 20h em São Paulo, UTC-3), todos os dias.
+    - cron: "17 11,17,23 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Duas coletas simultâneas poderiam tentar gravar a mesma notícia; a fila evita a corrida.
+concurrency:
+  group: alpha-news
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    name: Agência Brasil, BCB e IBGE
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Mesmo interruptor da coleta Alpha: sem ALPHA_INGEST_ENABLED=true o job é pulado.
+    if: ${{ vars.ALPHA_INGEST_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: '0.13.7'
+          python-version: '3.12'
+          enable-cache: false
+      - name: Instalar dependências oficiais
+        run: make sync
+      - name: Coletar manchetes
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          : "${NEON_DATABASE_URL:?configure o secret NEON_DATABASE_URL}"
+          # Mesma conversão do deploy/start.sh: o SQLAlchemy precisa do driver psycopg explícito.
+          case "$NEON_DATABASE_URL" in
+            postgres://*) DATABASE_URL="postgresql+psycopg://${NEON_DATABASE_URL#postgres://}" ;;
+            postgresql://*) DATABASE_URL="postgresql+psycopg://${NEON_DATABASE_URL#postgresql://}" ;;
+            *) DATABASE_URL="$NEON_DATABASE_URL" ;;
+          esac
+          export DATABASE_URL
+          uv run --locked --directory services/api python -m valyra.scripts.ingest_news

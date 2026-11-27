@@ -27,6 +27,7 @@ from valyra.ai.schemas import (
     MoneyValue,
     TextValue,
 )
+from valyra.alpha import news_service
 from valyra.alpha import service as alpha_service
 from valyra.core.errors import AppError
 from valyra.finance import service as finance_service
@@ -237,6 +238,7 @@ def _finance_context(
     evidences.extend(_calculation_evidences(session, user_id, account, as_of, clock, limitations))
     room = _EVIDENCE_CAP - len(evidences)
     evidences.extend(_alpha_evidences(session, as_of, limitations, room))
+    evidences.extend(_news_evidences(session, as_of, limitations, _EVIDENCE_CAP - len(evidences)))
     built_at = _aware(clock())
     if built_at < as_of:
         raise EvidenceContextError("Relógio retrocedeu durante a montagem do contexto")
@@ -309,6 +311,55 @@ def _alpha_evidences(
             limitations.append(_ALPHA_ESTIMATED)
     else:
         limitations.append(_NO_ALPHA)
+    return items
+
+
+# Manchetes da semana: poucas bastam para o resumo e mantêm o prompt bem abaixo do teto.
+_NEWS_LIMIT = 8
+_NEWS_RULE = (
+    "Notícias entram só como manchete, com fonte e data; o tema ligado ao orçamento vem da "
+    "regra news_theme_v1 e indica o que pode mudar, não causa nem previsão."
+)
+
+
+def _news_evidences(
+    session: Session, as_of: datetime, limitations: list[str], room: int
+) -> list[EvidenceItem]:
+    """Manchetes da semana até o corte (proposta da ADR-0013), como evidência textual."""
+    report = news_service.get_weekly_report(session, as_of)
+    # Uma manchete de cada tema primeiro, para o resumo cobrir a semana e não um tema só.
+    rounds = max((len(view.items) for view in report.themes), default=0)
+    ordered = [
+        (view.theme, view.items[index])
+        for index in range(rounds)
+        for view in report.themes
+        if index < len(view.items)
+    ]
+    items = [
+        EvidenceItem(
+            evidence_id=f"news_{item.signal_id.hex}",
+            metric_key=f"alpha.news.{theme.key}",
+            label=f"Manchete sobre {theme.title.lower()}, de {item.source.name}",
+            basis="observed",
+            source={
+                "kind": "alpha_signal",
+                "source_id": item.source.id,
+                "signal_id": item.signal_id,
+                "signal_key": item.signal_key,
+                "revision_id": item.revision_id,
+                "source_url": item.url,
+                "observation_date": item.observation_date,
+                "published_at": item.published_at,
+                "published_at_estimated": False,
+                "ingested_at": item.ingested_at,
+            },
+            value=TextValue(value_text=item.title),
+            period={"start": item.observation_date, "end": item.observation_date},
+        )
+        for theme, item in ordered[: min(_NEWS_LIMIT, max(room, 0))]
+    ]
+    if items:
+        limitations.append(_NEWS_RULE)
     return items
 
 

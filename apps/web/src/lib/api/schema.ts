@@ -247,6 +247,25 @@ export type MoneyValue = {
   kind?: string;
 };
 
+export type NewsItemOut = {
+  /** date-time */ ingested_at: string;
+  /** date */ observation_date: string;
+  /** date-time */ published_at: string;
+  signal_key: string;
+  source: SourceOut;
+  summary: string;
+  title: string;
+  url: string;
+};
+
+export type NewsThemeOut = {
+  category_slugs: string[];
+  items: NewsItemOut[];
+  key: string;
+  title: string;
+  why: string;
+};
+
 export type PageAccountOut = {
   items: AccountOut[];
   limit: number;
@@ -375,9 +394,25 @@ export type TransactionUpdate = {
   /** uuid */ category_id: string;
 };
 
+/** Notícias publicadas nos 7 dias até `as_of`, agrupadas por tema pela regra `rule`. */
+export type WeeklyNewsOut = {
+  /** date-time */ as_of: string;
+  last_ingested_at: string | null;
+  rule: string;
+  sources: SourceOut[];
+  themes: NewsThemeOut[];
+  total_items: number;
+  unmatched_items: number;
+  /** date-time */ week_start: string;
+};
+
 export type AlertsListQuery = {
   limit?: number;
   offset?: number;
+};
+
+export type AlphaGetWeeklyNewsQuery = {
+  as_of?: string | null;
 };
 
 export type AlphaGetRadarQuery = {
@@ -427,6 +462,7 @@ export const OPERATIONS = {
   ai_explain: { method: 'POST', path: '/api/v1/ai/explain' },
   alerts_list: { method: 'GET', path: '/api/v1/alerts' },
   alerts_update: { method: 'PATCH', path: '/api/v1/alerts/{id}' },
+  alpha_get_weekly_news: { method: 'GET', path: '/api/v1/alpha/news/weekly' },
   alpha_get_radar: { method: 'GET', path: '/api/v1/alpha/radar' },
   finance_list_accounts: { method: 'GET', path: '/api/v1/finance/accounts' },
   finance_create_import_batch: { method: 'POST', path: '/api/v1/finance/accounts/{account_id}/import-batches' },

@@ -23,6 +23,7 @@ from valyra.ai.llm_client import (
     LLMUnavailableError,
 )
 from valyra.ai.schemas import LLMPayload, LLMResponse
+from valyra.alpha.news_service import WeeklyReport
 from valyra.alpha.service import Radar
 from valyra.core.config import Settings
 from valyra.core.db import get_session
@@ -31,6 +32,15 @@ from valyra.core.errors import AppError
 
 EMPTY_RADAR = Radar(
     as_of=datetime(2026, 1, 1, tzinfo=UTC), indicators=[], signals=[], last_ingested_at=None
+)
+EMPTY_NEWS = WeeklyReport(
+    as_of=datetime(2026, 1, 1, tzinfo=UTC),
+    week_start=datetime(2025, 12, 25, tzinfo=UTC),
+    themes=[],
+    total=0,
+    unmatched=0,
+    sources=[],
+    last_ingested_at=None,
 )
 
 URL = "/api/v1/ai/explain"
@@ -61,6 +71,8 @@ def stack(app, monkeypatch):
     monkeypatch.setattr(service.finance_service, "is_anomalous", Mock(return_value=False))
     # Radar vazio: sem coletas Alpha, o contexto declara a ausência como limitação.
     monkeypatch.setattr(service.alpha_service, "get_radar", Mock(return_value=EMPTY_RADAR))
+    # Sem notícias coletadas: o relatório semanal não acrescenta evidências.
+    monkeypatch.setattr(service.news_service, "get_weekly_report", Mock(return_value=EMPTY_NEWS))
     monkeypatch.setattr(llm_client, "call_llm", llm)
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[get_current_user_id] = lambda: USER_ID
