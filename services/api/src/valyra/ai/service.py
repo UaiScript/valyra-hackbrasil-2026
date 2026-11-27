@@ -6,7 +6,7 @@ corpo HTTP. O domínio lexical não certifica a semântica ou causalidade da res
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -24,7 +24,9 @@ from valyra.ai.schemas import (
     LLMPayload,
     LLMRequest,
     MoneyValue,
+    TextValue,
 )
+from valyra.core.errors import AppError
 from valyra.finance import service as finance_service
 
 LLMClient = Callable[[LLMRequest], LLMPayload]
@@ -32,12 +34,30 @@ ContextProvider = Callable[[datetime], EvidenceContext]
 Clock = Callable[[], datetime]
 _BUSINESS_ZONE = ZoneInfo("America/Sao_Paulo")
 _TRANSACTION_LIMIT = 20
-_MISSING_CONTEXT = (
-    "O saldo informado é de referência; não há saldo realizado calculado neste contexto.",
-    "Resumo de receitas e despesas ainda indisponível.",
-    "Projeções de caixa ainda indisponíveis.",
-    "Contexto econômico Alpha ainda indisponível.",
+_MISSING_CONTEXT = ("Contexto econômico Alpha ainda indisponível.",)
+_NO_CALCULATIONS = (
+    "Sem lote de importação concluído: resumo, orçamento e projeção não foram calculados."
 )
+_FUTURE_BUSINESS_DAY = (
+    "A data de negócio do Finance é posterior ao corte; cálculos do Finance omitidos."
+)
+_NO_PROJECTION = "Projeção de caixa indisponível para esta conta."
+_CHANGED_AFTER_CUTOFF = (
+    "Houve alterações no Finance depois do corte; cálculos omitidos para não antecipar dados."
+)
+_BUDGET_TRIMMED = "Orçamento parcial: só as categorias mais pressionadas entram no contexto."
+# Três evidências por categoria orçada: oito categorias mantêm o contexto abaixo de 100 itens.
+_BUDGET_LIMIT = 8
+_BUDGET_PRIORITY = {"over": 0, "warning": 1, "ok": 2}
+# Poucas categorias bastam para explicar o mês sem estourar o teto de 100 evidências.
+_CATEGORY_LIMIT = 8
+_PROJECTION_DAYS = 30
+_METHOD_VERSION = "adr-0010"
+_BUDGET_STATUS_TEXT = {
+    "ok": "dentro do limite",
+    "warning": "em atenção, perto do limite",
+    "over": "acima do limite",
+}
 _UNSAFE_MONEY = (
     "Há valores financeiros incompatíveis com a precisão ou o tipo exigido pelo contrato IA."
 )
@@ -184,7 +204,7 @@ def _finance_context(
             EvidenceItem(
                 evidence_id=f"tx_{transaction.id.hex}",
                 metric_key="finance.transaction.amount",
-                label="Movimentação importada",
+                label=_transaction_label(transaction, _category),
                 basis="observed",
                 source={
                     "kind": "finance_record",
@@ -200,6 +220,7 @@ def _finance_context(
         included += 1
     if not included:
         limitations.append("Nenhuma movimentação elegível foi incluída neste contexto.")
+    evidences.extend(_calculation_evidences(session, user_id, account, as_of, clock, limitations))
     built_at = _aware(clock())
     if built_at < as_of:
         raise EvidenceContextError("Relógio retrocedeu durante a montagem do contexto")
@@ -210,6 +231,247 @@ def _finance_context(
         evidences=evidences,
         limitations=list(dict.fromkeys(limitations)),
     )
+
+
+def _transaction_label(transaction: object, category: object) -> str:
+    # Categoria e sinais ajudam a explicar o mês; a descrição livre do extrato continua fora.
+    parts = ["Movimentação importada"]
+    name = getattr(category, "name", None)
+    if name:
+        parts.append(name)
+    if getattr(transaction, "is_recurring", False):
+        parts.append("recorrente")
+    if finance_service.is_anomalous(transaction):
+        parts.append("atípica")
+    return " · ".join(parts)
+
+
+def _previous_month(month: str) -> str:
+    year, number = (int(part) for part in month.split("-"))
+    year, number = (year - 1, 12) if number == 1 else (year, number - 1)
+    return f"{year:04d}-{number:02d}"
+
+
+def _calculation_evidences(
+    session: Session,
+    user_id: UUID,
+    account: _AccountSnapshot,
+    as_of: datetime,
+    clock: Clock,
+    limitations: list[str],
+) -> list[EvidenceItem]:
+    """Resultados já calculados pelo Finance; o LLM só cita, nunca refaz as contas.
+
+    Cada cálculo aponta os lotes concluídos até o corte, para a procedência ser auditável.
+    """
+    cutoff_day = as_of.astimezone(_BUSINESS_ZONE).date()
+    batches = [
+        batch_id
+        for batch_id, completed_at in finance_service.list_completed_import_batches(
+            session, user_id, account.id
+        )
+        if completed_at is not None and _aware(completed_at) <= as_of
+    ]
+    if not batches:
+        limitations.append(_NO_CALCULATIONS)
+        return []
+    # Os services do Finance leem o estado corrente; se algo mudou após o corte, os totais
+    # já incluiriam essa mudança. Omitir é a única forma de não vazar dados futuros.
+    last_change = finance_service.get_last_change_at(session, user_id, account.id)
+    if last_change is not None and _aware(last_change) > as_of:
+        limitations.append(_CHANGED_AFTER_CUTOFF)
+        return []
+    summary = finance_service.get_summary(session, user_id, account.id, None)
+    if summary.today > cutoff_day:
+        # Um DEMO_TODAY no futuro anteciparia dados que o corte ainda não conhece.
+        limitations.append(_FUTURE_BUSINESS_DAY)
+        return []
+    previous = finance_service.get_summary(
+        session, user_id, account.id, _previous_month(summary.month)
+    )
+    budget = finance_service.get_account_budget_report(session, user_id, account.id, None)
+    try:
+        projection = finance_service.get_projection(
+            session, user_id, account.id, _PROJECTION_DAYS
+        ).projection
+    except AppError as error:
+        # Só a ausência esperada de saldo de partida vira limitação; o resto propaga.
+        if error.code != "BALANCE_UNAVAILABLE":
+            raise
+        projection = None
+    computed_at = _aware(clock())
+    items: list[EvidenceItem] = []
+
+    def period(start: date, end: date) -> dict[str, date]:
+        return {"start": start, "end": end}
+
+    def add(evidence_id, metric_key, label, basis, method, span, value) -> None:
+        if isinstance(value, int):
+            value = _money(value, limitations)
+            if value is None:
+                return
+        items.append(
+            EvidenceItem(
+                evidence_id=evidence_id,
+                metric_key=metric_key,
+                label=label,
+                basis=basis,
+                source={
+                    "kind": "calculation",
+                    "module": "finance",
+                    "method_key": method,
+                    "method_version": _METHOD_VERSION,
+                    "computed_at": computed_at,
+                    "input_scope": {
+                        "account_id": account.id,
+                        "period": span,
+                        "import_batch_ids": batches,
+                    },
+                },
+                value=value,
+                period=span,
+            )
+        )
+
+    month_first = date(*(int(part) for part in summary.month.split("-")), 1)
+    month_span = period(month_first, summary.today)
+    if summary.realized_balance_cents is not None:
+        add(
+            "finance_realized_balance",
+            "finance.balance.realized",
+            "Saldo realizado: referência somada às movimentações até hoje",
+            "observed",
+            "finance.realized_balance",
+            period(min(account.balance_as_of, summary.today), summary.today),
+            summary.realized_balance_cents,
+        )
+    month = summary.month_summary
+    for key, label, cents in (
+        ("income", "Entradas do mês até hoje", month.income_cents),
+        ("expenses", "Saídas do mês até hoje", month.expenses_cents),
+        ("net", "Resultado do mês até hoje", month.net_cents),
+    ):
+        add(
+            f"month_{key}",
+            f"finance.month.{key}",
+            label,
+            "observed",
+            "finance.month_summary",
+            month_span,
+            cents,
+        )
+    for total in month.categories[:_CATEGORY_LIMIT]:
+        name = summary.categories[total.category_id].name
+        add(
+            f"month_cat_{total.category_id.hex}",
+            "finance.month.category_total",
+            f"Total do mês até hoje em {name}",
+            "observed",
+            "finance.month_summary",
+            month_span,
+            total.total_cents,
+        )
+
+    prev_month = previous.month_summary
+    if prev_month.categories:
+        prev_first = date(*(int(part) for part in previous.month.split("-")), 1)
+        # O mês anterior está fechado: vai do dia 1 ao último dia, antes do mês corrente.
+        prev_span = period(prev_first, month_first - timedelta(days=1))
+        add(
+            "prev_month_expenses",
+            "finance.month.expenses",
+            "Saídas do mês anterior",
+            "observed",
+            "finance.month_summary",
+            prev_span,
+            prev_month.expenses_cents,
+        )
+        for total in prev_month.categories[:_CATEGORY_LIMIT]:
+            name = previous.categories[total.category_id].name
+            add(
+                f"prev_cat_{total.category_id.hex}",
+                "finance.month.category_total",
+                f"Total do mês anterior em {name}",
+                "observed",
+                "finance.month_summary",
+                prev_span,
+                total.total_cents,
+            )
+
+    lines = sorted(
+        budget.lines,
+        key=lambda line: (_BUDGET_PRIORITY[line.status], -line.spent_cents, line.category.name),
+    )
+    if len(lines) > _BUDGET_LIMIT:
+        limitations.append(_BUDGET_TRIMMED)
+    for line in lines[:_BUDGET_LIMIT]:
+        hex_id = line.category.id.hex
+        name = line.category.name
+        add(
+            f"budget_limit_{hex_id}",
+            "finance.budget.limit",
+            f"Limite mensal definido para {name}",
+            "reference",
+            "finance.budget_report",
+            month_span,
+            line.limit_cents,
+        )
+        add(
+            f"budget_spent_{hex_id}",
+            "finance.budget.spent",
+            f"Gasto do mês até hoje em {name}, comparado ao limite",
+            "observed",
+            "finance.budget_report",
+            month_span,
+            line.spent_cents,
+        )
+        add(
+            f"budget_status_{hex_id}",
+            "finance.budget.status",
+            f"Situação do orçamento de {name}",
+            "observed",
+            "finance.budget_report",
+            month_span,
+            TextValue(value_text=_BUDGET_STATUS_TEXT[line.status]),
+        )
+
+    # Só dias depois do corte são futuros: com DEMO_TODAY anterior ao relógio real,
+    # os primeiros dias da série já não são projeção e ficam fora.
+    future = [day for day in projection.items if day.date > cutoff_day] if projection else []
+    if future:
+        horizon = period(future[0].date, future[-1].date)
+        end = future[-1]
+        add(
+            "projection_end_balance",
+            "finance.projection.balance",
+            "Saldo previsto ao fim do horizonte de projeção",
+            "projected",
+            "finance.cash_projection",
+            period(end.date, end.date),
+            end.balance_cents,
+        )
+        lowest = min(future, key=lambda day: day.balance_cents)
+        add(
+            "projection_min_balance",
+            "finance.projection.min_balance",
+            "Menor saldo previsto no horizonte de projeção",
+            "projected",
+            "finance.cash_projection",
+            period(lowest.date, lowest.date),
+            lowest.balance_cents,
+        )
+        add(
+            "projection_variable_daily",
+            "finance.projection.variable_daily",
+            "Premissa: gasto variável diário estimado pela média recente",
+            "projected",
+            "finance.cash_projection",
+            horizon,
+            projection.variable_daily_cents,
+        )
+    else:
+        limitations.append(_NO_PROJECTION)
+    return items
 
 
 def explain_for_account(

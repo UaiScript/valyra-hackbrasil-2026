@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { AlertTriangle, BellOff, Check, Info } from 'lucide-react';
+import { AlertTriangle, BellOff, Check, Info, Sparkles } from 'lucide-react';
+import { askHref } from '../api/ai';
 import { api, describeError } from '../api/client';
 import type { AlertOut } from '../../lib/api/schema';
 import { formatCents, formatIsoDate } from '../money';
@@ -38,6 +39,7 @@ const AlertItem: FC<{ alert: AlertOut; onRead: (a: AlertOut) => Promise<void> }>
         <footer>
           <span className="app-muted">Criado em {createdDate(alert.created_at)}. Valores previstos no momento do alerta.</span>
           <span className="vx-alert__actions">
+            <a className="button button--ghost button--sm" href={askHref('Por que meu saldo previsto fica abaixo de zero nos próximos 30 dias?')}><Sparkles size={14} aria-hidden="true" />Por quê?</a>
             <a className="button button--ghost button--sm" href={ROUTES.projection}>Ver projeção atual</a>
             {alert.status === 'new' && (
               <button type="button" className="button button--outline button--sm" disabled={busy} onClick={async () => { setBusy(true); try { await onRead(alert); } finally { setBusy(false); } }}>

@@ -59,6 +59,8 @@ export type BudgetOut = {
 
 /** Orçamento do mês: limite e consumo realizado até hoje, sem previsão. */
 export type BudgetReportOut = {
+  daily_allowance_cents: number | null;
+  days_left: number;
   items: BudgetOut[];
   month: string;
   /** date */ today: string;

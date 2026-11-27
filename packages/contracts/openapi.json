@@ -270,6 +270,21 @@
       "BudgetReportOut": {
         "description": "Or\u00e7amento do m\u00eas: limite e consumo realizado at\u00e9 hoje, sem previs\u00e3o.",
         "properties": {
+          "daily_allowance_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Allowance Cents"
+          },
+          "days_left": {
+            "title": "Days Left",
+            "type": "integer"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/BudgetOut"
@@ -300,7 +315,9 @@
           "today",
           "items",
           "total_limit_cents",
-          "total_spent_cents"
+          "total_spent_cents",
+          "days_left",
+          "daily_allowance_cents"
         ],
         "title": "BudgetReportOut",
         "type": "object"

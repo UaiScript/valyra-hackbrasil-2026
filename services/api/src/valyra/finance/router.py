@@ -300,6 +300,8 @@ def _budget_report_out(report: service.BudgetReport) -> BudgetReportOut:
         items=items,
         total_limit_cents=sum(item.limit_cents for item in items),
         total_spent_cents=sum(item.spent_cents for item in items),
+        days_left=report.days_left,
+        daily_allowance_cents=report.daily_allowance_cents,
     )
 
 

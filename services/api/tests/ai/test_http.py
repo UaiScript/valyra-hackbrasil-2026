@@ -49,6 +49,11 @@ def stack(app, monkeypatch):
     llm = Mock(side_effect=AssertionError("Teste deve instalar seu cliente simulado"))
     monkeypatch.setattr(service.finance_service, "get_account_for_user", authorize)
     monkeypatch.setattr(service.finance_service, "list_transactions", transactions)
+    # Sem lote concluído: o contexto não traz cálculos Finance nestes testes HTTP.
+    monkeypatch.setattr(
+        service.finance_service, "list_completed_import_batches", Mock(return_value=[])
+    )
+    monkeypatch.setattr(service.finance_service, "is_anomalous", Mock(return_value=False))
     monkeypatch.setattr(llm_client, "call_llm", llm)
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[get_current_user_id] = lambda: USER_ID

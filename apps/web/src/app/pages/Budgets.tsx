@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FC, FormEvent } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { askHref } from '../api/ai';
 import { api, describeError } from '../api/client';
 import type { BudgetOut, BudgetReportOut, CategoryOut } from '../../lib/api/schema';
 import { BUDGET_STATUS_LABEL, BudgetMeter, usedPercent } from '../Budget';
@@ -112,7 +113,7 @@ export const Budgets: FC = () => {
               <section className="cx-kpis" aria-label="Totais do orçamento">
                 <div className="cx-kpi"><span className="cx-kpi__label">Limite do mês</span><strong className="cx-kpi__value">{formatCents(rep.total_limit_cents)}</strong><span className="cx-kpi__hint">{rep.items.length} {rep.items.length === 1 ? 'categoria' : 'categorias'} com teto</span></div>
                 <div className="cx-kpi"><span className="cx-kpi__label">Gasto até {formatIsoDate(rep.today)}</span><strong className="cx-kpi__value">{formatCents(rep.total_spent_cents)}</strong><span className="cx-kpi__hint">só categorias com teto</span></div>
-                <div className={`cx-kpi${available < 0 ? ' cx-kpi--danger' : ''}`}><span className="cx-kpi__label">{available < 0 ? 'Acima do limite' : 'Disponível'}</span><strong className="cx-kpi__value">{formatCents(Math.abs(available))}</strong><span className="cx-kpi__hint">limite menos gasto</span></div>
+                <div className={`cx-kpi${available < 0 ? ' cx-kpi--danger' : ''}`}><span className="cx-kpi__label">{available < 0 ? 'Acima do limite' : 'Disponível'}</span><strong className="cx-kpi__value">{formatCents(Math.abs(available))}</strong><span className="cx-kpi__hint">{rep.daily_allowance_cents !== null ? `${formatCents(rep.daily_allowance_cents)} por dia nos ${rep.days_left} ${rep.days_left === 1 ? 'dia restante' : 'dias restantes'}` : 'limite menos gasto'}</span></div>
                 <div className={`cx-kpi${over ? ' cx-kpi--danger' : warn ? ' cx-kpi--warning' : ''}`}><span className="cx-kpi__label">Sinais</span><strong className="cx-kpi__value">{over} <small>estourado{over === 1 ? '' : 's'}</small></strong><span className="cx-kpi__hint">{warn} em atenção (≥ 80%)</span></div>
               </section>
 
@@ -142,6 +143,12 @@ export const Budgets: FC = () => {
                       </div>
                       {budget && <BudgetMeter spent={spent} limit={budget.limit_cents} status={budget.status} />}
                       {budget && budget.remaining_cents < 0 && <span className="cx-budget-row__note">Passou {formatCents(-budget.remaining_cents)} do limite.</span>}
+                      {budget && budget.status !== 'ok' && (
+                        // A IA recebe o orçamento como evidência calculada; a pergunta só aponta a categoria.
+                        <a className="cx-why" href={askHref(`Por que o orçamento de ${category.name} está ${budget.status === 'over' ? 'acima do limite' : 'perto do limite'} neste mês?`)}>
+                          <Sparkles size={11} aria-hidden="true" />Por quê?
+                        </a>
+                      )}
                       {editing === category.id && (
                         <LimitEditor initial={budget?.limit_cents} onCancel={() => setEditing(null)} onSave={(cents) => save(category, cents)} />
                       )}

@@ -54,9 +54,17 @@ const Hero: FC<{ account: AccountOut; reloadKey: number }> = ({ account, reloadK
           <span className="cx-kpi__hint">{p ? `previsto para ${formatShortDate(p.min_balance_date)}` : 'previsão'}</span>
           <span className="cx-kpi__bar" aria-hidden="true" />
         </a>
+        {/* "Quanto cabe hoje": o back divide o teto restante pelos dias do mês, em centavos. */}
         <a href={ROUTES.budgets} className="cx-kpi cx-kpi--lime">
-          <dt>Orçamento usado</dt>
-          <dd className={budgetPct !== null && budgetPct > 100 ? 'cx-neg' : undefined}>{budgetPct === null ? (b ? 'Sem tetos' : dash(budgets.state)) : `${budgetPct}%`}</dd>
+          <dt>Cabe por dia</dt>
+          <dd className={b?.daily_allowance_cents === 0 ? 'cx-neg' : undefined}>
+            {b ? (b.daily_allowance_cents === null ? 'Sem tetos' : formatCents(b.daily_allowance_cents)) : dash(budgets.state)}
+          </dd>
+          <span className="cx-kpi__hint">
+            {b && b.daily_allowance_cents !== null
+              ? `${b.days_left} ${b.days_left === 1 ? 'dia restante' : 'dias restantes'} · ${budgetPct ?? 0}% usado`
+              : 'defina tetos no orçamento'}
+          </span>
           <span className="cx-kpi__bar" aria-hidden="true" />
         </a>
         <a href={ROUTES.alerts} className="cx-kpi cx-kpi--sky">
