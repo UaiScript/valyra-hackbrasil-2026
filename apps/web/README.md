@@ -6,16 +6,18 @@ Este pacote serve duas coisas: a **landing** em `/` (estática, dados sintético
 
 | Tela | Rota | Operações da API |
 | --- | --- | --- |
-| Visão geral | `#/app` | `finance_get_summary` (saldo realizado de hoje), `finance_get_projection` (30 dias), `alerts_list`, `finance_list_accounts`, `finance_update_account`, `finance_list_transactions`, `finance_list_import_batches` |
-| Resumo do mês | `#/app/resumo` | `finance_get_summary` (mês e conta), `finance_list_accounts` |
+| Central | `#/app` | `finance_get_summary` (saldo realizado de hoje), `finance_get_projection` (30 dias), `finance_get_budgets`, `alerts_list`, `finance_list_accounts`, `finance_update_account`, `finance_list_transactions`, `finance_list_import_batches` |
+| Resumo do mês | `#/app/resumo` | `finance_get_summary` (mês e conta), `finance_get_budgets`, `finance_list_accounts` |
+| Orçamento | `#/app/orcamento` | `finance_get_budgets`, `finance_set_budget`, `finance_delete_budget`, `finance_get_summary`, `finance_list_categories` |
 | Projeção de caixa | `#/app/projecao` | `finance_get_projection` (30, 60 ou 90 dias), `finance_list_accounts` |
 | Transações | `#/app/transacoes` | `finance_list_transactions` (filtros de conta, categoria, período, recorrente e atípico), `finance_list_categories`, `finance_update_transaction` |
 | Alertas | `#/app/alertas` | `alerts_list`, `alerts_update` (marcar como lido) |
+| Pergunte ao Valyra | `#/app/valyra-ai` | `POST /api/v1/ai/explain` (contrato da ADR-0011, ainda fora do OpenAPI da main: tipos à mão em `src/app/api/ai.ts`); aceita `?q=` com a pergunta pronta, usado pelo botão “Por quê?” do selo atípico |
 | Importar CSV | `#/app/importar` | `finance_create_import_batch` (inclui `alerts_created`), `finance_list_import_batches` |
 
 Todas as operações do contrato atual têm tela. Valores previstos (projeção, evidências de alerta) aparecem sempre rotulados como previstos, separados do saldo realizado. O score de gasto atípico é exibido como indicador (ADR-0010), sem porcentagem nem causa.
 
-O indicador do cabeçalho usa `system_health`. Não há login: a API responde pelo usuário demo do seed.
+O app usa um tema escuro próprio (`src/app/cockpit.css`, escopo `.cx`), sem afetar a landing. O indicador do cabeçalho usa `system_health`; a barra de comando (Ctrl/⌘+K) abre Pergunte ao Valyra. Não há login: a API responde pelo usuário demo do seed.
 
 Para rodar com dados reais, na raiz:
 

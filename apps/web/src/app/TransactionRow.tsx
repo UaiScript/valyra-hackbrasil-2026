@@ -1,5 +1,6 @@
 import type { FC } from 'react';
-import { Repeat, TrendingUp } from 'lucide-react';
+import { Repeat, Sparkles, TrendingUp } from 'lucide-react';
+import { askHref } from './api/ai';
 import type { TransactionOut } from '../lib/api/schema';
 import { formatCents, formatIsoDate, formatScore } from './money';
 
@@ -28,6 +29,12 @@ export const TransactionFlags: FC<{ t: TransactionOut }> = ({ t }) => (
       <span className="vx-flag vx-flag--anomaly" title="Acima do padrão da categoria; o selo aparece a partir do indicador 0,80.">
         <TrendingUp size={12} aria-hidden="true" />Atípico{t.anomaly_score && <span className="vx-flag__score">{formatScore(t.anomaly_score)}</span>}
       </span>
+    )}
+    {t.is_anomaly && (
+      // Pergunta pronta para a IA explicar o selo com as evidências da conta.
+      <a className="cx-why" href={askHref(`Por que a transação "${t.description}" de ${formatCents(t.amount_cents)} em ${formatIsoDate(t.date)} foi marcada como atípica?`)}>
+        <Sparkles size={11} aria-hidden="true" />Por quê?
+      </a>
     )}
   </>
 );
