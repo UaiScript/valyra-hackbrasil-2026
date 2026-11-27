@@ -37,6 +37,8 @@ test('every access link leads to the official repository, even with stale stored
 });
 
 test('demo buttons open the Finance app inside the same build', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
   await page.route('**/health', r => r.fulfill({ contentType: 'application/json', body: '{"status":"ok","postgres":"ok"}' }));
   await page.route('**/api/v1/**', r => r.fulfill({ contentType: 'application/json', body: '{"items":[],"total":0,"limit":50,"offset":0}' }));
   await page.goto('/');
@@ -46,6 +48,10 @@ test('demo buttons open the Finance app inside the same build', async ({ page })
   await page.locator('header [data-demo-cta]').click();
   await expect(page).toHaveURL(/#\/app$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Central' })).toBeVisible();
+  // Respostas vazias da API não podem derrubar a Central depois do primeiro desenho.
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('heading', { level: 1, name: 'Central' })).toBeVisible();
+  expect(errors).toEqual([]);
 });
 
 test('language switch persists and updates document language', async ({ page }) => {

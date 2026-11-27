@@ -23,12 +23,14 @@ type TickerItem = { label: string; value: string; delta?: number | null; tone?: 
  */
 export const Ticker: FC<{ current?: SummaryOut; previous?: SummaryOut }> = ({ current, previous }) => {
   const items: TickerItem[] = useMemo(() => {
-    if (!current) return [];
+    // Faixa decorativa: um resumo incompleto (API antiga ou resposta parcial) só esconde
+    // itens, nunca derruba a Central inteira.
+    if (!current || typeof current.net_cents !== 'number') return [];
     const prev = new Map((previous?.categories ?? []).map((c) => [c.category.id, -c.total_cents]));
     const list: TickerItem[] = [];
-    if (current.realized_balance_cents !== null) list.push({ label: 'SALDO', value: formatCents(current.realized_balance_cents), tone: 'flat' });
+    if (typeof current.realized_balance_cents === 'number') list.push({ label: 'SALDO', value: formatCents(current.realized_balance_cents), tone: 'flat' });
     list.push({ label: 'RESULTADO', value: formatCents(current.net_cents), tone: current.net_cents < 0 ? 'down' : 'up' });
-    for (const c of current.categories) {
+    for (const c of current.categories ?? []) {
       if (c.category.kind !== 'expense') continue;
       const spent = -c.total_cents;
       const d = prev.has(c.category.id) ? deltaPercent(spent, prev.get(c.category.id)!) : null;
