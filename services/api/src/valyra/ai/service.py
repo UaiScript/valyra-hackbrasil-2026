@@ -325,7 +325,7 @@ def _alpha_evidences(
 _NEWS_LIMIT = 8
 _NEWS_RULE = (
     "Notícias entram só como manchete, com fonte e data; o tema ligado ao orçamento vem da "
-    "regra news_theme_v2 e indica o que pode mudar, não causa nem previsão."
+    "regra news_theme_v3 e indica o que pode mudar, não causa nem previsão."
 )
 
 

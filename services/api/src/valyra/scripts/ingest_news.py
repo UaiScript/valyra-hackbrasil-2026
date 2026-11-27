@@ -8,6 +8,7 @@ na própria transação: uma fonte fora do ar não descarta o que as outras trou
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sys
@@ -15,6 +16,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 import httpx
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from valyra.alpha import news_service
@@ -35,15 +37,37 @@ TIMEOUT = httpx.Timeout(20.0)
 IBGE_PARAMS = {"qtd": "40"}
 
 
+DB_ERROR = "erro de banco"
+
+
+def _same_source(source: NewsSource, host: str) -> bool:
+    # Redirecionamento só vale dentro do domínio da própria fonte (http→https, www).
+    # Confere só a resposta final: saltos intermediários já foram requisitados, o que é
+    # aceitável porque as URLs de feed são fixas no código, não vêm de usuário.
+    host = host.lower()
+    return host == source.domain or host.endswith(f".{source.domain}")
+
+
 def fetch(client: httpx.Client, source: NewsSource) -> list[FeedItem]:
     params = IBGE_PARAMS if source.format == "ibge_json" else None
-    response = client.get(source.feed_url, params=params)
-    response.raise_for_status()
-    body = response.content
-    if len(body) > MAX_FEED_BYTES:
-        raise FeedFormatError("feed acima do tamanho máximo")
+    with client.stream("GET", source.feed_url, params=params) as response:
+        response.raise_for_status()
+        if not _same_source(source, response.url.host):
+            raise FeedFormatError("feed redirecionado para fora do domínio da fonte")
+        # Lido em pedaços com teto: um corpo enorme é recusado sem ir inteiro para a memória.
+        chunks: list[bytes] = []
+        size = 0
+        for chunk in response.iter_bytes():
+            size += len(chunk)
+            if size > MAX_FEED_BYTES:
+                raise FeedFormatError("feed acima do tamanho máximo")
+            chunks.append(chunk)
+    body = b"".join(chunks)
     if source.format == "ibge_json":
-        return parse_ibge(source.slug, response.json())
+        try:
+            return parse_ibge(source.slug, json.loads(body))
+        except ValueError:
+            raise FeedFormatError("JSON inválido") from None
     return parse_rss(source.slug, body)
 
 
@@ -71,6 +95,12 @@ def ingest(
                     for item in items
                 )
                 session.commit()
+            except SQLAlchemyError as error:
+                # Falha de banco numa fonte não impede as próximas; o relatório registra o erro.
+                session.rollback()
+                logger.warning("Falha ao gravar %s: %s", source.slug, type(error).__name__)
+                report[source.slug] = f"{DB_ERROR}: {type(error).__name__}"
+                continue
             except BaseException:
                 session.rollback()
                 raise
@@ -79,8 +109,14 @@ def ingest(
 
 
 def exit_code(report: dict[str, int | str]) -> int:
-    """1 só quando todas as fontes falharam: uma fonte fora do ar não deixa o job vermelho."""
-    return 1 if report and all(isinstance(result, str) for result in report.values()) else 0
+    """1 quando todas as fontes falharam ou o banco falhou em alguma.
+
+    Uma fonte fora do ar não deixa o job vermelho; erro de banco é nosso e precisa de alerta.
+    """
+    results = list(report.values())
+    if any(isinstance(result, str) and result.startswith(DB_ERROR) for result in results):
+        return 1
+    return 1 if results and all(isinstance(result, str) for result in results) else 0
 
 
 def main(argv: list[str] | None = None) -> int:

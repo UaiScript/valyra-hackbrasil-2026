@@ -19,15 +19,16 @@ não puderam ser chamadas do ambiente de nuvem usado na análise:
 
 ## Decisão
 
-Proposta para o time aprovar:
+Decidido:
 
 1. Guardar cada manchete como sinal `news_event` (o `kind` já existe na migração
    `0004_alpha`), sem valor numérico, com título, trecho de até 240 caracteres, link da
    matéria e fonte. Nenhuma matéria é copiada inteira; a tela sempre leva ao original.
 2. Regras temporais: `published_at` é a data da fonte limitada ao instante da coleta
    (nunca depois dela; sem data, a própria coleta), `ingested_at` é a coleta e a data da
-   fonte fica no `payload`. O relatório da semana mostra só o publicado até o corte.
-3. Ligação com o orçamento por regra determinística e versionada (`news_theme_v2`):
+   fonte fica no `payload`. O relatório da semana mostra só o que foi publicado e também
+   coletado até o corte: matéria coletada depois do corte ainda não era conhecida.
+3. Ligação com o orçamento por regra determinística e versionada (`news_theme_v3`):
    palavras-chave inteiras levam a manchete a um tema e o tema aponta categorias Finance.
    É um "pode mexer em", nunca causa nem previsão. Os temas são calculados na leitura,
    então trocar a regra não reescreve linhas somente inserção.
@@ -35,7 +36,8 @@ Proposta para o time aprovar:
    e "Agro e cadeia da soja", e cada tema aponta o tema do radar Alpha cujo dado observado
    (variação do dia, Selic, IPCA, chuva) aparece ao lado das manchetes. Nenhum percentual
    de "possibilidade de alta ou queda" é exibido: sem modelo validado, seria número sem
-   suporte verificável.
+   suporte verificável. A versão 3 tira "pix" e "internet", amplas demais; como os temas
+   saem da leitura, um `as_of` antigo passa a ser exibido com a regra vigente.
 4. A Valyra AI recebe até 8 manchetes da semana como evidência textual `alpha_signal`,
    com fonte e data, e só pode reproduzi-las literalmente (contrato da ADR-0011).
 5. Imagem da notícia só por endereço (a Valyra não copia o arquivo), quando o feed traz
@@ -64,5 +66,6 @@ Proposta para o time aprovar:
 
 ## Status
 
-Proposta em 27/11/2026, com protótipo em PR para avaliação do time. Não aceita.
+Aceita em 27/11/2026 por Willian, no thread do projeto, depois da avaliação do protótipo
+pelo time. Proposta registrada no mesmo dia.
 Ainda não verificados: os três endereços de feed a partir de uma rede com acesso.

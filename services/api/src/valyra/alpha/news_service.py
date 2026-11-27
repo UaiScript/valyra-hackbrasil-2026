@@ -138,8 +138,7 @@ def get_weekly_report(session: Session, as_of: datetime, *, per_theme: int = 4) 
     ]
     digest = build_digest(views, as_of, per_theme=per_theme)
     sources = {view.source.slug: view.source for view in views}
-    # Coleta posterior ao corte não conta: o replay mostra só o que já tinha chegado.
-    seen = [view.ingested_at for view in views if view.ingested_at <= as_of]
+    seen = [view.ingested_at for view in views]
     return WeeklyReport(
         as_of=as_of,
         week_start=digest.week_start,
