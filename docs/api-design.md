@@ -151,7 +151,7 @@ Todas as listagens usam `Page[T]`/`PageParams` da Issue #9: `items`, `total`, `l
 | `ImportBatchSummaryOut` | Resumo sem `rejections`; implementado na #14 com `id`, `status` e os quatro contadores, sujeito à lacuna abaixo |
 | `BudgetUpsert` | `limit_cents: int` estrito, positivo, dentro de BIGINT; campos extras recusados |
 | `BudgetOut` | `category: CategoryOut`, `limit_cents: int` (> 0), `spent_cents: int` (saídas realizadas do mês em módulo, ≥ 0), `remaining_cents: int` (`limit - spent`, negativo se estourou), `status: ok \| warning \| over` (atenção a partir de 80% do limite, comparação em inteiros) |
-| `BudgetReportOut` | `month: "AAAA-MM"`, `today: date`, `items: list[BudgetOut]` (ordem por nome da categoria), `total_limit_cents: int`, `total_spent_cents: int` |
+| `BudgetReportOut` | `month: "AAAA-MM"`, `today: date`, `items: list[BudgetOut]` (ordem por nome da categoria), `total_limit_cents: int`, `total_spent_cents: int`, `days_left: int` (dias do mês a partir de hoje, inclusive; 0 em mês encerrado), `daily_allowance_cents: int \| null` (teto total restante dividido por `days_left`, arredondado para baixo; 0 se estourou; null sem tetos ou em mês encerrado) |
 | `SummaryOut` | `account_id: UUID \| null`, `month: "AAAA-MM"`, `today: date`, `realized_balance_cents: int \| null`, `income_cents: int`, `expenses_cents: int` (≤ 0), `net_cents: int`, `categories: list[CategoryTotalOut]` (#43) |
 | `CategoryTotalOut` | `category: CategoryOut`, `total_cents: int` com sinal, `count: int` (#43) |
 | `ProjectionOut` | `account_id: UUID`, `today: date`, `start_balance_cents: int`, `variable_daily_cents: int` (≤ 0), `days: int`, `items: list[ProjectionDayOut]`, `min_balance_cents: int`, `min_balance_date: date` (#46) |

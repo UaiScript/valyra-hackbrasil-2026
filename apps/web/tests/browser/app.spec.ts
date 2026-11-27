@@ -45,6 +45,7 @@ const ALERT = {
 };
 const BUDGETS = {
   month: '2026-11', today: '2026-11-07', total_limit_cents: 200000, total_spent_cents: 180000,
+  days_left: 24, daily_allowance_cents: 833,
   items: [{ category: { ...CATEGORIES[0] }, limit_cents: 150000, spent_cents: 180000, remaining_cents: -30000, status: 'over' }],
 };
 const page1 = <T,>(items: T[]) => ({ items, total: items.length, limit: 50, offset: 0 });
@@ -133,6 +134,10 @@ test('central separa saldo realizado de hoje e projeção dos próximos 30 dias'
   await expect(page.getByText('Saldo previsto · 30 dias')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Projeção semanal' })).toBeVisible();
   await expect(page.getByText('Saldo previsto negativo')).toBeVisible();
+  // "Cabe por dia" vem pronto do back, em centavos; a tela só formata.
+  await expect(page.getByText('Cabe por dia')).toBeVisible();
+  await expect(page.getByText('R$ 8,33', { exact: true })).toBeVisible();
+  await expect(page.getByText('24 dias restantes · 90% usado')).toBeVisible();
 });
 
 test('orçamento mostra consumo, status e envia limite em centavos', async ({ page }) => {
@@ -140,6 +145,7 @@ test('orçamento mostra consumo, status e envia limite em centavos', async ({ pa
   await page.goto('/#/app/orcamento');
   await expect(page.getByText('R$ 1.800,00 / R$ 1.500,00')).toBeVisible();
   await expect(page.getByText('Passou R$ 300,00 do limite.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Por quê?' })).toHaveAttribute('href', /valyra-ai\?q=/);
   await page.getByRole('button', { name: 'Definir limite' }).click();
   await page.getByLabel('Limite mensal em reais').fill('600,50');
   await page.getByRole('button', { name: 'Salvar' }).click();

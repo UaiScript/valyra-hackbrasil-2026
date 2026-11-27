@@ -12,6 +12,8 @@ const SUGGESTIONS = [
   'Onde estou gastando mais neste mês?',
   'Quais gastos fogem do meu padrão?',
   'Quais contas fixas vencem nas próximas semanas?',
+  'O que mudou nos meus gastos em relação ao mês passado?',
+  'Meu orçamento aguenta até o fim do mês?',
 ];
 
 const BASIS_LABEL: Record<EvidenceItem['basis'], string> = {
