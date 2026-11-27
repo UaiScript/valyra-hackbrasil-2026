@@ -43,7 +43,7 @@ _ALPHA_NOT_CAUSE = (
 # Último e penúltimo ponto de cada série bastam para "subiu ou caiu" sem o LLM calcular.
 _ALPHA_POINTS = 2
 # Mesmo teto de EvidenceContext.evidences (ai/schemas.py). Hoje o Finance ocupa no máximo
-# ~71 itens e o Alpha 14 (7 séries x 2); a folga é explícita para um teto nunca virar erro.
+# ~71 itens e o Alpha 26 (13 séries x 2); o corte explícito impede que o teto vire erro.
 _EVIDENCE_CAP = 100
 _ALPHA_TRIMMED = "Parte dos indicadores Alpha ficou fora do contexto pelo limite de evidências."
 _ALPHA_ESTIMATED = (
@@ -274,32 +274,39 @@ def _alpha_evidences(
     """Indicadores Alpha publicados até o corte, com procedência completa (ADR-0011/0012)."""
     radar = alpha_service.get_radar(session, as_of)
     items: list[EvidenceItem] = []
-    for view in radar.indicators:
-        for point in view.history[-_ALPHA_POINTS:]:
-            items.append(
-                EvidenceItem(
-                    evidence_id=f"alpha_{point.signal_id.hex}",
-                    metric_key=view.series.metric_key,
-                    label=f"{view.series.title}, em {view.series.unit_label}",
-                    basis="observed",
-                    source={
-                        "kind": "alpha_signal",
-                        "source_id": view.source.id,
-                        "signal_id": point.signal_id,
-                        "signal_key": point.signal_key,
-                        "revision_id": point.revision_id,
-                        "source_url": point.source_url,
-                        "observation_date": point.observation_date,
-                        "published_at": point.published_at,
-                        "published_at_estimated": point.published_at_estimated,
-                        "ingested_at": point.ingested_at,
-                    },
-                    value=DecimalValue(
-                        value_decimal=alpha_service.format_value(point.value), unit=view.series.unit
-                    ),
-                    period={"start": point.observation_date, "end": point.observation_date},
-                )
+    # Último ponto de todas as séries antes dos anteriores: se faltar espaço, sai o histórico.
+    ranked = [
+        (view, point)
+        for depth in range(1, _ALPHA_POINTS + 1)
+        for view in radar.indicators
+        if len(view.history) >= depth
+        for point in (view.history[-depth],)
+    ]
+    for view, point in ranked:
+        items.append(
+            EvidenceItem(
+                evidence_id=f"alpha_{point.signal_id.hex}",
+                metric_key=view.series.metric_key,
+                label=f"{view.series.title}, em {view.series.unit_label}",
+                basis="observed",
+                source={
+                    "kind": "alpha_signal",
+                    "source_id": view.source.id,
+                    "signal_id": point.signal_id,
+                    "signal_key": point.signal_key,
+                    "revision_id": point.revision_id,
+                    "source_url": point.source_url,
+                    "observation_date": point.observation_date,
+                    "published_at": point.published_at,
+                    "published_at_estimated": point.published_at_estimated,
+                    "ingested_at": point.ingested_at,
+                },
+                value=DecimalValue(
+                    value_decimal=alpha_service.format_value(point.value), unit=view.series.unit
+                ),
+                period={"start": point.observation_date, "end": point.observation_date},
             )
+        )
     if len(items) > room:
         limitations.append(_ALPHA_TRIMMED)
         items = items[: max(room, 0)]

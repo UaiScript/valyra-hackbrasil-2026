@@ -164,7 +164,7 @@ export default function FinanceApp() {
           {route === 'import' && <ImportCsv />}
           <p className="cx-footnote" role="note">
             {route === 'alpha'
-              ? 'Dados públicos do Banco Central e da brapi.dev, com fonte e instante de coleta. Contexto econômico, não recomendação de investimento.'
+              ? 'Dados públicos do Banco Central, da brapi.dev e da Open-Meteo, com fonte e instante de coleta. Contexto econômico, não recomendação de investimento.'
               : 'Ambiente de demonstração: usuário demo e dados sintéticos, sem login. Todo número vem de um cálculo auditável da API.'}
           </p>
         </main>

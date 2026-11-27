@@ -1,6 +1,7 @@
 """Saída HTTP do radar Alpha; valores como texto decimal para não passar por float."""
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -30,12 +31,22 @@ class HistoryPointOut(BaseModel):
     value: str
 
 
+class RegionOut(BaseModel):
+    slug: str
+    name: str
+    # Produção típica da região, para dar contexto ao dado de clima.
+    production: str
+
+
 class IndicatorOut(BaseModel):
     key: str
     title: str
     unit: str
     unit_label: str
     kind: str
+    theme: Literal["juros", "inflacao", "acoes", "clima"]
+    periodicity: Literal["daily", "monthly"]
+    region: RegionOut | None
     source: SourceOut
     latest: PointOut
     previous: PointOut | None
@@ -50,7 +61,16 @@ class DerivedSignalOut(BaseModel):
     published_at: datetime
     # Regra determinística e versionada que gerou o sinal; não é previsão nem causa.
     rule: str
+    theme: Literal["juros", "inflacao", "acoes", "clima"]
+    # signal_key das observações que fundamentam o sinal (dados observados).
     evidence_keys: list[str]
+    limitations: list[str]
+
+
+class SourceStatusOut(BaseModel):
+    source: SourceOut
+    last_ingested_at: datetime | None
+    series_count: int
 
 
 class RadarOut(BaseModel):
@@ -60,3 +80,4 @@ class RadarOut(BaseModel):
     last_ingested_at: datetime | None
     indicators: list[IndicatorOut]
     signals: list[DerivedSignalOut]
+    sources: list[SourceStatusOut]

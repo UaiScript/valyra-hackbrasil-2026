@@ -579,6 +579,13 @@
             "title": "Key",
             "type": "string"
           },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
           "observation_date": {
             "format": "date",
             "title": "Observation Date",
@@ -597,6 +604,16 @@
             "title": "Summary",
             "type": "string"
           },
+          "theme": {
+            "enum": [
+              "juros",
+              "inflacao",
+              "acoes",
+              "clima"
+            ],
+            "title": "Theme",
+            "type": "string"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -609,7 +626,9 @@
           "observation_date",
           "published_at",
           "rule",
-          "evidence_keys"
+          "theme",
+          "evidence_keys",
+          "limitations"
         ],
         "title": "DerivedSignalOut",
         "type": "object"
@@ -1127,6 +1146,14 @@
           "latest": {
             "$ref": "#/components/schemas/PointOut"
           },
+          "periodicity": {
+            "enum": [
+              "daily",
+              "monthly"
+            ],
+            "title": "Periodicity",
+            "type": "string"
+          },
           "previous": {
             "anyOf": [
               {
@@ -1137,8 +1164,28 @@
               }
             ]
           },
+          "region": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "source": {
             "$ref": "#/components/schemas/SourceOut"
+          },
+          "theme": {
+            "enum": [
+              "juros",
+              "inflacao",
+              "acoes",
+              "clima"
+            ],
+            "title": "Theme",
+            "type": "string"
           },
           "title": {
             "title": "Title",
@@ -1159,6 +1206,9 @@
           "unit",
           "unit_label",
           "kind",
+          "theme",
+          "periodicity",
+          "region",
           "source",
           "latest",
           "previous",
@@ -1568,15 +1618,46 @@
             },
             "title": "Signals",
             "type": "array"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceStatusOut"
+            },
+            "title": "Sources",
+            "type": "array"
           }
         },
         "required": [
           "as_of",
           "last_ingested_at",
           "indicators",
-          "signals"
+          "signals",
+          "sources"
         ],
         "title": "RadarOut",
+        "type": "object"
+      },
+      "RegionOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "production": {
+            "title": "Production",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "production"
+        ],
+        "title": "RegionOut",
         "type": "object"
       },
       "SourceOut": {
@@ -1605,6 +1686,36 @@
           "license"
         ],
         "title": "SourceOut",
+        "type": "object"
+      },
+      "SourceStatusOut": {
+        "properties": {
+          "last_ingested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Ingested At"
+          },
+          "series_count": {
+            "title": "Series Count",
+            "type": "integer"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceOut"
+          }
+        },
+        "required": [
+          "source",
+          "last_ingested_at",
+          "series_count"
+        ],
+        "title": "SourceStatusOut",
         "type": "object"
       },
       "SummaryOut": {

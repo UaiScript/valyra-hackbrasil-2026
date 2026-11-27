@@ -31,7 +31,7 @@ Make aceita UV=/caminho/uv e ENV_FILE=/caminho/configuração. Usa .env existent
 
 ## Mapa de pastas
 
-- services/api/: [contexto de backend](services/api/AGENTS.md), core HTTP, Finance (ORM, domínio CSV, importação, consultas e cálculos HTTP), Alerts (pressão de caixa), Alpha (radar SGS/brapi, coleta agendada), IA (cliente, contratos, domínio, serviço e HTTP), Alembic e testes.
+- services/api/: [contexto de backend](services/api/AGENTS.md), core HTTP, Finance (ORM, domínio CSV, importação, consultas e cálculos HTTP), Alerts (pressão de caixa), Alpha (radar SGS/brapi/Open-Meteo, coleta agendada), IA (cliente, contratos, domínio, serviço e HTTP), Alembic e testes.
 - apps/web/: [landing em / e app em #/app (Finance, radar Alpha, IA)](apps/web/README.md), ligado à API; tipos gerados do OpenAPI em src/lib/api/.
 - packages/ui/: estilos CSS compartilhados e [guia de uso](packages/ui/README.md).
 - packages/contracts/: OpenAPI gerado; infra/postgres/init/: criação idempotente do banco de testes.

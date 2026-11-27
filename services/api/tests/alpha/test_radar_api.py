@@ -71,7 +71,30 @@ def test_as_of_sem_fuso_e_recusado(client):
     assert client.get(URL, params={"as_of": "2026-11-10T12:00:00"}).status_code == 422
 
 
+def _open_meteo(request: httpx.Request) -> httpx.Response:
+    from datetime import date as day_type
+
+    params = request.url.params
+    if request.url.host == "api.open-meteo.com":
+        end = T0.date()
+        start = end - timedelta(days=int(params["past_days"]))
+        value = "1.0"
+    else:
+        start = day_type.fromisoformat(params["start_date"])
+        end = day_type.fromisoformat(params["end_date"])
+        value = "2.0"
+    days = [(start + timedelta(days=i)).isoformat() for i in range((end - start).days + 1)]
+    # Texto cru com literais decimais: a chuva também não passa por float.
+    rain = ",".join(value for _ in days)
+    times = ",".join(f'"{d}"' for d in days)
+    return httpx.Response(
+        200, text=f'{{"daily":{{"time":[{times}],"precipitation_sum":[{rain}]}}}}'
+    )
+
+
 def _transport(request: httpx.Request) -> httpx.Response:
+    if "open-meteo" in request.url.host:
+        return _open_meteo(request)
     if request.url.host == "api.bcb.gov.br":
         code = request.url.path.split("bcdata.sgs.")[1].split("/")[0]
         if code == "12":
@@ -116,3 +139,29 @@ def test_prefixo_da_serie_e_literal_no_like(db_session):
     record(db_session, impostor, date(2026, 11, 3), "9", T0)
     rows = repository.list_visible(db_session, petr4.key, T0, 30)
     assert [signal.signal_key for signal, _ in rows] == [f"{petr4.key}:2026-11-03"]
+
+
+def test_clima_gera_chuva_anomalia_sinal_e_status_da_fonte(client, db_session, test_engine):
+    from sqlalchemy.orm import Session
+
+    from valyra.alpha.domain import REGIONS, climate_pair
+
+    def factory():
+        return Session(test_engine, expire_on_commit=False)
+
+    with httpx.Client(transport=httpx.MockTransport(_transport)) as http:
+        report = ingest_alpha.ingest(factory, http, now=lambda: T0, sources=("clima",))
+    rain, anomaly = climate_pair(REGIONS[0])
+    assert report[rain.key] == 1 and report[anomaly.key] == 1
+    assert SELIC.key not in report
+    radar = client.get(URL).json()
+    by_key = {i["key"]: i for i in radar["indicators"]}
+    assert by_key[rain.key]["latest"]["value"] == "30"
+    assert by_key[anomaly.key]["latest"]["value"] == "-50"
+    assert by_key[rain.key]["theme"] == "clima"
+    assert by_key[rain.key]["region"]["name"] == "Sorriso (MT)"
+    dry = [s for s in radar["signals"] if s["rule"] == "climate_dry_spell_v1"]
+    assert len(dry) == len(REGIONS)
+    assert dry[0]["limitations"] and dry[0]["evidence_keys"]
+    [status] = radar["sources"]
+    assert status["source"]["slug"] == "open-meteo" and status["series_count"] == 6

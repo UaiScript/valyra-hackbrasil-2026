@@ -465,7 +465,7 @@ def test_alpha_respeita_o_espaco_restante_e_avisa_publicacao_estimada(monkeypatc
     )
     limitations: list[str] = []
     items = service._alpha_evidences(Mock(), datetime(2026, 11, 21, tzinfo=UTC), limitations, 5)
-    # Sem espaço para as 14 evidências, entram só 5 e o corte vira limitação.
+    # Sem espaço para as 26 evidências, entram só 5 e o corte vira limitação.
     assert len(items) == 5
     assert service._ALPHA_TRIMMED in limitations
     assert service._ALPHA_ESTIMATED in limitations
@@ -478,5 +478,5 @@ def test_alpha_completo_cabe_no_teto_sem_limitacao_de_corte(monkeypatch):
     )
     limitations: list[str] = []
     items = service._alpha_evidences(Mock(), datetime(2026, 11, 21, tzinfo=UTC), limitations)
-    assert len(items) == 14  # 7 séries x 2 pontos, mesmo com histórico maior
+    assert len(items) == 26  # 13 séries x 2 pontos, mesmo com histórico maior
     assert limitations == [service._ALPHA_NOT_CAUSE]
