@@ -10,6 +10,7 @@ import { ROUTES } from '../router';
 import { TransactionSummary } from '../TransactionRow';
 import { Async, Card, Empty, NoticeBar } from '../ui';
 import type { Notice } from '../ui';
+import { MODULES } from '../modules';
 import { useApi } from '../useApi';
 
 /**
@@ -156,7 +157,7 @@ const SignalRadar: FC = () => {
       </ul>
       <a className="cx-ask" href={ROUTES.ai}>
         <Sparkles size={16} aria-hidden="true" />
-        <span><b>Pergunte ao Valyra</b><small>Explicações em linguagem simples, com evidências citadas</small></span>
+        <span><b>{MODULES.ai.title} · Pergunte ao Valyra</b><small>{MODULES.ai.subtitle}: explicações em linguagem simples, com evidências citadas</small></span>
         <ArrowUpRight size={16} aria-hidden="true" />
       </a>
     </section>
@@ -243,14 +244,14 @@ export const Overview: FC = () => {
   return (
     <div className="cx-grid">
       <MarketTicker reloadKey={heroKey} />
-      {account && <Hero account={account} reloadKey={heroKey} />}
-      {account && (
+      {account ? <Hero account={account} reloadKey={heroKey} /> : <div className="cx-placeholder cx-span-8" aria-hidden="true" />}
+      {account ? (
         <div className="cx-stack cx-span-4">
           <ForecastCard account={account} reloadKey={heroKey} />
           <BudgetCard reloadKey={heroKey} />
         </div>
-      )}
-      {account && <CandlesCard account={account} reloadKey={heroKey} />}
+      ) : <div className="cx-placeholder cx-span-4" aria-hidden="true" />}
+      {account ? <CandlesCard account={account} reloadKey={heroKey} /> : <div className="cx-placeholder cx-placeholder--candles cx-span-8" aria-hidden="true" />}
       <SignalRadar />
       <BudgetPanel reloadKey={heroKey} />
       <NoticeBar notice={notice} onClose={() => setNotice(null)} />
