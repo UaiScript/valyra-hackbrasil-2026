@@ -158,19 +158,19 @@ export const HeroArt: FC<{ projection?: ProjectionOut }> = ({ projection }) => {
     <svg className="cx-hero-art" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
       <defs>
         <radialGradient id="cx-orb" cx="38%" cy="32%" r="70%">
-          <stop offset="0%" stopColor="#ffe6a8" />
-          <stop offset="30%" stopColor="#ffb547" />
-          <stop offset="62%" stopColor="#ff6a3d" />
-          <stop offset="100%" stopColor="#5b1d3a" />
+          <stop offset="0%" stopColor="#d6f6ff" />
+          <stop offset="30%" stopColor="#52d4ff" />
+          <stop offset="62%" stopColor="#2f6dff" />
+          <stop offset="100%" stopColor="#081a5c" />
         </radialGradient>
         <radialGradient id="cx-orb-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#ff8a3d" stopOpacity="0.55" />
-          <stop offset="100%" stopColor="#ff8a3d" stopOpacity="0" />
+          <stop offset="0%" stopColor="#2f86ff" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#2f86ff" stopOpacity="0" />
         </radialGradient>
         <linearGradient id="cx-trail" x1="0" x2="1">
-          <stop offset="0%" stopColor="#c8f169" stopOpacity="0" />
-          <stop offset="35%" stopColor="#c8f169" />
-          <stop offset="100%" stopColor="#ffd25e" />
+          <stop offset="0%" stopColor="#52d4ff" stopOpacity="0" />
+          <stop offset="35%" stopColor="#52d4ff" />
+          <stop offset="100%" stopColor="#e8fbff" />
         </linearGradient>
       </defs>
       <circle cx="230" cy="180" r="170" fill="url(#cx-orb-glow)" />
