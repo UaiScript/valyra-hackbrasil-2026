@@ -128,15 +128,17 @@ def parse_sgs(payload: object) -> list[tuple[date, Decimal]]:
 
 
 def estimated_publication(series: Series, observation_date: date) -> datetime:
-    """Publicação reconstituída para carga histórica; erra para depois, nunca para antes.
+    """Publicação reconstituída para carga histórica, escolhida para errar para depois.
 
-    Diárias: dia seguinte ao meio-dia. Mensais (IPCA): dia 12 do mês seguinte ao meio-dia,
-    depois da janela usual de divulgação do IBGE. Sempre marcada como estimada.
+    Diárias: dia seguinte ao meio-dia (Copom anuncia a meta na véspera da vigência; a B3
+    divulga o CDI na noite do próprio dia). Mensais (IPCA): último dia do mês seguinte ao
+    meio-dia. O dia de divulgação do IBGE varia, então não se usa uma data típica: o fim do
+    mês seguinte fica depois de qualquer divulgação regular. Sempre marcada como estimada.
     """
     if series.periodicity == "monthly":
-        year = observation_date.year + (observation_date.month == 12)
-        month = 1 if observation_date.month == 12 else observation_date.month + 1
-        day = date(year, month, 12)
+        # Primeiro dia do segundo mês seguinte, menos um dia = último dia do mês seguinte.
+        index = observation_date.year * 12 + observation_date.month + 1
+        day = date(index // 12, index % 12 + 1, 1) - timedelta(days=1)
     else:
         day = observation_date + timedelta(days=1)
     return datetime.combine(day, time(12), BUSINESS_ZONE).astimezone(UTC)
@@ -178,6 +180,10 @@ def format_decimal(value: Decimal) -> str:
     # Texto sem notação científica nem zeros à direita; não passa por float.
     text = format(value.normalize(), "f")
     return "0" if text in {"-0", ""} else text
+
+
+def _br_date(day: date) -> str:
+    return day.strftime("%d/%m/%Y")
 
 
 def display(value: Decimal, unit_label: str) -> str:
@@ -228,7 +234,11 @@ def selic_signal(series: Series, history: Sequence[Revision]) -> DerivedSignal |
         first = points[0]
         return DerivedSignal(
             key=f"{series.key}:estavel",
-            title=f"Selic meta estável em {display(last.value, series.unit_label)}",
+            # O título fala só da janela coletada: antes dela pode ter havido mudança.
+            title=(
+                f"Selic meta em {display(last.value, series.unit_label)}, sem mudança entre "
+                f"{_br_date(first.observation_date)} e {_br_date(last.observation_date)}"
+            ),
             summary=(
                 "Sem mudança da meta no histórico coletado, de "
                 f"{first.observation_date.isoformat()} a {last.observation_date.isoformat()}."

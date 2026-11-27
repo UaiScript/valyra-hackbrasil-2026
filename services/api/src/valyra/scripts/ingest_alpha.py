@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -39,6 +40,8 @@ SGS_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{code}/dados"
 BRAPI_URL = "https://brapi.dev/api/quote/{ticker}"
 # O SGS recusa janelas diárias acima de 10 anos; fatias de 3 anos ficam bem abaixo.
 SGS_WINDOW_DAYS = 365 * 3
+# Teto da carga histórica: 10 anos cabem no limite do SGS e no tempo do workflow.
+MAX_BACKFILL_DAYS = 3650
 TIMEOUT = httpx.Timeout(20.0)
 
 
@@ -94,7 +97,7 @@ def fetch_brapi(client: httpx.Client, series: Series, *, token: str) -> list[Obs
     # parse_float=Decimal: a variação nunca passa por float.
     body = response.json(parse_float=Decimal)
     results = body.get("results") if isinstance(body, dict) else None
-    if not results:
+    if not isinstance(results, list) or not results or not isinstance(results[0], dict):
         raise SgsFormatError("resposta da brapi sem resultados")
     quote = results[0]
     raw_time = str(quote.get("regularMarketTime", ""))
@@ -153,9 +156,24 @@ def ingest(
     return report
 
 
+def _backfill_days(text: str) -> int:
+    days = int(text)
+    if not 1 <= days <= MAX_BACKFILL_DAYS:
+        raise argparse.ArgumentTypeError(f"use de 1 a {MAX_BACKFILL_DAYS} dias")
+    return days
+
+
+def exit_code(report: dict[str, int | str]) -> int:
+    """1 quando uma fonte inteira falhou: o agendamento fica vermelho e alguém vê."""
+    by_source: dict[str, list[bool]] = {}
+    for key, result in report.items():
+        by_source.setdefault(key.split(":", 1)[0], []).append(isinstance(result, str))
+    return 1 if any(all(failed) for failed in by_source.values()) else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--backfill-days", type=int, default=None)
+    parser.add_argument("--backfill-days", type=_backfill_days, default=None)
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     settings = get_settings()
@@ -168,8 +186,10 @@ def main(argv: list[str] | None = None) -> int:
         )
     for key, result in report.items():
         logger.info("%s: %s", key, result)
-    # Falha só quando nada foi coletado: uma fonte instável não derruba o agendamento.
-    return 1 if all(isinstance(result, str) for result in report.values()) else 0
+        if isinstance(result, str) and os.environ.get("GITHUB_ACTIONS") == "true":
+            # Anotação visível no resumo do workflow, mesmo quando o job termina verde.
+            print(f"::warning title=Coleta Alpha::{key}: {result}")
+    return exit_code(report)
 
 
 if __name__ == "__main__":

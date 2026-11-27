@@ -1,6 +1,5 @@
 """Casos de uso do Alpha: gravar observações coletadas e montar o radar num corte `as_of`."""
 
-from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -15,11 +14,11 @@ from valyra.alpha.domain import (
     DerivedSignal,
     Series,
     estimated_publication,
+    format_decimal,
     ipca_signal,
     next_revision,
     selic_signal,
     signal_key,
-    visible_at,
 )
 from valyra.alpha.models import Signal, Source
 
@@ -132,23 +131,22 @@ class Radar:
 
 def get_radar(session: Session, as_of: datetime) -> Radar:
     """Radar com o que era conhecido no corte: nada publicado depois de `as_of` entra."""
-    rows = repository.list_revisions(session, [s.key for s in ALL_SERIES], as_of)
-    sources = {signal.signal_key: source for signal, source in rows}
-    visible = visible_at((signal for signal, _ in rows), as_of)
-    by_series: dict[str, list[Signal]] = defaultdict(list)
-    for key, signal in visible.items():
-        by_series[key.rsplit(":", 1)[0]].append(signal)
     indicators: list[IndicatorView] = []
     signals: list[DerivedSignal] = []
+    last: datetime | None = None
     for series in ALL_SERIES:
-        history = sorted(by_series.get(series.key, []), key=lambda s: s.observation_date)
-        history = [s for s in history if s.value is not None][-HISTORY_POINTS:]
-        if not history:
+        rows = repository.list_visible(session, series.key, as_of, HISTORY_POINTS)
+        if not rows:
             continue
+        history = [signal for signal, _ in reversed(rows)]
+        # Coleta posterior ao corte não aparece: o replay mostra só o que já tinha chegado.
+        seen = [s.ingested_at for s in history if s.ingested_at <= as_of]
+        if seen:
+            last = max(seen) if last is None else max(last, *seen)
         indicators.append(
             IndicatorView(
                 series=series,
-                source=sources[history[-1].signal_key],
+                source=rows[0][1],
                 history=[
                     Point(
                         signal_id=s.id,
@@ -162,7 +160,6 @@ def get_radar(session: Session, as_of: datetime) -> Radar:
                         source_url=s.source_url,
                     )
                     for s in history
-                    if s.value is not None
                 ],
             )
         )
@@ -175,6 +172,9 @@ def get_radar(session: Session, as_of: datetime) -> Radar:
         if derived is not None:
             signals.append(derived)
     signals.sort(key=lambda s: s.observation_date, reverse=True)
-    # Coleta posterior ao corte não aparece: o replay mostra só o que já tinha chegado.
-    last = max((s.ingested_at for s in visible.values() if s.ingested_at <= as_of), default=None)
     return Radar(as_of=as_of, indicators=indicators, signals=signals, last_ingested_at=last)
+
+
+def format_value(value: Decimal) -> str:
+    """Texto decimal de um valor Alpha, para outros módulos (IA) sem importar o domínio."""
+    return format_decimal(value)

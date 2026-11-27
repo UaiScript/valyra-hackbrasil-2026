@@ -2,8 +2,8 @@
 
 from datetime import datetime
 
-from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.orm import Session, aliased
 
 from valyra.alpha.models import Signal, Source
 
@@ -29,19 +29,36 @@ def add_signal(session: Session, signal: Signal) -> None:
     session.flush()
 
 
-def list_revisions(
-    session: Session, prefixes: list[str], as_of: datetime
+def _like_prefix(prefix: str) -> str:
+    # "_" e "%" são curingas no LIKE ("change_pct"); escapados, o prefixo é literal.
+    escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"{escaped}:%"
+
+
+def list_visible(
+    session: Session, prefix: str, as_of: datetime, limit: int
 ) -> list[tuple[Signal, Source]]:
-    """Revisões publicadas até o corte das séries pedidas; a escolha final é do domínio."""
-    if not prefixes:
-        return []
-    rows = session.execute(
-        select(Signal, Source)
-        .join(Source, Source.id == Signal.source_id)
+    """Últimas `limit` observações de uma série, cada uma na revisão visível no corte.
+
+    É a regra de `domain.visible_at` (modelagem 5.2) feita no banco com DISTINCT ON:
+    revisões intradiárias e anos de histórico não chegam ao Python.
+    """
+    visible = (
+        select(Signal)
         .where(
             Signal.published_at <= as_of,
-            or_(*(Signal.signal_key.startswith(f"{prefix}:") for prefix in prefixes)),
+            Signal.signal_key.like(_like_prefix(prefix), escape="\\"),
         )
-        .order_by(Signal.signal_key, Signal.revision_id)
+        .distinct(Signal.signal_key)
+        .order_by(Signal.signal_key, Signal.published_at.desc(), Signal.revision_id.desc())
+        .subquery()
     )
-    return [(row[0], row[1]) for row in rows]
+    row = aliased(Signal, visible)
+    rows = session.execute(
+        select(row, Source)
+        .join(Source, Source.id == row.source_id)
+        .where(row.value.is_not(None))
+        .order_by(row.observation_date.desc())
+        .limit(limit)
+    )
+    return [(signal, source) for signal, source in rows]

@@ -57,8 +57,10 @@ def test_parse_sgs_recusa_formato_inesperado(payload):
 
 def test_publicacao_estimada_erra_para_depois():
     # IPCA de outubro: dia 12 de novembro ao meio-dia em São Paulo (15h UTC).
-    assert estimated_publication(IPCA, date(2026, 10, 1)) == datetime(2026, 11, 12, 15, tzinfo=UTC)
-    assert estimated_publication(IPCA, date(2026, 12, 1)) == datetime(2027, 1, 12, 15, tzinfo=UTC)
+    assert estimated_publication(IPCA, date(2026, 10, 1)) == datetime(2026, 11, 30, 15, tzinfo=UTC)
+    assert estimated_publication(IPCA, date(2026, 12, 1)) == datetime(2027, 1, 31, 15, tzinfo=UTC)
+    assert estimated_publication(IPCA, date(2027, 1, 1)) == datetime(2027, 2, 28, 15, tzinfo=UTC)
+    assert estimated_publication(IPCA, date(2026, 11, 1)) == datetime(2026, 12, 31, 15, tzinfo=UTC)
     assert estimated_publication(SELIC, date(2026, 11, 26)) == datetime(
         2026, 11, 27, 15, tzinfo=UTC
     )
@@ -99,7 +101,7 @@ def test_sinal_selic_detecta_ultima_mudanca_e_estabilidade():
     assert change.observation_date == date(2026, 11, 3)
     assert change.evidence_keys == (rows[1].signal_key, rows[2].signal_key)
     stable = selic_signal(SELIC, rows[:2])
-    assert stable.title == "Selic meta estável em 15 % ao ano"
+    assert stable.title == "Selic meta em 15 % ao ano, sem mudança entre 01/11/2026 e 02/11/2026"
 
 
 def test_sinal_ipca_compara_com_mes_anterior():

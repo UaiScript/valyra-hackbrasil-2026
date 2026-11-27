@@ -28,7 +28,6 @@ from valyra.ai.schemas import (
     TextValue,
 )
 from valyra.alpha import service as alpha_service
-from valyra.alpha.domain import format_decimal
 from valyra.core.errors import AppError
 from valyra.finance import service as finance_service
 
@@ -43,6 +42,13 @@ _ALPHA_NOT_CAUSE = (
 )
 # Último e penúltimo ponto de cada série bastam para "subiu ou caiu" sem o LLM calcular.
 _ALPHA_POINTS = 2
+# Mesmo teto de EvidenceContext.evidences (ai/schemas.py). Hoje o Finance ocupa no máximo
+# ~71 itens e o Alpha 14 (7 séries x 2); a folga é explícita para um teto nunca virar erro.
+_EVIDENCE_CAP = 100
+_ALPHA_TRIMMED = "Parte dos indicadores Alpha ficou fora do contexto pelo limite de evidências."
+_ALPHA_ESTIMATED = (
+    "Parte dos indicadores Alpha tem publicação reconstituída na carga histórica (estimada)."
+)
 _NO_CALCULATIONS = (
     "Sem lote de importação concluído: resumo, orçamento e projeção não foram calculados."
 )
@@ -229,7 +235,8 @@ def _finance_context(
     if not included:
         limitations.append("Nenhuma movimentação elegível foi incluída neste contexto.")
     evidences.extend(_calculation_evidences(session, user_id, account, as_of, clock, limitations))
-    evidences.extend(_alpha_evidences(session, as_of, limitations))
+    room = _EVIDENCE_CAP - len(evidences)
+    evidences.extend(_alpha_evidences(session, as_of, limitations, room))
     built_at = _aware(clock())
     if built_at < as_of:
         raise EvidenceContextError("Relógio retrocedeu durante a montagem do contexto")
@@ -262,7 +269,7 @@ def _previous_month(month: str) -> str:
 
 
 def _alpha_evidences(
-    session: Session, as_of: datetime, limitations: list[str]
+    session: Session, as_of: datetime, limitations: list[str], room: int = _EVIDENCE_CAP
 ) -> list[EvidenceItem]:
     """Indicadores Alpha publicados até o corte, com procedência completa (ADR-0011/0012)."""
     radar = alpha_service.get_radar(session, as_of)
@@ -288,13 +295,18 @@ def _alpha_evidences(
                         "ingested_at": point.ingested_at,
                     },
                     value=DecimalValue(
-                        value_decimal=format_decimal(point.value), unit=view.series.unit
+                        value_decimal=alpha_service.format_value(point.value), unit=view.series.unit
                     ),
                     period={"start": point.observation_date, "end": point.observation_date},
                 )
             )
+    if len(items) > room:
+        limitations.append(_ALPHA_TRIMMED)
+        items = items[: max(room, 0)]
     if items:
         limitations.append(_ALPHA_NOT_CAUSE)
+        if any(item.source.published_at_estimated for item in items):
+            limitations.append(_ALPHA_ESTIMATED)
     else:
         limitations.append(_NO_ALPHA)
     return items

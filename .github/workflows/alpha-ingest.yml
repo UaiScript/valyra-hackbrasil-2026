@@ -26,8 +26,10 @@ jobs:
   ingest:
     name: SGS e brapi
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    # Sem o secret do banco (forks, repositório recém-clonado), o job é pulado em vez de falhar.
+    # Folga para a carga histórica de até 10 anos (uma consulta por observação).
+    timeout-minutes: 20
+    # Só roda com a variável de repositório ALPHA_INGEST_ENABLED=true, configurada junto com o
+    # secret do banco; sem ela (forks, repositório recém-clonado) o job é pulado em vez de falhar.
     if: ${{ vars.ALPHA_INGEST_ENABLED == 'true' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -58,7 +60,7 @@ jobs:
           # As migrações rodam no deploy do Render (start.sh); aqui só se coleta.
           args=""
           if [ -n "$BACKFILL_DAYS" ]; then
-            # Entrada manual: aceita só inteiro positivo antes de chegar ao comando.
+            # Entrada manual: só dígitos chegam ao comando; o script valida a faixa (1 a 3650).
             case "$BACKFILL_DAYS" in *[!0-9]*) echo "backfill_days deve ser inteiro" >&2; exit 1 ;; esac
             args="--backfill-days $BACKFILL_DAYS"
           fi

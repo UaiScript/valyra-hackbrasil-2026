@@ -56,7 +56,7 @@ def test_carga_historica_marca_publicacao_estimada(client, db_session):
     db_session.commit()
     latest = client.get(URL).json()["indicators"][0]["latest"]
     assert latest["published_at_estimated"] is True
-    assert latest["published_at"].startswith("2026-10-12T15:00:00")
+    assert latest["published_at"].startswith("2026-10-31T15:00:00")
 
 
 def test_signals_e_somente_insercao(db_session):
@@ -104,3 +104,15 @@ def test_coleta_grava_series_e_tolera_fonte_fora_do_ar(client, db_session, test_
     assert values[STOCK_SERIES[0].key] == "-1.2345"
     assert values[IPCA.key] == "0.09"
     assert radar["last_ingested_at"].startswith("2026-11-10T12:00:00")
+
+
+def test_prefixo_da_serie_e_literal_no_like(db_session):
+    from valyra.alpha import repository
+
+    petr4 = STOCK_SERIES[0]
+    record(db_session, petr4, date(2026, 11, 3), "-1.5", T0)
+    # Sem escape, "_" de "change_pct" casaria com qualquer caractere e traria esta chave.
+    impostor = service.Series(**{**petr4.__dict__, "key": petr4.key.replace("_", "X")})
+    record(db_session, impostor, date(2026, 11, 3), "9", T0)
+    rows = repository.list_visible(db_session, petr4.key, T0, 30)
+    assert [signal.signal_key for signal, _ in rows] == [f"{petr4.key}:2026-11-03"]

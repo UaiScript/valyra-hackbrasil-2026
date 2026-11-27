@@ -86,4 +86,8 @@ o código SGS do IPCA acumulado em 12 meses.
 
 Escopo implementado no primeiro incremento: Selic meta (432), CDI diário (12) e
 IPCA mensal (433) pelo SGS; variação diária de PETR4, VALE3, ITUB4 e MGLU3 pela
-brapi, guardada em `%` para não abrir o contrato de dinheiro Alpha.
+brapi, guardada em `%` para não abrir o contrato de dinheiro Alpha. Na carga histórica,
+ainda sem calendário versionado, a publicação estimada é conservadora: dia seguinte ao
+meio-dia para séries diárias e último dia do mês seguinte para o IPCA, que a IA recebe
+com limitação de publicação estimada. Cada variação intradiária da brapi é uma revisão
+nova da chave do dia, para o replay mostrar o valor conhecido em cada hora.
