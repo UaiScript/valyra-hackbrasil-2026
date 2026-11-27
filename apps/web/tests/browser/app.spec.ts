@@ -473,3 +473,85 @@ test('notícias trazem foto com crédito, visual do tema sem foto e link para a 
   await expect(source).toHaveAttribute('href', 'https://agenciabrasil.ebc.com.br/economia/noticia/soja');
   await expect(source).toHaveAttribute('target', '_blank');
 });
+
+test('faixa da Central troca entre bolsa, manchetes e clima com a fonte citada', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/#/app');
+  const bar = page.locator('.cx-ticker');
+  // Sem perfil escolhido, a faixa abre na bolsa: ações do radar e juros do Banco Central.
+  await expect(bar.getByRole('button', { name: 'Bolsa' })).toHaveAttribute('aria-pressed', 'true');
+  const first = bar.locator('.cx-ticker__row').first();
+  await expect(first.locator('.cx-ticker__item', { hasText: 'PETR4' })).toContainText('▼ -1,2345%pregão de 27 nov');
+  await expect(first.locator('.cx-ticker__item', { hasText: 'SELIC META' })).toContainText('15');
+  await expect(first).toContainText('brapi.dev');
+  await bar.getByRole('button', { name: 'Manchetes' }).click();
+  // Manchetes mais recentes primeiro, com link para a matéria original.
+  const headline = first.getByRole('link').first();
+  await expect(headline).toContainText('Desemprego recua no trimestre');
+  await expect(headline).toHaveAttribute('href', /agenciadenoticias\.ibge\.gov\.br\/+noticia\/pnad$/);
+  await bar.getByRole('button', { name: 'Clima' }).click();
+  await expect(first.locator('.cx-ticker__item', { hasText: 'SORRISO (MT)' })).toContainText('42,5 mm');
+  await expect(first.locator('.cx-ticker__item--dry')).toContainText('45,2% abaixo da média · até 26 nov');
+  await expect(first).toContainText('Open-Meteo');
+  // A escolha fica salva no navegador.
+  await page.reload();
+  await expect(page.locator('.cx-ticker').getByRole('button', { name: 'Clima' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('perfil da demo adapta menu, atalhos, faixa, radar e perguntas da IA', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/#/app');
+  const picker = page.getByRole('region', { name: 'Para quem a Valyra vai trabalhar hoje?' });
+  await expect(picker.getByRole('button')).toHaveCount(3);
+  await picker.getByRole('button', { name: /Cooperado do agro/ }).click();
+  await expect(picker).toHaveCount(0);
+  const forYou = page.getByRole('region', { name: 'Para você: perfil Cooperado do agro' });
+  await expect(forYou.getByRole('link', { name: /Chuva nas regiões produtoras/ })).toHaveAttribute('href', '#/app/alpha');
+  await expect(page.locator('.cx-ticker').getByRole('button', { name: 'Clima' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.cx-nav__focus')).toHaveCount(1);
+  await page.goto('/#/app/alpha');
+  await expect(page.getByRole('button', { name: /^Clima/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('article', { name: 'Selic meta' })).toHaveCount(0);
+  // Trocar de perfil com o radar aberto reabre no tema do novo perfil.
+  await page.getByRole('button', { name: /Perfil da demonstração/ }).click();
+  await page.getByRole('group', { name: 'Perfis da demonstração' }).getByRole('button', { name: /Começando a investir/ }).click();
+  await expect(page.getByRole('button', { name: /^Ações/ })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: /Perfil da demonstração/ }).click();
+  await page.getByRole('group', { name: 'Perfis da demonstração' }).getByRole('button', { name: /Cooperado do agro/ }).click();
+  await page.goto('/#/app/alpha/semana');
+  await expect(page.locator('.nx-grid > *').first()).toContainText('Agro e cadeia da soja');
+  await page.goto('/#/app/valyra-ai');
+  await expect(page.locator('.cx-suggestion').first()).toHaveText('Como está a chuva nas regiões produtoras do radar?');
+  // Troca pelo menu do cabeçalho: menu e faixa seguem o novo perfil.
+  await page.getByRole('button', { name: /Perfil da demonstração/ }).click();
+  await page.getByRole('group', { name: 'Perfis da demonstração' }).getByRole('button', { name: /Começando a investir/ }).click();
+  await expect(page.locator('.cx-nav__title').first()).toHaveText(/Alternative Alpha/);
+  await page.goto('/#/app');
+  await expect(page.locator('.cx-ticker').getByRole('button', { name: 'Bolsa' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('faixa recolhe, para de buscar dados e lembra a escolha', async ({ page }) => {
+  const calls = await mockApi(page);
+  await page.goto('/#/app');
+  const bar = page.locator('.cx-ticker');
+  await expect(bar.locator('.cx-ticker__item').first()).toBeVisible();
+  await bar.getByRole('button', { name: 'Recolher a faixa' }).click();
+  await expect(bar.locator('.cx-ticker__item')).toHaveCount(0);
+  await page.reload();
+  const radarBefore = calls.filter((c) => c.url.startsWith('/api/v1/alpha/radar')).length;
+  await expect(page.locator('.cx-ticker').getByRole('button', { name: 'Mostrar a faixa' })).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByText('R$ 4.870,10', { exact: true })).toBeVisible();
+  expect(calls.filter((c) => c.url.startsWith('/api/v1/alpha/radar')).length).toBe(radarBefore);
+  // Escolher um modo com a faixa recolhida já a abre.
+  await page.locator('.cx-ticker').getByRole('button', { name: 'Clima' }).click();
+  await expect(page.locator('.cx-ticker__item', { hasText: 'SORRISO (MT)' }).first()).toBeVisible();
+});
+
+test('leituras iguais e simultâneas viram uma só requisição', async ({ page }) => {
+  const calls = await mockApi(page);
+  await page.goto('/#/app');
+  await expect(page.getByRole('heading', { name: 'Orçamento do mês' })).toBeVisible();
+  await page.waitForTimeout(500);
+  // Destaque, cartão e painel de orçamento pedem o mesmo GET: chega um só à API.
+  expect(calls.filter((c) => c.url === '/api/v1/finance/budgets').length).toBe(1);
+});

@@ -9,9 +9,10 @@ import { ROUTES } from '../router';
 import { Async, NoticeBar } from '../ui';
 import type { Notice } from '../ui';
 import { useApi } from '../useApi';
+import { ALERTS_CHANGED } from '../alertsEvents';
 
 /** Avisa o menu lateral para recontar alertas novos depois de uma mudança. */
-export const ALERTS_CHANGED = 'valyra:alerts-changed';
+export { ALERTS_CHANGED };
 
 // created_at é timestamp UTC; para exibir só a data usamos o calendário de São Paulo,
 // o mesmo da regra de "hoje" do backend (ADR-0010).

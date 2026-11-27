@@ -3,9 +3,11 @@ import type { FC, FormEvent } from 'react';
 import { ArrowUpRight, BellRing, Pencil, Radar, Repeat, Sparkles, TrendingUp } from 'lucide-react';
 import { api, describeError } from '../api/client';
 import type { AccountOut, AccountUpdate } from '../../lib/api/schema';
-import { centsToInput, formatCents, formatIsoDate, formatShortDate, parseReaisToCents, shiftMonth } from '../money';
+import { centsToInput, formatCents, formatIsoDate, formatShortDate, parseReaisToCents } from '../money';
 import { BudgetList, BudgetMeter, usedPercent } from '../Budget';
-import { CandleChart, HeroArt, Sparkline, Ticker } from '../Market';
+import { CandleChart, HeroArt, Sparkline } from '../Market';
+import { TickerBar } from '../TickerBar';
+import { ProfileFocus } from '../ProfileUI';
 import { ROUTES } from '../router';
 import { TransactionSummary } from '../TransactionRow';
 import { Async, Card, Empty, NoticeBar } from '../ui';
@@ -164,13 +166,6 @@ const SignalRadar: FC = () => {
   );
 };
 
-const MarketTicker: FC<{ reloadKey: number }> = ({ reloadKey }) => {
-  const current = useApi((s) => api.getSummary({}, s), [reloadKey]);
-  const month = current.state.data?.month;
-  const previous = useApi((s) => (month ? api.getSummary({ month: shiftMonth(month, -1) }, s) : Promise.resolve(undefined)), [month, reloadKey]);
-  return <Ticker current={current.state.data} previous={previous.state.data} />;
-};
-
 const BudgetPanel: FC<{ reloadKey: number }> = ({ reloadKey }) => {
   const budgets = useApi((s) => api.getBudgets({}, s), [reloadKey]);
   return (
@@ -243,7 +238,8 @@ export const Overview: FC = () => {
 
   return (
     <div className="cx-grid">
-      <MarketTicker reloadKey={heroKey} />
+      <ProfileFocus />
+      <TickerBar />
       {account ? <Hero account={account} reloadKey={heroKey} /> : <div className="cx-placeholder cx-span-8" aria-hidden="true" />}
       {account ? (
         <div className="cx-stack cx-span-4">

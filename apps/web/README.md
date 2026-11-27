@@ -20,6 +20,10 @@ Todas as operações do contrato atual têm tela. Valores previstos (projeção,
 
 O app usa um tema escuro próprio (`src/app/cockpit.css`, escopo `.cx`), sem afetar a landing. O indicador do cabeçalho usa `system_health`; a barra de comando (Ctrl/⌘+K) abre Pergunte ao Valyra. Não há login: a API responde pelo usuário demo do seed.
 
+**Perfis da demonstração e faixa do topo.** A Central abre com um seletor de perfil; o perfil escolhido muda a ordem dos módulos no menu, os atalhos "Para você", o modo inicial da faixa do topo, o tema aberto no radar Alpha, a ordem dos temas do relatório da semana e as perguntas sugeridas à IA. Os dados são os mesmos para todos os perfis. Os perfis são só dados em `src/app/profiles.ts` (provisórios até a persona final): trocar uma persona é editar esse arquivo, e `tests/profiles.test.ts` confere a estrutura. A faixa (`src/app/TickerBar.tsx`) mostra bolsa (`alpha_get_radar`: ações da brapi, Selic, CDI e IPCA), manchetes (`alpha_get_weekly_news`, com link para a matéria) ou clima (chuva observada nas regiões produtoras, Open-Meteo); só o modo ativo é buscado. A faixa pode ser recolhida (não busca nem anima enquanto recolhida) e pausa a animação fora da tela. Perfil, modo e faixa recolhida ficam no `localStorage` do navegador, como preferência de visualização.
+
+**Desempenho.** Só a Central vem no pacote inicial do app; as demais telas são pedaços separados, pré-carregados no tempo ocioso. O cliente (`src/app/api/client.ts`) junta GETs idênticos em andamento e reaproveita respostas por 4 s; qualquer escrita limpa esse cache, e `/health` sempre consulta a API.
+
 Para rodar com dados reais, na raiz:
 
 ```sh
@@ -33,7 +37,7 @@ Abra <http://127.0.0.1:3000/#/app> e importe `datasets/samples/transactions_demo
 - **Chamadas à API:** em dev e preview o Vite repassa `/api` e `/health` para `VITE_API_PROXY_TARGET` (padrão `http://127.0.0.1:8000`), então o navegador fala só com a própria origem e não depende de CORS. Para um build publicado com a API em outro domínio, defina `VITE_API_URL` (HTTPS fora de localhost); a origem entra no `connect-src` da CSP. Veja `.env.example`.
 - **Contrato:** os tipos em `src/lib/api/schema.ts` são gerados de `packages/contracts/openapi.json`. Não edite à mão: após `make openapi`, rode `npm --prefix apps/web run gen:api`. O `check` (e portanto o `build`) falha se os tipos estiverem desatualizados. O cliente escrito à mão fica em `src/app/api/client.ts`.
 - **Dinheiro:** valores chegam em centavos inteiros e são formatados/lidos por `src/app/money.ts` sem ponto flutuante. Totais e cálculos financeiros ficam no backend. O gráfico de projeção (`src/app/ProjectionChart.tsx`) usa ponto flutuante só para posicionar pixels; todo rótulo vem de `formatCents`.
-- **Testes:** `tests/money.test.ts` cobre a conversão; `tests/browser/app.spec.ts` simula a API com `page.route`, sem precisar de banco.
+- **Testes:** `tests/money.test.ts` cobre a conversão e `tests/profiles.test.ts`, os perfis; `tests/browser/app.spec.ts` simula a API com `page.route`, sem precisar de banco.
 
 ## Landing (`/`)
 

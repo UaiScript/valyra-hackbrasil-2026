@@ -54,10 +54,10 @@ function buildUrl(path: string, query?: Query): string {
   return `${BASE_URL}${path}${qs ? `?${qs}` : ''}`;
 }
 
-async function request<T>(method: string, path: string, init: { query?: Query; json?: unknown; body?: BodyInit; signal?: AbortSignal } = {}): Promise<T> {
+async function send<T>(method: string, url: string, init: { json?: unknown; body?: BodyInit; signal?: AbortSignal }): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(buildUrl(path, init.query), {
+    response = await fetch(url, {
       method,
       signal: init.signal,
       headers: init.json !== undefined ? { 'Content-Type': 'application/json' } : undefined,
@@ -75,6 +75,63 @@ async function request<T>(method: string, path: string, init: { query?: Query; j
     throw new ApiError(response.status, err?.code ?? 'HTTP_ERROR', err?.message ?? `Erro HTTP ${response.status}`, err?.details ?? {});
   }
   return data as T;
+}
+
+/*
+ * Leituras repetidas viram uma só requisição. Várias peças da Central pedem o mesmo dado
+ * ao mesmo tempo (orçamento, alertas, resumo); com a API gratuita acordando devagar, cada
+ * GET a menos conta. Regras: GET idêntico em andamento é compartilhado; resposta de sucesso
+ * vale por alguns segundos; erro nunca fica guardado; qualquer escrita limpa tudo, para a
+ * tela nunca mostrar dado anterior a uma alteração feita pela própria pessoa.
+ */
+const FRESH_MS = 4_000;
+const inflight = new Map<string, Promise<unknown>>();
+const fresh = new Map<string, { at: number; data: unknown }>();
+
+export function clearApiCache() {
+  inflight.clear();
+  fresh.clear();
+}
+
+/** Espera a promessa compartilhada, mas respeita o cancelamento de quem chamou. */
+function withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new DOMException('Aborted', 'AbortError'));
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (v) => { signal.removeEventListener('abort', onAbort); resolve(v); },
+      (e) => { signal.removeEventListener('abort', onAbort); reject(e); },
+    );
+  });
+}
+
+async function request<T>(method: string, path: string, init: { query?: Query; json?: unknown; body?: BodyInit; signal?: AbortSignal } = {}): Promise<T> {
+  const url = buildUrl(path, init.query);
+  if (method !== 'GET') {
+    clearApiCache();
+    try {
+      return await send<T>(method, url, init);
+    } finally {
+      // Limpa de novo: uma leitura iniciada durante a escrita pode ter trazido o dado antigo.
+      clearApiCache();
+    }
+  }
+  // O indicador da API precisa de uma checagem real a cada vez: só compartilha o que está em voo.
+  const cacheable = path !== '/health';
+  const hit = cacheable ? fresh.get(url) : undefined;
+  if (hit && Date.now() - hit.at < FRESH_MS) return hit.data as T;
+  let shared = inflight.get(url) as Promise<T> | undefined;
+  if (!shared) {
+    shared = send<T>('GET', url, {});
+    inflight.set(url, shared);
+    shared.then(
+      (data) => { if (inflight.get(url) === shared) { inflight.delete(url); if (cacheable) fresh.set(url, { at: Date.now(), data }); } },
+      () => { if (inflight.get(url) === shared) inflight.delete(url); },
+    );
+  }
+  return withAbort(shared, init.signal);
 }
 
 function safeJson(text: string): unknown {

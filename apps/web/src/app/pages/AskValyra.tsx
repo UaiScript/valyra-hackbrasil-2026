@@ -6,6 +6,7 @@ import { AI_MESSAGES, explain, formatEvidenceValue } from '../api/ai';
 import type { EvidenceItem, ExplainResponse } from '../api/ai';
 import { formatIsoDate } from '../money';
 import { useApi } from '../useApi';
+import { useProfile } from '../useProfile';
 
 const SUGGESTIONS = [
   'Por que meu saldo previsto fica negativo nos próximos dias?',
@@ -82,6 +83,9 @@ export const AskValyra: FC = () => {
   const nextId = useRef(1);
   const endRef = useRef<HTMLDivElement>(null);
   const busy = turns.some((t) => t.status === 'loading');
+  // Perguntas do perfil primeiro, completadas pelas gerais, sem repetir: a grade fica com 6.
+  const { profile } = useProfile();
+  const suggestions = [...new Set([...profile.questions, ...SUGGESTIONS])].slice(0, SUGGESTIONS.length);
 
   async function ask(question: string) {
     const q = question.trim();
@@ -131,7 +135,7 @@ export const AskValyra: FC = () => {
           <div className="cx-suggestions">
             <span className="cx-suggestions__title">Comece por uma destas</span>
             <div>
-              {SUGGESTIONS.map((s) => (
+              {suggestions.map((s) => (
                 <button key={s} type="button" className="cx-suggestion" disabled={!account} onClick={() => void ask(s)}>{s}</button>
               ))}
             </div>
