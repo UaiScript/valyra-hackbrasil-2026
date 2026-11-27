@@ -3,7 +3,7 @@ recorrência (#44), gastos atípicos (#45), projeção de caixa (#46), pressão 
 e orçamento por categoria."""
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -22,7 +22,9 @@ from valyra.finance.analytics import (
     anomaly_scores,
     budget_spent_cents,
     budget_status,
+    daily_allowance,
     detect_recurrences,
+    is_anomaly,
     is_cash_pressure,
     month_bounds,
     project_cash,
@@ -387,12 +389,25 @@ class BudgetReport:
     month: str
     today: date
     lines: list[BudgetLine]
+    days_left: int
+    # Teto total restante dividido pelos dias que faltam; None sem tetos ou mês encerrado.
+    daily_allowance_cents: int | None
 
 
 def get_budget_report(session: Session, user_id: UUID, month: str | None) -> BudgetReport:
     """Limites do usuário e o consumo realizado no mês, somando todas as contas dele."""
     # Mesmo recorte do resumo mensal: só o realizado até hoje entra no consumo.
-    summary = get_summary(session, user_id, None, month)
+    return _budget_report(session, user_id, get_summary(session, user_id, None, month))
+
+
+def get_account_budget_report(
+    session: Session, user_id: UUID, account_id: UUID, month: str | None
+) -> BudgetReport:
+    """Limites do usuário com o consumo de uma conta; o contexto da IA é sempre por conta."""
+    return _budget_report(session, user_id, get_summary(session, user_id, account_id, month))
+
+
+def _budget_report(session: Session, user_id: UUID, summary: Summary) -> BudgetReport:
     totals = {total.category_id: total.total_cents for total in summary.month_summary.categories}
     lines = []
     for budget, category in repository.list_budgets(session, user_id):
@@ -402,7 +417,21 @@ def get_budget_report(session: Session, user_id: UUID, month: str | None) -> Bud
                 category, budget.limit_cents, spent, budget_status(spent, budget.limit_cents)
             )
         )
-    return BudgetReport(month=summary.month, today=summary.today, lines=lines)
+    first, last = month_bounds(summary.month, summary.today)
+    days_left, allowance = daily_allowance(
+        sum(line.limit_cents for line in lines),
+        sum(line.spent_cents for line in lines),
+        summary.today,
+        first,
+        last,
+    )
+    return BudgetReport(
+        month=summary.month,
+        today=summary.today,
+        lines=lines,
+        days_left=days_left,
+        daily_allowance_cents=allowance if lines else None,
+    )
 
 
 def _expense_category(session: Session, category_id: UUID) -> Category:
@@ -433,3 +462,16 @@ def remove_budget(session: Session, user_id: UUID, category_id: UUID) -> None:
     except BaseException:
         session.rollback()
         raise
+
+
+def list_completed_import_batches(
+    session: Session, user_id: UUID, account_id: UUID
+) -> list[tuple[UUID, datetime]]:
+    """Lotes concluídos da conta com o instante de conclusão, para rastrear cálculos."""
+    account = get_account_for_user(session, user_id, account_id)
+    return repository.list_completed_batches(session, account.id)
+
+
+def is_anomalous(transaction: Transaction) -> bool:
+    """Mesmo limiar do filtro `is_anomaly` das rotas, exposto para outros módulos."""
+    return is_anomaly(transaction.anomaly_score)

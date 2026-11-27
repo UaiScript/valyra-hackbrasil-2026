@@ -39,17 +39,44 @@ rejeitada; seu mapeamento para HTTP está no router IA e no [contrato](ai-http.m
   lote, valor com sinal, data e instante da versão consultada.
 - O recorte registra limitação quando não contém todas as movimentações. Não é
   um resumo do período nem base para o modelo calcular totais ou percentuais.
-- Nomes da conta e descrições livres do extrato não entram nesse contexto.
+- Nomes da conta e descrições livres do extrato não entram nesse contexto. O
+  rótulo de cada movimentação traz só a categoria e os sinais recorrente/atípica.
 - Valores incompatíveis com os inteiros seguros da IA são omitidos com limitação,
   sem arredondamento, conversão para string ou substituição por zero.
 - Versões atualizadas depois do corte e datas de negócio futuras são omitidas
   com limitação. A consulta é do estado corrente; não implementa replay histórico.
 
-Resumo, projeções e Alpha ainda não têm integração e sempre aparecem como
-limitações na montagem padrão. Saldo zero informado é evidência válida; ausência
-de dados não significa zero. Sem nenhuma evidência elegível, o serviço retorna
-uma mensagem determinística de insuficiência, com incerteza alta e limitações,
-sem chamar o provedor.
+### Cálculos Finance como evidência
+
+Quando a conta tem lote de importação concluído até o corte, o serviço anexa
+resultados já calculados pelos services públicos do Finance. O LLM só cita os
+IDs; nenhum total, diferença ou percentual é produzido por ele. Cada item usa
+`source.kind="calculation"`, `module="finance"`, `method_version="adr-0010"` e
+aponta os lotes concluídos em `input_scope.import_batch_ids`.
+
+| Evidência | `basis` | Origem |
+| --- | --- | --- |
+| `finance_realized_balance` | observed | `get_summary` da conta |
+| `month_income`, `month_expenses`, `month_net` | observed | Resumo do mês corrente até hoje |
+| `month_cat_<categoria>` (até 8) | observed | Totais por categoria do mês corrente |
+| `prev_month_expenses`, `prev_cat_<categoria>` (até 8) | observed | Mês anterior fechado, para comparação |
+| `budget_limit_`, `budget_spent_`, `budget_status_<categoria>` | reference / observed | `get_account_budget_report`, consumo desta conta |
+| `projection_end_balance`, `projection_min_balance` | projected | `get_projection` de 30 dias, dia único futuro |
+| `projection_variable_daily` | projected | Premissa de gasto variável da projeção |
+
+Regras de corte:
+
+- Lotes concluídos depois do corte não entram no escopo; sem lote concluído, os
+  cálculos são omitidos com limitação.
+- Se a data de negócio do Finance (`DEMO_TODAY` ou relógio) for posterior à
+  data do corte, todos os cálculos são omitidos: seria antecipar dados.
+- Com `DEMO_TODAY` anterior ao corte, só dias da projeção posteriores à data do
+  corte entram como `projected`, porque o contrato exige período futuro.
+
+Alpha ainda não tem integração e aparece sempre como limitação. Saldo zero
+informado é evidência válida; ausência de dados não significa zero. Sem nenhuma
+evidência elegível, o serviço retorna uma mensagem determinística de
+insuficiência, com incerteza alta e limitações, sem chamar o provedor.
 
 ## Substituição nos testes e evolução
 

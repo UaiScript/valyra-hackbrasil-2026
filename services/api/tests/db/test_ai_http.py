@@ -38,7 +38,7 @@ def test_http_consulta_finance_real_preserva_origem_e_valida_resposta(
     body = response.json()
     assert body["evidences"][0]["source"]["record_id"] == str(account.id)
     assert body["evidences"][0]["value"]["amount_cents"] == account.balance_cents
-    assert any("Projeções" in text for text in body["limitations"])
+    assert any("projeção" in text for text in body["limitations"])
 
 
 @pytest.mark.parametrize("target", ["other_user", "missing_account"])

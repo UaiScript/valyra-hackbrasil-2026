@@ -75,8 +75,16 @@ def finance(monkeypatch):
     transactions = Mock(return_value=([], 0))
     monkeypatch.setattr(service.finance_service, "get_account_for_user", get)
     monkeypatch.setattr(service.finance_service, "list_transactions", transactions)
+    # Sem lote concluído, a montagem não calcula resumo, orçamento nem projeção.
+    batches = Mock(return_value=[])
+    monkeypatch.setattr(service.finance_service, "list_completed_import_batches", batches)
+    monkeypatch.setattr(service.finance_service, "is_anomalous", Mock(return_value=False))
     return SimpleNamespace(
-        account=account, get=get, transactions=transactions, session=Mock(spec=Session)
+        account=account,
+        get=get,
+        transactions=transactions,
+        batches=batches,
+        session=Mock(spec=Session),
     )
 
 
@@ -295,7 +303,7 @@ def test_contexto_finance_padrao_tem_referencia_e_limitacoes_sem_calculos_invent
     )
     assert all(
         any(word in item for item in result.limitations)
-        for word in ("Resumo", "Projeções", "Alpha")
+        for word in ("resumo, orçamento e projeção", "Alpha")
     )
     finance.transactions.assert_called_once_with(
         finance.session,
