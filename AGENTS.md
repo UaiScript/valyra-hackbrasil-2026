@@ -36,6 +36,7 @@ Make aceita UV=/caminho/uv e ENV_FILE=/caminho/configuração. Usa .env existent
 - packages/ui/: estilos CSS compartilhados e [guia de uso](packages/ui/README.md).
 - packages/contracts/: OpenAPI gerado; infra/postgres/init/: criação idempotente do banco de testes.
 - docs/: arquitetura, glossário, ADRs e specs. .github/: CI, templates e revisão.
+- .claude/skills/design-taste-frontend/: regras de design (taste-skill, MIT, só texto) para a landing; a identidade Valyra tem prioridade e o kit/scripts originais não foram copiados.
 - datasets/samples/: dados sintéticos de demonstração (CSV de transações), nunca dados reais.
 - pipelines e experiments são caminhos planejados; a coleta Alpha roda em .github/workflows/alpha-ingest.yml.
 
