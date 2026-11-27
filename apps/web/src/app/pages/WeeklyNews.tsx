@@ -14,6 +14,8 @@ import { BUDGET_STATUS_LABEL, usedPercent } from '../Budget';
 import { compareDecimal, formatCents, formatDecimal, formatInstant } from '../money';
 import { Async, Empty } from '../ui';
 import { useApi } from '../useApi';
+import { useProfile } from '../useProfile';
+import { byPriority } from '../profiles';
 import './news.css';
 
 /*
@@ -231,6 +233,9 @@ const AiDigest: FC<{ accountId?: string }> = ({ accountId }) => {
 
 const Report: FC<{ r: WeeklyNewsOut; categories: Map<string, CategoryStatus>; radar?: RadarOut; accountId?: string }> = ({ r, categories, radar, accountId }) => {
   const linked = r.total_items - r.unmatched_items;
+  // Os temas que mais importam ao perfil sobem; o conteúdo de cada tema não muda.
+  const { profile } = useProfile();
+  const themes = byPriority(r.themes, (t) => t.key, profile.newsThemes);
   return (
     <>
       <section className="nx-hero">
@@ -261,7 +266,7 @@ const Report: FC<{ r: WeeklyNewsOut; categories: Map<string, CategoryStatus>; ra
       ) : (
         <>
           <AiDigest accountId={accountId} />
-          <div className="nx-grid">{r.themes.map((t) => <ThemeCard key={t.key} t={t} categories={categories} radar={radar} />)}</div>
+          <div className="nx-grid">{themes.map((t) => <ThemeCard key={t.key} t={t} categories={categories} radar={radar} />)}</div>
         </>
       )}
 

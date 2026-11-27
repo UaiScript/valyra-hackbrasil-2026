@@ -9,7 +9,7 @@
     "check": "npm run check:api && tsc --noEmit",
     "build": "npm run check && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
-    "test": "node --test tests/config.test.mjs tests/money.test.ts",
+    "test": "node --test tests/config.test.mjs tests/money.test.ts tests/profiles.test.ts",
     "gen:api": "node scripts/generate-api-types.mjs",
     "check:api": "node scripts/generate-api-types.mjs --check",
     "test:e2e": "playwright test"

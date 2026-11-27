@@ -1,60 +1,13 @@
 import { useMemo } from 'react';
 import type { FC } from 'react';
-import type { ProjectionOut, SummaryOut } from '../lib/api/schema';
+import type { ProjectionOut } from '../lib/api/schema';
 import { formatCents, formatShortDate } from './money';
 
 /*
- * Peças visuais de "mercado" da Central: ticker, candles e sparkline. Todos os valores
- * exibidos chegam prontos da API em centavos; a conversão para pixels usa ponto
- * flutuante só para desenhar, nunca para um número mostrado.
+ * Peças visuais de "mercado" da Central: candles e sparkline (a faixa do topo fica em
+ * TickerBar.tsx). Todos os valores exibidos chegam prontos da API em centavos; a conversão
+ * para pixels usa ponto flutuante só para desenhar, nunca para um número mostrado.
  */
-
-/** Variação inteira em % entre dois totais de saída (em módulo), ou null sem base. */
-export function deltaPercent(current: number, previous: number): number | null {
-  if (previous === 0) return null;
-  return Math.trunc(((current - previous) * 100) / previous);
-}
-
-type TickerItem = { label: string; value: string; delta?: number | null; tone?: 'up' | 'down' | 'flat' };
-
-/**
- * Faixa rolante como em home broker: gasto do mês por categoria, comparado ao mesmo
- * total do mês anterior. Gasto maior aparece em coral (pior), menor em verde.
- */
-export const Ticker: FC<{ current?: SummaryOut; previous?: SummaryOut }> = ({ current, previous }) => {
-  const items: TickerItem[] = useMemo(() => {
-    // Faixa decorativa: um resumo incompleto (API antiga ou resposta parcial) só esconde
-    // itens, nunca derruba a Central inteira.
-    if (!current || typeof current.net_cents !== 'number') return [];
-    const prev = new Map((previous?.categories ?? []).map((c) => [c.category.id, -c.total_cents]));
-    const list: TickerItem[] = [];
-    if (typeof current.realized_balance_cents === 'number') list.push({ label: 'SALDO', value: formatCents(current.realized_balance_cents), tone: 'flat' });
-    list.push({ label: 'RESULTADO', value: formatCents(current.net_cents), tone: current.net_cents < 0 ? 'down' : 'up' });
-    for (const c of current.categories ?? []) {
-      if (c.category.kind !== 'expense') continue;
-      const spent = -c.total_cents;
-      const d = prev.has(c.category.id) ? deltaPercent(spent, prev.get(c.category.id)!) : null;
-      list.push({ label: c.category.name.toUpperCase(), value: formatCents(spent), delta: d, tone: d === null || d === 0 ? 'flat' : d > 0 ? 'down' : 'up' });
-    }
-    return list;
-  }, [current, previous]);
-  if (items.length === 0) return <div className="cx-ticker cx-ticker--empty" aria-hidden="true" />;
-  const row = items.map((it, i) => (
-    <span key={i} className={`cx-ticker__item cx-ticker__item--${it.tone ?? 'flat'}`}>
-      <b>{it.label}</b>{it.value}
-      {it.delta !== undefined && it.delta !== null && <em>{it.delta > 0 ? '▲' : it.delta < 0 ? '▼' : '■'} {Math.abs(it.delta)}%</em>}
-    </span>
-  ));
-  return (
-    <section className="cx-ticker" aria-label="Movimento do mês por categoria, comparado ao mês anterior">
-      <div className="cx-ticker__track">
-        <div className="cx-ticker__row">{row}</div>
-        {/* Cópia só para o laço contínuo da animação; leitores de tela ignoram. */}
-        <div className="cx-ticker__row" aria-hidden="true">{row}</div>
-      </div>
-    </section>
-  );
-};
 
 type Candle = { start: string; end: string; open: number; close: number; high: number; low: number };
 

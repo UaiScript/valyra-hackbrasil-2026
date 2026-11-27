@@ -18,6 +18,8 @@ import { WeeklyNews } from './pages/WeeklyNews';
 import { LogoMark } from '../components/LogoMark';
 import { MODULES, ModuleBadge } from './modules';
 import type { ModuleId } from './modules';
+import { ProfileMenu } from './ProfileUI';
+import { ProfileProvider, useProfile } from './useProfile';
 import './cockpit.css';
 import './app.css';
 
@@ -89,7 +91,14 @@ function useNewAlertCount(route: AppRoute): number {
 }
 
 export default function FinanceApp() {
+  return <ProfileProvider><Shell /></ProfileProvider>;
+}
+
+function Shell() {
   const route = routeFromHash(useHash());
+  const { profile, chosen } = useProfile();
+  // O menu segue a ordem de módulos do perfil: o foco do cliente aparece primeiro.
+  const groups = profile.modules.map((m) => NAV_GROUPS.find((g) => g.module === m)!);
   const [menuOpen, setMenuOpen] = useState(false);
   const current = NAV.find((n) => n.route === route)!;
   const newAlerts = useNewAlertCount(route);
@@ -120,9 +129,9 @@ export default function FinanceApp() {
           <span className="cx-brand__text"><b>Valyra</b><small>Inteligência financeira</small></span>
         </a>
         <nav className="cx-nav">
-          {NAV_GROUPS.map((group) => (
+          {groups.map((group, index) => (
             <div key={group.module} className={`cx-nav__group cx-nav__group--${group.module}`}>
-              <span className="cx-nav__title"><ModuleBadge id={group.module} compact /></span>
+              <span className="cx-nav__title"><ModuleBadge id={group.module} compact />{chosen && index === 0 && <span className="cx-nav__focus" title={`Foco do perfil ${profile.name}`}>Foco</span>}</span>
               {group.items.map(({ route: r, label, icon: Icon }) => (
                 <a key={r} href={ROUTES[r]} aria-current={r === route ? 'page' : undefined} data-tip={`${MODULES[group.module].title} · ${label}`}>
                   <Icon size={19} aria-hidden="true" /><span className="cx-nav__label">{label}</span>
@@ -154,7 +163,7 @@ export default function FinanceApp() {
           <a className="cx-icon-link" href={ROUTES.alerts} aria-label={newAlerts ? `Alertas, ${newAlerts} novos` : 'Alertas'}>
             <Bell size={18} aria-hidden="true" />{newAlerts > 0 && <span className="cx-icon-link__dot" aria-hidden="true" />}
           </a>
-          <span className="cx-avatar" title="Usuário demo · dados sintéticos, sem login" aria-label="Usuário demo">D</span>
+          <ProfileMenu />
         </header>
         <main className="app-content" id="main">
           {route === 'overview' && <Overview />}

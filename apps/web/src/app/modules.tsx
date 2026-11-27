@@ -1,12 +1,13 @@
 import type { FC } from 'react';
 import { BrainCircuit, ChartNoAxesCombined, Compass } from 'lucide-react';
 import { pt } from '../content/pt';
+import type { ModuleId } from './profiles';
 
 /*
  * Os três módulos da Valyra com nome e subtítulo lidos da própria landing (content/pt.ts):
  * o app nunca diverge do que a página pública promete.
  */
-export type ModuleId = 'finance' | 'alpha' | 'ai';
+export type { ModuleId };
 
 // Busca pelo número do módulo na landing, não pela posição: reordenar a landing não troca nomes.
 function byNumber(n: string) {

@@ -9,6 +9,7 @@ import { Sparkline } from '../Market';
 import { compareDecimal, formatDecimal, formatIsoDate, formatInstant, formatMonth } from '../money';
 import { Async, Card, Empty } from '../ui';
 import { useApi } from '../useApi';
+import { useProfile } from '../useProfile';
 
 /*
  * Radar do Alternative Alpha (ADR-0012). Cada número mostra a fonte, a data de referência,
@@ -349,13 +350,15 @@ const Drawer: FC<{ i: IndicatorOut; onClose: () => void }> = ({ i, onClose }) =>
 /* ---------- Página ---------- */
 
 const Board: FC<{ r: RadarOut }> = ({ r }) => {
-  const [filter, setFilter] = useState<Filter>('todos');
-  const [open, setOpen] = useState<string | null>(null);
+  const { profile } = useProfile();
   const counts = useMemo(() => {
     const c: Record<Filter, number> = { todos: r.indicators.length, juros: 0, inflacao: 0, acoes: 0, clima: 0 };
     for (const i of r.indicators) c[i.theme] += 1;
     return c;
   }, [r]);
+  // Abre no tema do perfil; se ele ainda não tem dado coletado, mostra tudo.
+  const [filter, setFilter] = useState<Filter>(() => (counts[profile.alphaFocus] > 0 ? profile.alphaFocus : 'todos'));
+  const [open, setOpen] = useState<string | null>(null);
   const show = (t: Theme) => filter === 'todos' || filter === t;
   const macro = r.indicators.filter((i) => (i.theme === 'juros' || i.theme === 'inflacao') && show(i.theme));
   const stocks = show('acoes') ? r.indicators.filter((i) => i.theme === 'acoes') : [];
