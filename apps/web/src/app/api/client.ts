@@ -3,6 +3,8 @@
 import type {
   AccountOut,
   AlertOut,
+  BudgetReportOut,
+  FinanceGetBudgetsQuery,
   FinanceGetSummaryQuery,
   ImportBatchCreatedOut,
   PageAlertOut,
@@ -10,6 +12,8 @@ import type {
   SummaryOut,
   AccountUpdate,
   ErrorResponse,
+  ExplainRequest,
+  ExplainResponse,
   FinanceListTransactionsQuery,
   HealthResponse,
   ImportBatchOut,
@@ -113,8 +117,20 @@ export const api = {
   getProjection: (accountId: string, days: number, signal?: AbortSignal) =>
     request<ProjectionOut>('GET', `/api/v1/finance/accounts/${id(accountId)}/projection`, { query: { days }, signal }),
 
+  getBudgets: (query: FinanceGetBudgetsQuery, signal?: AbortSignal) =>
+    request<BudgetReportOut>('GET', '/api/v1/finance/budgets', { query, signal }),
+
+  setBudget: (categoryId: string, limitCents: number) =>
+    request<BudgetReportOut>('PUT', `/api/v1/finance/budgets/${id(categoryId)}`, { json: { limit_cents: limitCents } }),
+
+  deleteBudget: (categoryId: string) =>
+    request<null>('DELETE', `/api/v1/finance/budgets/${id(categoryId)}`),
+
   listAlerts: (signal?: AbortSignal) =>
     request<PageAlertOut>('GET', '/api/v1/alerts', { query: { limit: 200 }, signal }),
+
+  explain: (body: ExplainRequest, signal?: AbortSignal) =>
+    request<ExplainResponse>('POST', '/api/v1/ai/explain', { json: body, signal }),
 
   markAlertRead: (alertId: string) =>
     request<AlertOut>('PATCH', `/api/v1/alerts/${id(alertId)}`, { json: { status: 'read' } }),
@@ -131,6 +147,7 @@ const MESSAGES: Record<string, string> = {
   TRANSACTION_NOT_FOUND: 'Transação não encontrada.',
   CATEGORY_NOT_FOUND: 'Categoria não encontrada.',
   ALERT_NOT_FOUND: 'Alerta não encontrado.',
+  BUDGET_NOT_FOUND: 'Essa categoria não tem limite definido.',
   BALANCE_UNAVAILABLE: 'O saldo de referência da conta é posterior a hoje. Ajuste a data do saldo na visão geral para calcular a projeção.',
 };
 

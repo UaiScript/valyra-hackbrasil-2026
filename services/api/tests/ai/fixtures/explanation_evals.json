@@ -1,0 +1,92 @@
+[
+  {
+    "id": "valores-micro-macro-sem-causalidade",
+    "answer": "O saldo de referência é R$ 5.000,00 e a produtividade é 12,500 t/ha. Esses dados não demonstram que um contexto causou o outro.",
+    "evidence_ids": [
+      "e1",
+      "e2"
+    ],
+    "automatic": "accept",
+    "human_review": "accept",
+    "reason": "Apresenta dados originais e explicita que simultaneidade não demonstra causa."
+  },
+  {
+    "id": "numero-inventado-com-citacao-real",
+    "answer": "Seu saldo de referência é R$ 999,00.",
+    "evidence_ids": [
+      "e1"
+    ],
+    "automatic": "reject",
+    "human_review": "reject",
+    "reason": "Uma citação existente não autoriza alterar o valor original."
+  },
+  {
+    "id": "valor-correto-em-evidencia-nao-citada",
+    "answer": "A produtividade é 12,500 t/ha.",
+    "evidence_ids": [
+      "e1"
+    ],
+    "automatic": "reject",
+    "human_review": "reject",
+    "reason": "Conhecer um valor no contexto não substitui citar a evidência correspondente."
+  },
+  {
+    "id": "causalidade-falsa-com-todos-os-numeros-corretos",
+    "answer": "A produtividade de 12,500 t/ha causou seu saldo de referência de R$ 5.000,00.",
+    "evidence_ids": [
+      "e1",
+      "e2"
+    ],
+    "automatic": "accept",
+    "human_review": "reject",
+    "reason": "Limite conhecido: consistência lexical não comprova nexo causal Micro/Macro. O prompt proíbe esta resposta."
+  },
+  {
+    "id": "troca-semantica-de-metrica-com-numero-correto",
+    "answer": "Seu lucro realizado é R$ 5.000,00.",
+    "evidence_ids": [
+      "e1"
+    ],
+    "automatic": "accept",
+    "human_review": "reject",
+    "reason": "Limite conhecido: o filtro não demonstra que saldo de referência é lucro realizado."
+  },
+  {
+    "id": "probabilidade-inventada",
+    "answer": "Existe 90% de chance de o saldo cair.",
+    "evidence_ids": [
+      "e1",
+      "e2"
+    ],
+    "automatic": "reject",
+    "human_review": "reject",
+    "reason": "Probabilidade não foi calculada nem fornecida."
+  },
+  {
+    "id": "sem-dados-nao-e-saldo-zero",
+    "context": "empty",
+    "answer": "Seu saldo é R$ 0,00.",
+    "evidence_ids": [],
+    "automatic": "reject",
+    "human_review": "reject",
+    "reason": "Ausência de dado não é evidência de valor zero."
+  },
+  {
+    "id": "ausencia-de-dados-explicita",
+    "context": "empty",
+    "answer": "Não há dados suficientes para avaliar saldo ou gastos.",
+    "evidence_ids": [],
+    "automatic": "accept",
+    "human_review": "accept",
+    "reason": "Declara insuficiência e não assume valores."
+  },
+  {
+    "id": "ausencia-implicita-de-gastos-sem-evidencias",
+    "context": "empty",
+    "answer": "Você não tem gastos.",
+    "evidence_ids": [],
+    "automatic": "accept",
+    "human_review": "reject",
+    "reason": "Limite conhecido: inferência implícita de ausência não é um numeral literal. O prompt proíbe esta conclusão."
+  }
+]

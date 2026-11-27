@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 
 // Hash routing: a build usa base './' e é servida como arquivos estáticos, sem
 // reescrita de rotas no servidor. Âncoras da landing (#capacidades) não começam com #/.
-export type AppRoute = 'overview' | 'summary' | 'projection' | 'transactions' | 'alerts' | 'import';
+export type AppRoute = 'overview' | 'summary' | 'budgets' | 'projection' | 'transactions' | 'alerts' | 'ai' | 'import';
 
 export const ROUTES: Record<AppRoute, string> = {
   overview: '#/app',
   summary: '#/app/resumo',
+  budgets: '#/app/orcamento',
+  ai: '#/app/valyra-ai',
   projection: '#/app/projecao',
   alerts: '#/app/alertas',
   transactions: '#/app/transacoes',
@@ -23,6 +25,8 @@ export function routeFromHash(hash: string): AppRoute {
   if (hash.startsWith('#/app/resumo')) return 'summary';
   if (hash.startsWith('#/app/projecao')) return 'projection';
   if (hash.startsWith('#/app/alertas')) return 'alerts';
+  if (hash.startsWith('#/app/orcamento')) return 'budgets';
+  if (hash.startsWith('#/app/valyra-ai')) return 'ai';
   return 'overview';
 }
 

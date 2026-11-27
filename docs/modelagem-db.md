@@ -425,6 +425,20 @@ Contagem de registros segue o [contrato CSV da Issue #13](api-design.md#entrada-
 
 **[Proposta] Exclusão de transação:** não oferecer remoção física no fluxo inicial, pois ela quebraria a conciliação histórica de `rows_imported` e permitiria reimportação do hash removido. FKs não impedem apagar a própria linha; a política deve ser respeitada pelo service/permissões futuros. Uma função de exclusão exigiria alinhar os contadores e a auditoria.
 
+#### `budgets`
+
+Limite mensal de gasto por categoria de saída. O consumo do mês é calculado na leitura, a partir das transações realizadas (mesmo recorte do resumo mensal), sem coluna derivada para manter em sincronia.
+
+| Coluna | Tipo | Default | Regra |
+|---|---|---|---|
+| `id` | UUID PK | `gen_random_uuid()` | Seção 3.1 |
+| `user_id` | UUID NN | — | FK `users(id)`, `ON DELETE RESTRICT` |
+| `category_id` | UUID NN | — | FK `categories(id)`, `ON DELETE RESTRICT`; o service aceita só `kind = expense` |
+| `limit_cents` | BIGINT NN | — | Teto positivo em centavos (`CHECK (limit_cents > 0)`) |
+| `created_at`, `updated_at` | TIMESTAMPTZ NN | `CURRENT_TIMESTAMP` | Seção 3.4 |
+
+`UNIQUE (user_id, category_id)`: um limite por categoria, que vale para todos os meses até ser trocado; índice `(category_id)`. Criada na migração `0003_budgets`.
+
 ### 4.2 Saldo e datas
 
 **[Registrado no desenho anterior]** O saldo é derivado da referência da conta e das transações posteriores; não existe coluna de saldo diário. O desenho não definia se a referência era de abertura ou fechamento nem o limite superior da soma.
@@ -676,6 +690,13 @@ Regras:
 | `source_url` | VARCHAR NULL | |
 | `published_at` | TIMESTAMPTZ NULL | |
 | `signal_id` | UUID NULL | FK `signals`; revisão exata usada |
+
+**Complemento de 17/11/2026 — ADR-0011:** o contrato IA em memória passa a usar
+valores tipados e citações por ID, conforme a [decisão aprovada](adr/0011-contrato-evidencias-ia.md).
+Dinheiro Finance nesse contrato usa centavos de BRL na faixa exata do JavaScript;
+indicadores Alpha não monetários preservam decimal textual e unidade registrada.
+Essa decisão não implementa as tabelas IA abaixo nem define persistência de dinheiro
+ou preços monetários Alpha. As pendências de armazenamento continuam abertas.
 
 `value` textual é mantido como desenho de evidências genéricas não monetárias. Ele não define serialização monetária válida para a API. A representação persistida de dinheiro e métricas de precisão variável nessas evidências permanece pendente, junto com o contrato citado na seção 6.
 

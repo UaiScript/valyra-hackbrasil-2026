@@ -195,3 +195,40 @@ class ProjectionOut(BaseModel):
     min_balance_cents: int
     # Primeiro dia em que o mínimo ocorre.
     min_balance_date: date
+
+
+def _positive_bigint(value: int) -> int:
+    # Mesmo motivo de _within_bigint: limites no validador, sem float no OpenAPI.
+    if not 0 < value <= BIGINT_MAX:
+        raise ValueError("Limite deve ser inteiro positivo em centavos, dentro da faixa BIGINT")
+    return value
+
+
+class BudgetUpsert(BaseModel):
+    """Define ou troca o limite mensal da categoria; limite é positivo e em centavos."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    limit_cents: Annotated[StrictInt, AfterValidator(_positive_bigint)]
+
+
+class BudgetOut(BaseModel):
+    category: CategoryOut
+    # Teto mensal em centavos, positivo.
+    limit_cents: int
+    # Saídas realizadas da categoria no mês, em módulo (positivo), somando todas as contas.
+    spent_cents: int
+    # limit_cents - spent_cents; negativo quando o limite estourou.
+    remaining_cents: int
+    # ok abaixo de 80% do limite; warning de 80% a 100%; over acima de 100%.
+    status: Literal["ok", "warning", "over"]
+
+
+class BudgetReportOut(BaseModel):
+    """Orçamento do mês: limite e consumo realizado até hoje, sem previsão."""
+
+    month: str
+    today: date
+    items: list[BudgetOut]
+    total_limit_cents: int
+    total_spent_cents: int

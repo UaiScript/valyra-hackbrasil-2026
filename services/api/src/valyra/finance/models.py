@@ -193,3 +193,29 @@ class Transaction(Base):
         server_default=text("CURRENT_TIMESTAMP"),
         onupdate=text("CURRENT_TIMESTAMP"),
     )
+
+
+class Budget(Base):
+    """Limite mensal de gasto por categoria de saída; vale para todos os meses até mudar."""
+
+    __tablename__ = "budgets"
+    __table_args__ = (
+        UniqueConstraint("user_id", "category_id"),
+        CheckConstraint("limit_cents > 0", name="positive_limit"),
+        CheckConstraint("updated_at >= created_at", name="timestamps_order"),
+        Index("ix_budgets_category_id", "category_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    category_id: Mapped[UUID] = mapped_column(ForeignKey("categories.id", ondelete="RESTRICT"))
+    # Valor positivo em centavos: é um teto de saída, não uma movimentação com sinal.
+    limit_cents: Mapped[int] = mapped_column(MoneyCents)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        onupdate=text("CURRENT_TIMESTAMP"),
+    )

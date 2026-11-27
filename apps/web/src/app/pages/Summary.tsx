@@ -3,6 +3,7 @@ import type { FC } from 'react';
 import { ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
 import { api } from '../api/client';
 import type { CategoryTotalOut, SummaryOut } from '../../lib/api/schema';
+import { BudgetList } from '../Budget';
 import { formatCents, formatIsoDate, formatMonth, shiftMonth } from '../money';
 import { ROUTES } from '../router';
 import { Async, Card, Empty } from '../ui';
@@ -37,6 +38,17 @@ export const MonthTotals: FC<{ s: SummaryOut }> = ({ s }) => (
     <div className="vx-totals__net"><dt>Resultado do mês</dt><dd className={s.net_cents < 0 ? 'vx-totals__neg' : s.net_cents > 0 ? 'vx-totals__in' : undefined}>{formatCents(s.net_cents)}</dd></div>
   </dl>
 );
+
+/** Tetos do mês exibido; o orçamento vale para todas as contas do usuário. */
+const MonthBudgets: FC<{ month: string }> = ({ month }) => {
+  const budgets = useApi((sig) => api.getBudgets({ month }, sig), [month]);
+  const items = budgets.state.data?.items ?? [];
+  return (
+    <Card title="Orçamento do mês" action={<a className="app-link" href={ROUTES.budgets}>Gerenciar</a>}>
+      {items.length ? <BudgetList items={items} /> : <Empty>Sem limites definidos. <a className="app-link" href={ROUTES.budgets}>Definir tetos</a>.</Empty>}
+    </Card>
+  );
+};
 
 export const Summary: FC = () => {
   const accounts = useApi((s) => api.listAccounts(s), []);
@@ -102,9 +114,12 @@ export const Summary: FC = () => {
                   <Card title="Para onde foi o dinheiro">
                     {expenses.length ? <CategoryBars items={expenses} total={s.expenses_cents} tone="out" /> : <Empty>Nenhuma saída no mês.</Empty>}
                   </Card>
-                  <Card title="De onde veio">
-                    {income.length ? <CategoryBars items={income} total={s.income_cents} tone="in" /> : <Empty>Nenhuma entrada no mês.</Empty>}
-                  </Card>
+                  <div className="app-stack app-stack--loose">
+                    <Card title="De onde veio">
+                      {income.length ? <CategoryBars items={income} total={s.income_cents} tone="in" /> : <Empty>Nenhuma entrada no mês.</Empty>}
+                    </Card>
+                    <MonthBudgets month={s.month} />
+                  </div>
                 </div>
               )}
             </>

@@ -128,6 +128,9 @@ IDs de caminho e filtros de identificação usam UUID. Upload usa `multipart/for
 | `GET /api/v1/finance/categories` | `finance_list_categories` | `Page[CategoryOut]`; ordem por `kind` e `name` |
 | `GET /api/v1/finance/summary` | `finance_get_summary` | Query `account_id` e `month` (`AAAA-MM`), ambos opcionais; **200**, `SummaryOut` (#43) |
 | `GET /api/v1/finance/accounts/{id}/projection` | `finance_get_projection` | Query `days` (1–90, padrão 30); **200**, `ProjectionOut` (#46) |
+| `GET /api/v1/finance/budgets` | `finance_get_budgets` | Query `month` (`AAAA-MM`) opcional; **200**, `BudgetReportOut` com limite e consumo realizado por categoria, somando todas as contas do usuário |
+| `PUT /api/v1/finance/budgets/{category_id}` | `finance_set_budget` | `BudgetUpsert`; cria ou troca o limite mensal; **200**, `BudgetReportOut` do mês corrente; só categorias `expense` |
+| `DELETE /api/v1/finance/budgets/{category_id}` | `finance_delete_budget` | **204**; limite ausente gera 404 `BUDGET_NOT_FOUND` |
 | `GET /api/v1/alerts` | `alerts_list` | `Page[AlertOut]` do usuário demo; `created_at` decrescente, depois `id` (#47) |
 | `PATCH /api/v1/alerts/{id}` | `alerts_update` | `AlertUpdate`; **200**, `AlertOut` lido; alerta alheio ou inexistente gera 404 (#47) |
 
@@ -146,6 +149,9 @@ Todas as listagens usam `Page[T]`/`PageParams` da Issue #9: `items`, `total`, `l
 | `ImportBatchOut` | Confirmados: `id: UUID`, `status: processing \| completed \| failed`, `rows_total: int`, `rows_imported: int`, `rows_duplicated: int`, `rows_rejected: int`, `rejections: list[ImportRejectionOut]`; usado no GET do lote, sem `alerts_created` |
 | `ImportBatchCreatedOut` | `ImportBatchOut` + `alerts_created: int` (0 ou 1), só na resposta do `POST` de importação (#47) |
 | `ImportBatchSummaryOut` | Resumo sem `rejections`; implementado na #14 com `id`, `status` e os quatro contadores, sujeito à lacuna abaixo |
+| `BudgetUpsert` | `limit_cents: int` estrito, positivo, dentro de BIGINT; campos extras recusados |
+| `BudgetOut` | `category: CategoryOut`, `limit_cents: int` (> 0), `spent_cents: int` (saídas realizadas do mês em módulo, ≥ 0), `remaining_cents: int` (`limit - spent`, negativo se estourou), `status: ok \| warning \| over` (atenção a partir de 80% do limite, comparação em inteiros) |
+| `BudgetReportOut` | `month: "AAAA-MM"`, `today: date`, `items: list[BudgetOut]` (ordem por nome da categoria), `total_limit_cents: int`, `total_spent_cents: int` |
 | `SummaryOut` | `account_id: UUID \| null`, `month: "AAAA-MM"`, `today: date`, `realized_balance_cents: int \| null`, `income_cents: int`, `expenses_cents: int` (≤ 0), `net_cents: int`, `categories: list[CategoryTotalOut]` (#43) |
 | `CategoryTotalOut` | `category: CategoryOut`, `total_cents: int` com sinal, `count: int` (#43) |
 | `ProjectionOut` | `account_id: UUID`, `today: date`, `start_balance_cents: int`, `variable_daily_cents: int` (≤ 0), `days: int`, `items: list[ProjectionDayOut]`, `min_balance_cents: int`, `min_balance_date: date` (#46) |
@@ -283,12 +289,34 @@ Envelope da Issue #9: `{"error":{"code":"...","message":"...","details":{}}}`. M
 | 404 | `IMPORT_BATCH_NOT_FOUND` | Consulta de lote ausente (#14) |
 | 404 | `TRANSACTION_NOT_FOUND` | Correção de transação inexistente ou de conta de outro usuário (#42) |
 | 404 | `CATEGORY_NOT_FOUND` | Correção para categoria inexistente (#42) |
-| 422 | `CATEGORY_KIND_MISMATCH` | Categoria `expense` em entrada ou `income` em saída (#42) |
+| 422 | `CATEGORY_KIND_MISMATCH` | Categoria `expense` em entrada ou `income` em saída (#42); orçamento para categoria `income` |
+| 404 | `BUDGET_NOT_FOUND` | Remoção de orçamento que não existe para a categoria |
 | 404 | `ALERT_NOT_FOUND` | Marcação de alerta inexistente ou de outro usuário (#47) |
 | 422 | `BALANCE_UNAVAILABLE` | Projeção com `balance_as_of` posterior a hoje (#46; ADR-0010, seção 1) |
 | 422 | `VALIDATION_ERROR` | Validação HTTP/Pydantic: paginação inválida e `balance_cents` não inteiro (#9/#15); `month` fora de `AAAA-MM` no resumo (#43); `days` fora de 1–90 na projeção (#46); `AlertUpdate` inválido (#47); `details.errors` contém os erros |
 
 Rejeições de linha são dados de uma importação concluída, sem promover cada rejeição a erro HTTP. **[Implementado, #41]** O OpenAPI declara o envelope como `ErrorResponse` em cada operação Finance (404/413 conforme a tabela; 422 em todas), sem o `HTTPValidationError` padrão do FastAPI. Falhas técnicas e persistência de tentativas estão na [modelagem, seção 4.5](modelagem-db.md#45-transação-e-falhas-da-importação).
+
+## Explicação IA
+
+`POST /api/v1/ai/explain` (`ai_explain`) recebe `ExplainRequest` (pergunta e conta)
+e retorna `ExplainResponse` com evidências originais validadas. Usuário, contexto
+e corte são definidos pelo servidor. Não calcula resumo/projeção nem implementa
+replay ou persistência de conversas. Contrato completo, códigos de erro e roteiro
+de verificação em [HTTP IA](ai-http.md).
+
+| HTTP | Código | Situação |
+| --- | --- | --- |
+| 404 | `ACCOUNT_NOT_FOUND` | Conta inexistente ou alheia |
+| 422 | `VALIDATION_ERROR` | Corpo inválido ou campo extra |
+| 500 | `AI_CONFIGURATION_ERROR` | Configuração recusada pelo provedor |
+| 500 | `AI_CONTEXT_INVALID` | Contexto ou prompt inválido no servidor |
+| 502 | `AI_INVALID_RESPONSE` | Saída incompatível ou rejeitada pelo domínio |
+| 503 | `AI_UNAVAILABLE` | Provedor sem chave, cota/crédito ou indisponível |
+
+Todas essas respostas desta operação usam `ErrorResponse` no OpenAPI. Sem
+evidências elegíveis, o serviço responde `200` com insuficiência, incerteza alta e
+limitações, sem chamar o provedor nem tratar ausência como saldo zero.
 
 ## Caminho dos dados
 

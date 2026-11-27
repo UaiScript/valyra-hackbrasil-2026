@@ -145,6 +145,77 @@
         "title": "AlertUpdate",
         "type": "object"
       },
+      "AlphaSignalSource": {
+        "additionalProperties": false,
+        "properties": {
+          "ingested_at": {
+            "format": "date-time",
+            "title": "Ingested At",
+            "type": "string"
+          },
+          "kind": {
+            "const": "alpha_signal",
+            "default": "alpha_signal",
+            "title": "Kind",
+            "type": "string"
+          },
+          "observation_date": {
+            "format": "date",
+            "title": "Observation Date",
+            "type": "string"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "published_at_estimated": {
+            "title": "Published At Estimated",
+            "type": "boolean"
+          },
+          "revision_id": {
+            "minimum": 1.0,
+            "title": "Revision Id",
+            "type": "integer"
+          },
+          "signal_id": {
+            "format": "uuid",
+            "title": "Signal Id",
+            "type": "string"
+          },
+          "signal_key": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Signal Key",
+            "type": "string"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "source_url": {
+            "format": "uri",
+            "maxLength": 2083,
+            "minLength": 1,
+            "title": "Source Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "signal_id",
+          "signal_key",
+          "revision_id",
+          "source_url",
+          "observation_date",
+          "published_at",
+          "published_at_estimated",
+          "ingested_at"
+        ],
+        "title": "AlphaSignalSource",
+        "type": "object"
+      },
       "Body_finance_create_import_batch": {
         "properties": {
           "file": {
@@ -157,6 +228,193 @@
           "file"
         ],
         "title": "Body_finance_create_import_batch",
+        "type": "object"
+      },
+      "BudgetOut": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/CategoryOut"
+          },
+          "limit_cents": {
+            "title": "Limit Cents",
+            "type": "integer"
+          },
+          "remaining_cents": {
+            "title": "Remaining Cents",
+            "type": "integer"
+          },
+          "spent_cents": {
+            "title": "Spent Cents",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "over"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "limit_cents",
+          "spent_cents",
+          "remaining_cents",
+          "status"
+        ],
+        "title": "BudgetOut",
+        "type": "object"
+      },
+      "BudgetReportOut": {
+        "description": "Or\u00e7amento do m\u00eas: limite e consumo realizado at\u00e9 hoje, sem previs\u00e3o.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BudgetOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "today": {
+            "format": "date",
+            "title": "Today",
+            "type": "string"
+          },
+          "total_limit_cents": {
+            "title": "Total Limit Cents",
+            "type": "integer"
+          },
+          "total_spent_cents": {
+            "title": "Total Spent Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "today",
+          "items",
+          "total_limit_cents",
+          "total_spent_cents"
+        ],
+        "title": "BudgetReportOut",
+        "type": "object"
+      },
+      "BudgetUpsert": {
+        "additionalProperties": false,
+        "description": "Define ou troca o limite mensal da categoria; limite \u00e9 positivo e em centavos.",
+        "properties": {
+          "limit_cents": {
+            "title": "Limit Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "limit_cents"
+        ],
+        "title": "BudgetUpsert",
+        "type": "object"
+      },
+      "CalculationInputScope": {
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "import_batch_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Import Batch Ids",
+            "type": "array"
+          },
+          "period": {
+            "$ref": "#/components/schemas/EvidencePeriod"
+          },
+          "record_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Record Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "period"
+        ],
+        "title": "CalculationInputScope",
+        "type": "object"
+      },
+      "CalculationSource": {
+        "additionalProperties": false,
+        "properties": {
+          "computed_at": {
+            "format": "date-time",
+            "title": "Computed At",
+            "type": "string"
+          },
+          "input_evidence_ids": {
+            "items": {
+              "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+              "type": "string"
+            },
+            "title": "Input Evidence Ids",
+            "type": "array"
+          },
+          "input_scope": {
+            "$ref": "#/components/schemas/CalculationInputScope"
+          },
+          "kind": {
+            "const": "calculation",
+            "default": "calculation",
+            "title": "Kind",
+            "type": "string"
+          },
+          "method_key": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Method Key",
+            "type": "string"
+          },
+          "method_version": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Method Version",
+            "type": "string"
+          },
+          "module": {
+            "enum": [
+              "finance",
+              "alpha"
+            ],
+            "title": "Module",
+            "type": "string"
+          }
+        },
+        "required": [
+          "module",
+          "method_key",
+          "method_version",
+          "computed_at",
+          "input_scope"
+        ],
+        "title": "CalculationSource",
         "type": "object"
       },
       "CashPressureEvidenceOut": {
@@ -250,6 +508,47 @@
         "title": "CategoryTotalOut",
         "type": "object"
       },
+      "DecimalValue": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "decimal",
+            "default": "decimal",
+            "title": "Kind",
+            "type": "string"
+          },
+          "unit": {
+            "enum": [
+              "%",
+              "pp",
+              "fraction",
+              "count",
+              "t",
+              "kg",
+              "ha",
+              "kg/ha",
+              "t/ha",
+              "mm",
+              "\u00b0C",
+              "index"
+            ],
+            "title": "Unit",
+            "type": "string"
+          },
+          "value_decimal": {
+            "maxLength": 256,
+            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+            "title": "Value Decimal",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value_decimal",
+          "unit"
+        ],
+        "title": "DecimalValue",
+        "type": "object"
+      },
       "ErrorBody": {
         "properties": {
           "code": {
@@ -285,6 +584,241 @@
           "error"
         ],
         "title": "ErrorResponse",
+        "type": "object"
+      },
+      "EvidenceItem": {
+        "additionalProperties": false,
+        "properties": {
+          "basis": {
+            "enum": [
+              "reference",
+              "observed",
+              "projected"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
+          "evidence_id": {
+            "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "metric_key": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Metric Key",
+            "type": "string"
+          },
+          "period": {
+            "$ref": "#/components/schemas/EvidencePeriod"
+          },
+          "source": {
+            "discriminator": {
+              "mapping": {
+                "alpha_signal": "#/components/schemas/AlphaSignalSource",
+                "calculation": "#/components/schemas/CalculationSource",
+                "finance_record": "#/components/schemas/FinanceRecordSource"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FinanceRecordSource"
+              },
+              {
+                "$ref": "#/components/schemas/CalculationSource"
+              },
+              {
+                "$ref": "#/components/schemas/AlphaSignalSource"
+              }
+            ],
+            "title": "Source"
+          },
+          "value": {
+            "discriminator": {
+              "mapping": {
+                "decimal": "#/components/schemas/DecimalValue",
+                "integer": "#/components/schemas/IntegerValue",
+                "money": "#/components/schemas/MoneyValue",
+                "text": "#/components/schemas/TextValue"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MoneyValue"
+              },
+              {
+                "$ref": "#/components/schemas/IntegerValue"
+              },
+              {
+                "$ref": "#/components/schemas/DecimalValue"
+              },
+              {
+                "$ref": "#/components/schemas/TextValue"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "metric_key",
+          "label",
+          "basis",
+          "source",
+          "value",
+          "period"
+        ],
+        "title": "EvidenceItem",
+        "type": "object"
+      },
+      "EvidencePeriod": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "EvidencePeriod",
+        "type": "object"
+      },
+      "ExplainRequest": {
+        "additionalProperties": false,
+        "description": "Entrada HTTP: contexto e identidade do usu\u00e1rio n\u00e3o v\u00eam do navegador.",
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "question": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "account_id"
+        ],
+        "title": "ExplainRequest",
+        "type": "object"
+      },
+      "ExplainResponse": {
+        "additionalProperties": false,
+        "description": "Resposta HTTP montada com as evid\u00eancias originais do servidor.",
+        "properties": {
+          "answer": {
+            "minLength": 1,
+            "title": "Answer",
+            "type": "string"
+          },
+          "as_of": {
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "evidences": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceItem"
+            },
+            "title": "Evidences",
+            "type": "array"
+          },
+          "limitations": {
+            "items": {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "uncertainty": {
+            "enum": [
+              "baixa",
+              "m\u00e9dia",
+              "alta"
+            ],
+            "title": "Uncertainty",
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer",
+          "as_of",
+          "evidences",
+          "uncertainty",
+          "limitations"
+        ],
+        "title": "ExplainResponse",
+        "type": "object"
+      },
+      "FinanceRecordSource": {
+        "additionalProperties": false,
+        "properties": {
+          "import_batch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Import Batch Id"
+          },
+          "kind": {
+            "const": "finance_record",
+            "default": "finance_record",
+            "title": "Kind",
+            "type": "string"
+          },
+          "record_id": {
+            "format": "uuid",
+            "title": "Record Id",
+            "type": "string"
+          },
+          "record_type": {
+            "enum": [
+              "account",
+              "transaction"
+            ],
+            "title": "Record Type",
+            "type": "string"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "record_type",
+          "record_id",
+          "recorded_at"
+        ],
+        "title": "FinanceRecordSource",
         "type": "object"
       },
       "HealthResponse": {
@@ -487,6 +1021,58 @@
           "raw_line"
         ],
         "title": "ImportRejectionOut",
+        "type": "object"
+      },
+      "IntegerValue": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "integer",
+            "default": "integer",
+            "title": "Kind",
+            "type": "string"
+          },
+          "unit": {
+            "const": "count",
+            "default": "count",
+            "title": "Unit",
+            "type": "string"
+          },
+          "value_int": {
+            "title": "Value Int",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "value_int"
+        ],
+        "title": "IntegerValue",
+        "type": "object"
+      },
+      "MoneyValue": {
+        "additionalProperties": false,
+        "properties": {
+          "amount_cents": {
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "currency": {
+            "const": "BRL",
+            "default": "BRL",
+            "title": "Currency",
+            "type": "string"
+          },
+          "kind": {
+            "const": "money",
+            "default": "money",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_cents"
+        ],
+        "title": "MoneyValue",
         "type": "object"
       },
       "Page_AccountOut_": {
@@ -822,6 +1408,28 @@
         "title": "SummaryOut",
         "type": "object"
       },
+      "TextValue": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "text",
+            "default": "text",
+            "title": "Kind",
+            "type": "string"
+          },
+          "value_text": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Value Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value_text"
+        ],
+        "title": "TextValue",
+        "type": "object"
+      },
       "TransactionCategoryOut": {
         "properties": {
           "id": {
@@ -954,6 +1562,88 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/ai/explain": {
+      "post": {
+        "description": "O servidor autoriza a conta do usu\u00e1rio demo e monta o contexto corrente. Sem evid\u00eancias eleg\u00edveis, retorna insufici\u00eancia sem chamar o provedor. N\u00e3o persiste conversa, n\u00e3o faz replay hist\u00f3rico nem calcula resumo/proje\u00e7\u00e3o.",
+        "operationId": "ai_explain",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplainResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "ACCOUNT_NOT_FOUND: conta inexistente ou alheia"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR: corpo inv\u00e1lido"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "AI_CONFIGURATION_ERROR ou AI_CONTEXT_INVALID: falha de prepara\u00e7\u00e3o"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "AI_INVALID_RESPONSE: sa\u00edda inv\u00e1lida ou rejeitada pelo dom\u00ednio"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "AI_UNAVAILABLE: provedor sem chave, cota ou acesso"
+          }
+        },
+        "summary": "Explicar evid\u00eancias da conta",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
     "/api/v1/alerts": {
       "get": {
         "operationId": "alerts_list",
@@ -1327,6 +2017,165 @@
           }
         },
         "summary": "Finance Get Projection",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/budgets": {
+      "get": {
+        "operationId": "finance_get_budgets",
+        "parameters": [
+          {
+            "description": "AAAA-MM; padr\u00e3o: m\u00eas de hoje",
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^([1-9][0-9]{3})-(0[1-9]|1[0-2])$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "AAAA-MM; padr\u00e3o: m\u00eas de hoje",
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Finance Get Budgets",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/budgets/{category_id}": {
+      "delete": {
+        "operationId": "finance_delete_budget",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Category Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso n\u00e3o encontrado"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Finance Delete Budget",
+        "tags": [
+          "finance"
+        ]
+      },
+      "put": {
+        "operationId": "finance_set_budget",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Category Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetUpsert"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso n\u00e3o encontrado"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Finance Set Budget",
         "tags": [
           "finance"
         ]

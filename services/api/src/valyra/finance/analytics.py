@@ -371,3 +371,21 @@ CASH_PRESSURE_DAYS = 30
 
 def is_cash_pressure(projection: Projection) -> bool:
     return projection.min_balance_cents < 0
+
+
+# Orçamento por categoria: "atenção" a partir de 80% do limite, "estourado" acima de 100%.
+# Comparação em inteiros (gasto * 100 contra limite * 80) para não depender de float.
+BUDGET_WARNING_PERCENT = 80
+
+
+def budget_spent_cents(category_total_cents: int) -> int:
+    """Gasto do mês em módulo; estorno maior que as saídas não vira gasto negativo."""
+    return max(0, -category_total_cents)
+
+
+def budget_status(spent_cents: int, limit_cents: int) -> str:
+    if spent_cents > limit_cents:
+        return "over"
+    if spent_cents * 100 >= limit_cents * BUDGET_WARNING_PERCENT:
+        return "warning"
+    return "ok"
