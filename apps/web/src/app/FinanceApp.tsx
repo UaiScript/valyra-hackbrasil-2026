@@ -13,6 +13,7 @@ import { Projection } from './pages/Projection';
 import { Alerts, ALERTS_CHANGED } from './pages/Alerts';
 import { Budgets } from './pages/Budgets';
 import { AskValyra } from './pages/AskValyra';
+import { LogoMark } from '../components/LogoMark';
 import './cockpit.css';
 import './app.css';
 
@@ -109,7 +110,7 @@ export default function FinanceApp() {
     <div className="app-shell cx">
       <aside className={`app-sidebar${menuOpen ? ' app-sidebar--open' : ''}`} aria-label="Módulos">
         <a href={ROUTES.overview} className="cx-brand" aria-label="Valyra — central">
-          <span className="cx-brand__mark" aria-hidden="true">V</span>
+          <span className="cx-brand__mark" aria-hidden="true"><LogoMark size={30} /></span>
           <span className="cx-brand__text"><b>Valyra</b><small>Inteligência financeira</small></span>
         </a>
         <nav className="cx-nav">
@@ -117,8 +118,8 @@ export default function FinanceApp() {
             <div key={group.title} className="cx-nav__group">
               <span className="cx-nav__title">{group.title}</span>
               {group.items.map(({ route: r, label, icon: Icon }) => (
-                <a key={r} href={ROUTES[r]} aria-current={r === route ? 'page' : undefined}>
-                  <Icon size={17} aria-hidden="true" />{label}
+                <a key={r} href={ROUTES[r]} aria-current={r === route ? 'page' : undefined} data-tip={label}>
+                  <Icon size={19} aria-hidden="true" /><span className="cx-nav__label">{label}</span>
                   {r === 'alerts' && newAlerts > 0 && <span className="app-nav__count" aria-label={`${newAlerts} novos`}>{newAlerts}</span>}
                 </a>
               ))}
@@ -126,14 +127,13 @@ export default function FinanceApp() {
           ))}
           <div className="cx-nav__group">
             <span className="cx-nav__title">Pesquisa</span>
-            <span className="cx-nav__soon" title="Módulo em pesquisa; ainda sem dados conectados">
-              <FlaskConical size={17} aria-hidden="true" />Alternative Alpha<em>em breve</em>
+            <span className="cx-nav__soon" data-tip="Alternative Alpha · em breve" title="Módulo em pesquisa; ainda sem dados conectados">
+              <FlaskConical size={19} aria-hidden="true" /><span className="cx-nav__label">Alternative Alpha</span><em>em breve</em>
             </span>
           </div>
         </nav>
         <div className="cx-sidebar__foot">
-          <span className="cx-session"><span className="cx-session__avatar" aria-hidden="true">D</span><span><b>Usuário demo</b><small>Dados sintéticos · sem login</small></span></span>
-          <a className="app-nav__back" href="#top"><ArrowLeft size={15} aria-hidden="true" />Voltar à landing</a>
+          <a className="app-nav__back" href="#top" data-tip="Voltar à landing"><ArrowLeft size={18} aria-hidden="true" /><span className="cx-nav__label">Voltar à landing</span></a>
         </div>
       </aside>
       <div className="app-main">
@@ -142,7 +142,7 @@ export default function FinanceApp() {
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="cx-header__title">
-            <span className="cx-crumb">{current.group}<span aria-hidden="true">/</span></span>
+            <span className="cx-crumb">{current.group}</span>
             <h1>{current.label}</h1>
           </div>
           <a className="cx-command" href={ROUTES.ai} aria-label="Pergunte ao Valyra (Ctrl+K)">
@@ -151,6 +151,10 @@ export default function FinanceApp() {
             <kbd><Command size={11} aria-hidden="true" />K</kbd>
           </a>
           <ApiStatus route={route} />
+          <a className="cx-icon-link" href={ROUTES.alerts} aria-label={newAlerts ? `Alertas, ${newAlerts} novos` : 'Alertas'}>
+            <Bell size={18} aria-hidden="true" />{newAlerts > 0 && <span className="cx-icon-link__dot" aria-hidden="true" />}
+          </a>
+          <span className="cx-avatar" title="Usuário demo · dados sintéticos, sem login" aria-label="Usuário demo">D</span>
         </header>
         <main className="app-content" id="main">
           {route === 'overview' && <Overview />}

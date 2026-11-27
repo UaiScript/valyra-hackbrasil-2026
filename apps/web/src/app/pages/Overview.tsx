@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import type { FC, FormEvent } from 'react';
-import { Activity, ArrowUpRight, BellRing, ChartSpline, Pencil, Radar, Repeat, Sparkles, Target, TrendingUp, Wallet } from 'lucide-react';
+import { ArrowUpRight, BellRing, Pencil, Radar, Repeat, Sparkles, TrendingUp } from 'lucide-react';
 import { api, describeError } from '../api/client';
 import type { AccountOut, AccountUpdate } from '../../lib/api/schema';
-import { centsToInput, formatCents, formatIsoDate, formatMonth, formatShortDate, parseReaisToCents } from '../money';
-import { BudgetList, usedPercent } from '../Budget';
-import { ProjectionChart } from '../ProjectionChart';
+import { centsToInput, formatCents, formatIsoDate, formatShortDate, parseReaisToCents, shiftMonth } from '../money';
+import { BudgetList, BudgetMeter, usedPercent } from '../Budget';
+import { CandleChart, HeroArt, Sparkline, Ticker } from '../Market';
 import { ROUTES } from '../router';
 import { TransactionSummary } from '../TransactionRow';
 import { Async, Card, Empty, NoticeBar } from '../ui';
@@ -13,61 +13,111 @@ import type { Notice } from '../ui';
 import { useApi } from '../useApi';
 
 /**
- * Linha de indicadores da central. Realizado e previsto ficam em blocos separados e
- * rotulados, para não confundir saldo de hoje com saldo estimado; todos os números vêm
- * prontos da API (resumo, projeção e orçamento), sem cálculo financeiro no navegador.
+ * Destaque da Central: saldo realizado em evidência, a arte com a trajetória prevista e,
+ * embaixo, a faixa de indicadores. Realizado e previsto ficam sempre rotulados à parte;
+ * todos os números vêm prontos da API (resumo, projeção, orçamento e alertas).
  */
-const CommandKpis: FC<{ account: AccountOut; reloadKey: number }> = ({ account, reloadKey }) => {
+const Hero: FC<{ account: AccountOut; reloadKey: number }> = ({ account, reloadKey }) => {
   const summary = useApi((s) => api.getSummary({ account_id: account.id }, s), [account.id, reloadKey]);
   const projection = useApi((s) => api.getProjection(account.id, 30, s), [account.id, reloadKey]);
   const budgets = useApi((s) => api.getBudgets({}, s), [reloadKey]);
+  const alerts = useApi((s) => api.listAlerts(s), []);
+  const anomalies = useApi((s) => api.listTransactions({ is_anomaly: true, limit: 1 }, s), []);
   const s = summary.state.data;
   const p = projection.state.data;
   const b = budgets.state.data;
-  const pending = (st: { status: string }) => (st.status === 'error' ? 'Indisponível' : '—');
+  const fresh = alerts.state.data?.items.filter((a) => a.status === 'new').length ?? 0;
+  const signals = fresh + (anomalies.state.data?.total ?? 0);
   const budgetPct = b && b.total_limit_cents > 0 ? usedPercent(b.total_spent_cents, b.total_limit_cents) : null;
-  const overCount = b?.items.filter((i) => i.status === 'over').length ?? 0;
+  const dash = (st: { status: string }) => (st.status === 'error' ? 'Indisponível' : '—');
   return (
-    <section className="cx-kpis cx-span" aria-label="Indicadores principais">
-      <a className="cx-kpi cx-kpi--lead" href={ROUTES.summary}>
-        <span className="cx-kpi__label"><Wallet size={13} aria-hidden="true" />Saldo realizado · {s ? formatIsoDate(s.today) : 'hoje'}</span>
-        <strong className="cx-kpi__value">{s ? (s.realized_balance_cents === null ? 'Indisponível' : formatCents(s.realized_balance_cents)) : pending(summary.state)}</strong>
-        <span className="cx-kpi__hint">{account.name}</span>
-      </a>
-      <a className={`cx-kpi${s && s.net_cents < 0 ? ' cx-kpi--danger' : ''}`} href={ROUTES.summary}>
-        <span className="cx-kpi__label"><Activity size={13} aria-hidden="true" />Resultado do mês</span>
-        <strong className="cx-kpi__value">{s ? formatCents(s.net_cents) : pending(summary.state)}</strong>
-        <span className="cx-kpi__hint">{s ? `${formatMonth(s.month)}, realizado` : 'entradas menos saídas'}</span>
-      </a>
-      <a className={`cx-kpi${p && p.min_balance_cents < 0 ? ' cx-kpi--danger' : ''}`} href={ROUTES.projection}>
-        <span className="cx-kpi__label"><ChartSpline size={13} aria-hidden="true" />Menor saldo · 30 dias</span>
-        <strong className="cx-kpi__value">{p ? formatCents(p.min_balance_cents) : pending(projection.state)}</strong>
-        <span className="cx-kpi__hint">{p ? `em ${formatShortDate(p.min_balance_date)} · previsão` : 'projeção de caixa'}</span>
-      </a>
-      <a className={`cx-kpi${overCount ? ' cx-kpi--danger' : budgetPct !== null && budgetPct >= 80 ? ' cx-kpi--warning' : ''}`} href={ROUTES.budgets}>
-        <span className="cx-kpi__label"><Target size={13} aria-hidden="true" />Orçamento do mês</span>
-        <strong className="cx-kpi__value">{budgetPct === null ? (b ? 'Sem limites' : pending(budgets.state)) : `${budgetPct}%`}</strong>
-        <span className="cx-kpi__hint">{b && budgetPct !== null ? `${formatCents(b.total_spent_cents)} de ${formatCents(b.total_limit_cents)}${overCount ? ` · ${overCount} estourado${overCount > 1 ? 's' : ''}` : ''}` : 'defina tetos por categoria'}</span>
-      </a>
+    <section className="cx-hero cx-span-8" aria-label="Saldo de hoje e indicadores">
+      <div className="cx-hero__body">
+        <span className="cx-eyebrow">Saldo realizado · {s ? formatIsoDate(s.today) : 'hoje'}</span>
+        <strong className="cx-hero__figure">{s ? (s.realized_balance_cents === null ? 'Indisponível' : formatCents(s.realized_balance_cents)) : dash(summary.state)}</strong>
+        <p className="cx-hero__lede">{account.name}. Saldo de referência mais tudo o que entrou e saiu até hoje.</p>
+        <div className="cx-hero__actions">
+          <a className="cx-pill cx-pill--light" href={ROUTES.ai}><Sparkles size={16} aria-hidden="true" />Pergunte ao Valyra</a>
+          <a className="cx-pill cx-pill--ghost" href={ROUTES.projection}>Ver projeção<ArrowUpRight size={16} aria-hidden="true" /></a>
+        </div>
+      </div>
+      <HeroArt projection={p} />
+      <dl className="cx-hero__kpis">
+        <a href={ROUTES.summary} className="cx-kpi cx-kpi--amber">
+          <dt>Resultado do mês</dt>
+          <dd className={s && s.net_cents < 0 ? 'cx-neg' : undefined}>{s ? formatCents(s.net_cents) : dash(summary.state)}</dd>
+          <span className="cx-kpi__bar" aria-hidden="true" />
+        </a>
+        <a href={ROUTES.projection} className="cx-kpi cx-kpi--coral">
+          <dt>Menor saldo · 30 dias</dt>
+          <dd className={p && p.min_balance_cents < 0 ? 'cx-neg' : undefined}>{p ? formatCents(p.min_balance_cents) : dash(projection.state)}</dd>
+          <span className="cx-kpi__hint">{p ? `previsto para ${formatShortDate(p.min_balance_date)}` : 'previsão'}</span>
+          <span className="cx-kpi__bar" aria-hidden="true" />
+        </a>
+        <a href={ROUTES.budgets} className="cx-kpi cx-kpi--lime">
+          <dt>Orçamento usado</dt>
+          <dd className={budgetPct !== null && budgetPct > 100 ? 'cx-neg' : undefined}>{budgetPct === null ? (b ? 'Sem tetos' : dash(budgets.state)) : `${budgetPct}%`}</dd>
+          <span className="cx-kpi__bar" aria-hidden="true" />
+        </a>
+        <a href={ROUTES.alerts} className="cx-kpi cx-kpi--sky">
+          <dt>Sinais ativos</dt>
+          <dd>{alerts.state.data && anomalies.state.data ? signals : '—'}</dd>
+          <span className="cx-kpi__bar" aria-hidden="true" />
+        </a>
+      </dl>
     </section>
   );
 };
 
-const ForecastPanel: FC<{ account: AccountOut; reloadKey: number }> = ({ account, reloadKey }) => {
+/** Saldo previsto em linha fina, com a mesma série do gráfico detalhado. */
+const ForecastCard: FC<{ account: AccountOut; reloadKey: number }> = ({ account, reloadKey }) => {
   const projection = useApi((s) => api.getProjection(account.id, 30, s), [account.id, reloadKey]);
   const p = projection.state.data;
+  const end = p?.items[p.items.length - 1];
   return (
-    <section className="app-card cx-panel cx-panel--chart">
+    <a className="cx-card cx-forecast cx-span-4" href={ROUTES.projection}>
+      <span className="cx-card__title">Saldo previsto · 30 dias</span>
+      {p && end ? (
+        <>
+          <strong className={`cx-card__figure${end.balance_cents < 0 ? ' cx-neg' : ''}`}>{formatCents(end.balance_cents)}</strong>
+          <span className="cx-card__hint">em {formatShortDate(end.date)} · previsão</span>
+          <Sparkline values={[p.start_balance_cents, ...p.items.map((d) => d.balance_cents)]} width={320} height={92} className="cx-spark--amber" />
+        </>
+      ) : <span className="cx-card__hint">{projection.state.status === 'error' ? 'Projeção indisponível.' : 'Calculando…'}</span>}
+    </a>
+  );
+};
+
+const BudgetCard: FC<{ reloadKey: number }> = ({ reloadKey }) => {
+  const budgets = useApi((s) => api.getBudgets({}, s), [reloadKey]);
+  const b = budgets.state.data;
+  const available = b ? b.total_limit_cents - b.total_spent_cents : 0;
+  const over = b?.items.filter((i) => i.status === 'over').length ?? 0;
+  return (
+    <a className="cx-card cx-budget-card cx-span-4" href={ROUTES.budgets}>
+      <span className="cx-card__title">Orçamento do mês</span>
+      {b && b.items.length > 0 ? (
+        <>
+          <strong className={`cx-card__figure cx-card__figure--lime${available < 0 ? ' cx-neg' : ''}`}>{formatCents(Math.abs(available))}</strong>
+          <span className="cx-card__hint">{available < 0 ? 'acima do limite' : 'disponível'} · {formatCents(b.total_spent_cents)} de {formatCents(b.total_limit_cents)}{over ? ` · ${over} estourado${over > 1 ? 's' : ''}` : ''}</span>
+          <BudgetMeter spent={b.total_spent_cents} limit={b.total_limit_cents} status={over ? 'over' : usedPercent(b.total_spent_cents, b.total_limit_cents) >= 80 ? 'warning' : 'ok'} />
+        </>
+      ) : <span className="cx-card__hint">{b ? 'Defina tetos por categoria para acompanhar aqui.' : 'Carregando…'}</span>}
+    </a>
+  );
+};
+
+const CandlesCard: FC<{ account: AccountOut; reloadKey: number }> = ({ account, reloadKey }) => {
+  const projection = useApi((s) => api.getProjection(account.id, 35, s), [account.id, reloadKey]);
+  const p = projection.state.data;
+  return (
+    <section className="app-card cx-panel cx-span-8">
       <header className="app-card__header">
-        <h2>Fluxo de caixa previsto · 30 dias</h2>
+        <h2>Projeção semanal</h2>
         <a className="app-link" href={ROUTES.projection}>Detalhar<ArrowUpRight size={14} aria-hidden="true" /></a>
       </header>
-      {p ? (
-        <>
-          <ProjectionChart projection={p} height={250} />
-          <p className="cx-caption">Previsão a partir do saldo realizado de hoje ({formatCents(p.start_balance_cents)}), das recorrências detectadas e da média de gastos variáveis ({formatCents(p.variable_daily_cents)}/dia).</p>
-        </>
-      ) : <span className="app-muted vx-hero__placeholder">{projection.state.status === 'error' ? 'Projeção indisponível.' : 'Calculando projeção…'}</span>}
+      {p ? <CandleChart projection={p} /> : <span className="app-muted">{projection.state.status === 'error' ? 'Projeção indisponível.' : 'Calculando projeção…'}</span>}
+      {p && <p className="cx-caption">Cada vela é uma semana prevista: abre no saldo da semana anterior e fecha no último dia. Base: saldo realizado de hoje, recorrências detectadas e média de gastos variáveis ({formatCents(p.variable_daily_cents)}/dia).</p>}
     </section>
   );
 };
@@ -80,7 +130,7 @@ const SignalRadar: FC = () => {
   const fresh = alerts.state.data?.items.filter((a) => a.status === 'new') ?? [];
   const atypical = anomalies.state.data;
   return (
-    <section className="app-card cx-panel cx-radar">
+    <section className="app-card cx-panel cx-radar cx-span-4">
       <header className="app-card__header"><h2><Radar size={14} aria-hidden="true" />Radar de sinais</h2></header>
       <ul className="cx-signals">
         <li className={fresh.length ? 'cx-signal cx-signal--warning' : 'cx-signal'}>
@@ -103,6 +153,13 @@ const SignalRadar: FC = () => {
       </a>
     </section>
   );
+};
+
+const MarketTicker: FC<{ reloadKey: number }> = ({ reloadKey }) => {
+  const current = useApi((s) => api.getSummary({}, s), [reloadKey]);
+  const month = current.state.data?.month;
+  const previous = useApi((s) => (month ? api.getSummary({ month: shiftMonth(month, -1) }, s) : Promise.resolve(undefined)), [month, reloadKey]);
+  return <Ticker current={current.state.data} previous={previous.state.data} />;
 };
 
 const BudgetPanel: FC<{ reloadKey: number }> = ({ reloadKey }) => {
@@ -177,8 +234,15 @@ export const Overview: FC = () => {
 
   return (
     <div className="cx-grid">
-      {account && <CommandKpis account={account} reloadKey={heroKey} />}
-      {account && <ForecastPanel account={account} reloadKey={heroKey} />}
+      <MarketTicker reloadKey={heroKey} />
+      {account && <Hero account={account} reloadKey={heroKey} />}
+      {account && (
+        <div className="cx-stack cx-span-4">
+          <ForecastCard account={account} reloadKey={heroKey} />
+          <BudgetCard reloadKey={heroKey} />
+        </div>
+      )}
+      {account && <CandlesCard account={account} reloadKey={heroKey} />}
       <SignalRadar />
       <BudgetPanel reloadKey={heroKey} />
       <NoticeBar notice={notice} onClose={() => setNotice(null)} />

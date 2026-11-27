@@ -86,7 +86,8 @@ body { background: var(--color-bg); }
 .site-header__inner { position: relative; display: flex; min-height: 5rem; align-items: center; justify-content: space-between; gap: var(--space-6); }
 .brand { display: inline-flex; align-items: center; gap: 0.65rem; color: var(--color-text); text-decoration: none; }
 .brand:hover { color: var(--color-text); text-decoration: none; }
-.brand__mark { display: grid; width: 2.1rem; height: 2.1rem; place-items: center; border-radius: 0.58rem; color: var(--valyra-neutral-0); background: var(--valyra-brand-700); font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; }
+.brand__mark { display: grid; width: 2.1rem; height: 2.1rem; place-items: center; border-radius: 0.58rem; background: radial-gradient(circle at 50% 42%, #0b1b46, #040814 75%); box-shadow: inset 0 0 0 1px rgb(82 212 255 / 0.12); }
+.brand__mark svg { width: 78%; height: 78%; }
 .brand__word { font-size: 1.28rem; font-weight: 700; letter-spacing: -0.055em; }
 .brand__period { color: var(--color-primary); }
 .site-nav { display: flex; align-items: center; gap: clamp(1rem, 2.3vw, 2rem); }

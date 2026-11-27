@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FC } from 'react';
 import { ArrowUpRight, LayoutDashboard, Menu, X } from 'lucide-react';
 import { CONTENT } from '../content';
+import { LogoMark } from './LogoMark';
 import { DEMO_HASH } from '../links';
 import type { Language } from '../types/content';
 
@@ -27,7 +28,7 @@ export const TerminalTopNavigation: FC<NavigationProps> = ({ lang, onToggleLang,
     <header className="site-header">
       <div className="site-header__inner container">
         <a href="#top" className="brand" aria-label="Valyra — início" onClick={closeMenu}>
-          <span className="brand__mark" aria-hidden="true">V</span>
+          <span className="brand__mark" aria-hidden="true"><LogoMark size={26} /></span>
           <span className="brand__word">valyra<span className="brand__period">.</span></span>
         </a>
 

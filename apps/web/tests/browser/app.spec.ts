@@ -130,7 +130,8 @@ test('central separa saldo realizado de hoje e projeção dos próximos 30 dias'
   await page.goto('/#/app');
   await expect(page.getByText('R$ 4.870,10', { exact: true })).toBeVisible();
   await expect(page.getByText('Saldo realizado · 07/11/2026')).toBeVisible();
-  await expect(page.getByText('Fluxo de caixa previsto · 30 dias')).toBeVisible();
+  await expect(page.getByText('Saldo previsto · 30 dias')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Projeção semanal' })).toBeVisible();
   await expect(page.getByText('Saldo previsto negativo')).toBeVisible();
 });
 

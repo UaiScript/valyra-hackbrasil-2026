@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import { CONTENT } from '../content';
+import { LogoMark } from './LogoMark';
 import type { Language } from '../types/content';
 import { REPOSITORY_URL } from '../links';
 
@@ -19,7 +20,7 @@ export const TerminalFooter: FC<{ lang: Language }> = ({ lang }) => {
       <div className="container">
         <div className="footer-main">
           <div className="footer-brand">
-            <a href="#top" className="brand brand--footer"><span className="brand__mark" aria-hidden="true">V</span><span className="brand__word">valyra<span className="brand__period">.</span></span></a>
+            <a href="#top" className="brand brand--footer"><span className="brand__mark" aria-hidden="true"><LogoMark size={26} /></span><span className="brand__word">valyra<span className="brand__period">.</span></span></a>
             <p>{t.tagline}</p>
             <span className="footer-project-label">UAISCRIPT · HACK BRASIL 2026</span>
           </div>
