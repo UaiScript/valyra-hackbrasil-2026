@@ -1,5 +1,6 @@
 """Casos de uso do Finance: importação (#14), consultas (#15), correção (#42), resumo (#43),
-recorrência (#44), gastos atípicos (#45), projeção de caixa (#46) e pressão de caixa (#47)."""
+recorrência (#44), gastos atípicos (#45), projeção de caixa (#46), pressão de caixa (#47)
+e orçamento por categoria."""
 
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -19,6 +20,8 @@ from valyra.finance.analytics import (
     MonthSummary,
     Projection,
     anomaly_scores,
+    budget_spent_cents,
+    budget_status,
     detect_recurrences,
     is_cash_pressure,
     month_bounds,
@@ -369,3 +372,64 @@ def _project(session: Session, account: Account, today: date, days: int) -> Proj
         ((row.date, row.amount_cents, row.is_recurring) for row in rows), today
     )
     return project_cash(start, today, days, series, variable)
+
+
+@dataclass(frozen=True)
+class BudgetLine:
+    category: Category
+    limit_cents: int
+    spent_cents: int
+    status: str
+
+
+@dataclass(frozen=True)
+class BudgetReport:
+    month: str
+    today: date
+    lines: list[BudgetLine]
+
+
+def get_budget_report(session: Session, user_id: UUID, month: str | None) -> BudgetReport:
+    """Limites do usuário e o consumo realizado no mês, somando todas as contas dele."""
+    # Mesmo recorte do resumo mensal: só o realizado até hoje entra no consumo.
+    summary = get_summary(session, user_id, None, month)
+    totals = {total.category_id: total.total_cents for total in summary.month_summary.categories}
+    lines = []
+    for budget, category in repository.list_budgets(session, user_id):
+        spent = budget_spent_cents(totals.get(category.id, 0))
+        lines.append(
+            BudgetLine(
+                category, budget.limit_cents, spent, budget_status(spent, budget.limit_cents)
+            )
+        )
+    return BudgetReport(month=summary.month, today=summary.today, lines=lines)
+
+
+def _expense_category(session: Session, category_id: UUID) -> Category:
+    category = repository.get_category(session, category_id)
+    if category is None:
+        raise AppError("CATEGORY_NOT_FOUND", "Categoria não encontrada", 404)
+    if category.kind != "expense":
+        # Orçamento é teto de gasto: categoria de entrada não tem o que limitar.
+        raise AppError("CATEGORY_KIND_MISMATCH", "Orçamento só vale para categorias de saída", 422)
+    return category
+
+
+def set_budget(session: Session, user_id: UUID, category_id: UUID, limit_cents: int) -> None:
+    try:
+        _expense_category(session, category_id)
+        repository.upsert_budget(session, user_id, category_id, limit_cents)
+        session.commit()
+    except BaseException:
+        session.rollback()
+        raise
+
+
+def remove_budget(session: Session, user_id: UUID, category_id: UUID) -> None:
+    try:
+        if not repository.delete_budget(session, user_id, category_id):
+            raise AppError("BUDGET_NOT_FOUND", "Orçamento não encontrado", 404)
+        session.commit()
+    except BaseException:
+        session.rollback()
+        raise

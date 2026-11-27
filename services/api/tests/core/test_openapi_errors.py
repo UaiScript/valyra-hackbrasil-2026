@@ -16,6 +16,9 @@ EXPECTED_4XX = {
     "finance_list_categories": {"422"},
     "finance_get_summary": {"404", "422"},
     "finance_get_projection": {"404", "422"},
+    "finance_get_budgets": {"422"},
+    "finance_set_budget": {"404", "422"},
+    "finance_delete_budget": {"404", "422"},
     "alerts_list": {"422"},
     "alerts_update": {"404", "422"},
 }

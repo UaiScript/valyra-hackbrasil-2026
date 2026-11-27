@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from valyra.core.db import get_session
@@ -20,6 +20,9 @@ from valyra.finance.models import Category, Transaction
 from valyra.finance.schemas import (
     AccountOut,
     AccountUpdate,
+    BudgetOut,
+    BudgetReportOut,
+    BudgetUpsert,
     CategoryOut,
     CategoryTotalOut,
     ImportBatchCreatedOut,
@@ -278,3 +281,60 @@ def get_projection(
         min_balance_cents=projection.min_balance_cents,
         min_balance_date=projection.min_balance_date,
     )
+
+
+def _budget_report_out(report: service.BudgetReport) -> BudgetReportOut:
+    items = [
+        BudgetOut(
+            category=CategoryOut.model_validate(line.category),
+            limit_cents=line.limit_cents,
+            spent_cents=line.spent_cents,
+            remaining_cents=line.limit_cents - line.spent_cents,
+            status=line.status,
+        )
+        for line in report.lines
+    ]
+    return BudgetReportOut(
+        month=report.month,
+        today=report.today,
+        items=items,
+        total_limit_cents=sum(item.limit_cents for item in items),
+        total_spent_cents=sum(item.spent_cents for item in items),
+    )
+
+
+@router.get("/budgets", name="finance_get_budgets", response_model=BudgetReportOut)
+def get_budgets(
+    session: SessionDep,
+    user_id: UserIdDep,
+    month: Annotated[
+        str | None, Query(pattern=f"^{MONTH_PATTERN}$", description="AAAA-MM; padrão: mês de hoje")
+    ] = None,
+) -> BudgetReportOut:
+    return _budget_report_out(service.get_budget_report(session, user_id, month))
+
+
+# 404 para categoria inexistente; 422 CATEGORY_KIND_MISMATCH para categoria de entrada.
+@router.put(
+    "/budgets/{category_id}",
+    name="finance_set_budget",
+    response_model=BudgetReportOut,
+    responses=error_responses(404),
+)
+def set_budget(
+    category_id: UUID, body: BudgetUpsert, session: SessionDep, user_id: UserIdDep
+) -> BudgetReportOut:
+    service.set_budget(session, user_id, category_id, body.limit_cents)
+    # Devolve o mês corrente já recalculado: a tela troca o painel inteiro de uma vez.
+    return _budget_report_out(service.get_budget_report(session, user_id, None))
+
+
+@router.delete(
+    "/budgets/{category_id}",
+    name="finance_delete_budget",
+    status_code=204,
+    responses=error_responses(404),
+)
+def delete_budget(category_id: UUID, session: SessionDep, user_id: UserIdDep) -> Response:
+    service.remove_budget(session, user_id, category_id)
+    return Response(status_code=204)

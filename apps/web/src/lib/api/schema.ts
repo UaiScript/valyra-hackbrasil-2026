@@ -36,6 +36,28 @@ export type Body_finance_create_import_batch = {
   file: string;
 };
 
+export type BudgetOut = {
+  category: CategoryOut;
+  limit_cents: number;
+  remaining_cents: number;
+  spent_cents: number;
+  status: "ok" | "warning" | "over";
+};
+
+/** Orçamento do mês: limite e consumo realizado até hoje, sem previsão. */
+export type BudgetReportOut = {
+  items: BudgetOut[];
+  month: string;
+  /** date */ today: string;
+  total_limit_cents: number;
+  total_spent_cents: number;
+};
+
+/** Define ou troca o limite mensal da categoria; limite é positivo e em centavos. */
+export type BudgetUpsert = {
+  limit_cents: number;
+};
+
 /** Snapshot da projeção que gerou o alerta; valores previstos, não realizados. */
 export type CashPressureEvidenceOut = {
   days: number;
@@ -221,6 +243,10 @@ export type FinanceGetProjectionQuery = {
   days?: number;
 };
 
+export type FinanceGetBudgetsQuery = {
+  month?: string | null;
+};
+
 export type FinanceListCategoriesQuery = {
   limit?: number;
   offset?: number;
@@ -254,6 +280,9 @@ export const OPERATIONS = {
   finance_create_import_batch: { method: 'POST', path: '/api/v1/finance/accounts/{account_id}/import-batches' },
   finance_update_account: { method: 'PATCH', path: '/api/v1/finance/accounts/{id}' },
   finance_get_projection: { method: 'GET', path: '/api/v1/finance/accounts/{id}/projection' },
+  finance_get_budgets: { method: 'GET', path: '/api/v1/finance/budgets' },
+  finance_delete_budget: { method: 'DELETE', path: '/api/v1/finance/budgets/{category_id}' },
+  finance_set_budget: { method: 'PUT', path: '/api/v1/finance/budgets/{category_id}' },
   finance_list_categories: { method: 'GET', path: '/api/v1/finance/categories' },
   finance_list_import_batches: { method: 'GET', path: '/api/v1/finance/import-batches' },
   finance_get_import_batch: { method: 'GET', path: '/api/v1/finance/import-batches/{id}' },

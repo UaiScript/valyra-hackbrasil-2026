@@ -159,6 +159,96 @@
         "title": "Body_finance_create_import_batch",
         "type": "object"
       },
+      "BudgetOut": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/CategoryOut"
+          },
+          "limit_cents": {
+            "title": "Limit Cents",
+            "type": "integer"
+          },
+          "remaining_cents": {
+            "title": "Remaining Cents",
+            "type": "integer"
+          },
+          "spent_cents": {
+            "title": "Spent Cents",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "over"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "limit_cents",
+          "spent_cents",
+          "remaining_cents",
+          "status"
+        ],
+        "title": "BudgetOut",
+        "type": "object"
+      },
+      "BudgetReportOut": {
+        "description": "Or\u00e7amento do m\u00eas: limite e consumo realizado at\u00e9 hoje, sem previs\u00e3o.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BudgetOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "today": {
+            "format": "date",
+            "title": "Today",
+            "type": "string"
+          },
+          "total_limit_cents": {
+            "title": "Total Limit Cents",
+            "type": "integer"
+          },
+          "total_spent_cents": {
+            "title": "Total Spent Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "today",
+          "items",
+          "total_limit_cents",
+          "total_spent_cents"
+        ],
+        "title": "BudgetReportOut",
+        "type": "object"
+      },
+      "BudgetUpsert": {
+        "additionalProperties": false,
+        "description": "Define ou troca o limite mensal da categoria; limite \u00e9 positivo e em centavos.",
+        "properties": {
+          "limit_cents": {
+            "title": "Limit Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "limit_cents"
+        ],
+        "title": "BudgetUpsert",
+        "type": "object"
+      },
       "CashPressureEvidenceOut": {
         "description": "Snapshot da proje\u00e7\u00e3o que gerou o alerta; valores previstos, n\u00e3o realizados.",
         "properties": {
@@ -1327,6 +1417,165 @@
           }
         },
         "summary": "Finance Get Projection",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/budgets": {
+      "get": {
+        "operationId": "finance_get_budgets",
+        "parameters": [
+          {
+            "description": "AAAA-MM; padr\u00e3o: m\u00eas de hoje",
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^([1-9][0-9]{3})-(0[1-9]|1[0-2])$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "AAAA-MM; padr\u00e3o: m\u00eas de hoje",
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Finance Get Budgets",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/budgets/{category_id}": {
+      "delete": {
+        "operationId": "finance_delete_budget",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Category Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso n\u00e3o encontrado"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Finance Delete Budget",
+        "tags": [
+          "finance"
+        ]
+      },
+      "put": {
+        "operationId": "finance_set_budget",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Category Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetUpsert"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso n\u00e3o encontrado"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Finance Set Budget",
         "tags": [
           "finance"
         ]

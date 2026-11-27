@@ -76,6 +76,9 @@ def test_operation_ids_e_contrato_minimo(app):
         "finance_list_categories",
         "finance_get_summary",
         "finance_get_projection",
+        "finance_get_budgets",
+        "finance_set_budget",
+        "finance_delete_budget",
         "alerts_list",
         "alerts_update",
     }

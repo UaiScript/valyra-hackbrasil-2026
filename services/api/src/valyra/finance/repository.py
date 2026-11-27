@@ -9,7 +9,14 @@ from sqlalchemy import Select, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from valyra.finance.models import Account, Category, ImportBatch, ImportRejection, Transaction
+from valyra.finance.models import (
+    Account,
+    Budget,
+    Category,
+    ImportBatch,
+    ImportRejection,
+    Transaction,
+)
 
 # 5000 linhas × 12 colunas = 60000 parâmetros, perto do teto de 65535 por comando do PostgreSQL;
 # blocos mantêm folga quando novas colunas forem gravadas na importação.
@@ -225,3 +232,36 @@ def update_signals(session: Session, changes: list[dict]) -> None:
     """UPDATE em lote por chave primária: id, is_recurring, recurrence_key e anomaly_score."""
     if changes:
         session.execute(update(Transaction), changes)
+
+
+def list_budgets(session: Session, user_id: UUID) -> list[tuple[Budget, Category]]:
+    rows = session.execute(
+        select(Budget, Category)
+        .join(Category, Category.id == Budget.category_id)
+        .where(Budget.user_id == user_id)
+        .order_by(Category.name, Category.id)
+    )
+    return [(row[0], row[1]) for row in rows]
+
+
+def upsert_budget(session: Session, user_id: UUID, category_id: UUID, limit_cents: int) -> None:
+    # ON CONFLICT evita corrida entre dois PUT simultâneos para a mesma categoria.
+    statement = insert(Budget).values(
+        user_id=user_id, category_id=category_id, limit_cents=limit_cents
+    )
+    session.execute(
+        statement.on_conflict_do_update(
+            index_elements=[Budget.user_id, Budget.category_id],
+            set_={"limit_cents": limit_cents, "updated_at": func.now()},
+        )
+    )
+
+
+def delete_budget(session: Session, user_id: UUID, category_id: UUID) -> bool:
+    budget = session.scalar(
+        select(Budget).where(Budget.user_id == user_id, Budget.category_id == category_id)
+    )
+    if budget is None:
+        return False
+    session.delete(budget)
+    return True

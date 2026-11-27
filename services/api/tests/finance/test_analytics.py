@@ -451,3 +451,14 @@ def test_horizonte_fora_da_faixa(dias):
 def test_pressao_de_caixa_somente_abaixo_de_zero(inicio, esperado):
     # Variável zero: o mínimo é o próprio saldo de partida; zero exato não dispara (< 0).
     assert is_cash_pressure(project_cash(inicio, HOJE, 30, [], 0)) is esperado
+
+
+def test_budget_status_limites():
+    from valyra.finance.analytics import budget_spent_cents, budget_status
+
+    assert budget_status(7999, 10000) == "ok"
+    assert budget_status(8000, 10000) == "warning"
+    assert budget_status(10000, 10000) == "warning"
+    assert budget_status(10001, 10000) == "over"
+    assert budget_spent_cents(-4500) == 4500
+    assert budget_spent_cents(1200) == 0
