@@ -481,7 +481,7 @@ test('faixa da Central troca entre bolsa, manchetes e clima com a fonte citada',
   // Sem perfil escolhido, a faixa abre na bolsa: ações do radar e juros do Banco Central.
   await expect(bar.getByRole('button', { name: 'Bolsa' })).toHaveAttribute('aria-pressed', 'true');
   const first = bar.locator('.cx-ticker__row').first();
-  await expect(first.locator('.cx-ticker__item', { hasText: 'PETR4' })).toContainText('▼ -1,2345%');
+  await expect(first.locator('.cx-ticker__item', { hasText: 'PETR4' })).toContainText('▼ -1,2345%pregão de 27 nov');
   await expect(first.locator('.cx-ticker__item', { hasText: 'SELIC META' })).toContainText('15');
   await expect(first).toContainText('brapi.dev');
   await bar.getByRole('button', { name: 'Manchetes' }).click();
@@ -491,7 +491,7 @@ test('faixa da Central troca entre bolsa, manchetes e clima com a fonte citada',
   await expect(headline).toHaveAttribute('href', /agenciadenoticias\.ibge\.gov\.br\/+noticia\/pnad$/);
   await bar.getByRole('button', { name: 'Clima' }).click();
   await expect(first.locator('.cx-ticker__item', { hasText: 'SORRISO (MT)' })).toContainText('42,5 mm');
-  await expect(first.locator('.cx-ticker__item--dry')).toContainText('45,2% abaixo da média');
+  await expect(first.locator('.cx-ticker__item--dry')).toContainText('45,2% abaixo da média · até 26 nov');
   await expect(first).toContainText('Open-Meteo');
   // A escolha fica salva no navegador.
   await page.reload();
@@ -512,6 +512,12 @@ test('perfil da demo adapta menu, atalhos, faixa, radar e perguntas da IA', asyn
   await page.goto('/#/app/alpha');
   await expect(page.getByRole('button', { name: /^Clima/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('article', { name: 'Selic meta' })).toHaveCount(0);
+  // Trocar de perfil com o radar aberto reabre no tema do novo perfil.
+  await page.getByRole('button', { name: /Perfil da demonstração/ }).click();
+  await page.getByRole('group', { name: 'Perfis da demonstração' }).getByRole('button', { name: /Começando a investir/ }).click();
+  await expect(page.getByRole('button', { name: /^Ações/ })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: /Perfil da demonstração/ }).click();
+  await page.getByRole('group', { name: 'Perfis da demonstração' }).getByRole('button', { name: /Cooperado do agro/ }).click();
   await page.goto('/#/app/alpha/semana');
   await expect(page.locator('.nx-grid > *').first()).toContainText('Agro e cadeia da soja');
   await page.goto('/#/app/valyra-ai');

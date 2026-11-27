@@ -3,7 +3,7 @@ import type { FC } from 'react';
 import { CandlestickChart, CloudSun, Newspaper } from 'lucide-react';
 import { api } from './api/client';
 import type { RadarOut, WeeklyNewsOut } from '../lib/api/schema';
-import { compareDecimal, formatDecimal } from './money';
+import { compareDecimal, formatDecimal, formatShortDate } from './money';
 import type { TickerMode } from './profiles';
 import { TICKER_MODES } from './profiles';
 import { useApi } from './useApi';
@@ -34,10 +34,13 @@ const arrow = (t: Tone) => (t === 'up' ? '▲' : t === 'down' ? '▼' : '■');
 export function stockItems(r: RadarOut): Item[] {
   const stocks = r.indicators.filter((i) => i.theme === 'acoes').map((i): Item => {
     const t = signTone(i.latest.value);
-    return { key: i.key, label: i.title.split(':')[0], value: `${arrow(t)} ${formatDecimal(i.latest.value)}%`, note: 'no dia', tone: t };
+    return { key: i.key, label: i.title.split(':')[0], value: `${arrow(t)} ${formatDecimal(i.latest.value)}%`,
+      // Data da cotação sempre visível: em fim de semana, feriado ou coleta parada, o
+      // último pregão pode ser de dias atrás, e "no dia" sozinho afirmaria uma recência falsa.
+      note: `pregão de ${formatShortDate(i.latest.observation_date)}`, tone: t };
   });
   const macro = r.indicators.filter((i) => i.theme === 'juros' || i.theme === 'inflacao').map((i): Item => ({
-    key: i.key, label: i.title.toUpperCase(), value: formatDecimal(i.latest.value), note: i.unit_label, tone: 'flat',
+    key: i.key, label: i.title.toUpperCase(), value: formatDecimal(i.latest.value), note: `${i.unit_label} · ${formatShortDate(i.latest.observation_date)}`, tone: 'flat',
   }));
   return [...stocks, ...macro];
 }
@@ -45,13 +48,16 @@ export function stockItems(r: RadarOut): Item[] {
 export function climateItems(r: RadarOut): Item[] {
   const rains = r.indicators.filter((i) => i.theme === 'clima' && i.unit === 'mm');
   return rains.map((rain): Item => {
-    const anomaly = r.indicators.find((i) => i.theme === 'clima' && i.unit === '%' && i.region?.slug === rain.region?.slug);
+    // Sem região não há como parear com segurança: mostra só os milímetros.
+    const slug = rain.region?.slug;
+    const anomaly = slug ? r.indicators.find((i) => i.theme === 'clima' && i.unit === '%' && i.region?.slug === slug) : undefined;
+    const until = `até ${formatShortDate(rain.latest.observation_date)}`;
     const c = anomaly ? compareDecimal(anomaly.latest.value, '0') : 0;
     return {
       key: rain.key,
       label: (rain.region?.name ?? rain.title).toUpperCase(),
       value: `${formatDecimal(rain.latest.value)} mm`,
-      note: anomaly ? `${c < 0 ? '▼' : c > 0 ? '▲' : '■'} ${formatDecimal(anomaly.latest.value.replace('-', ''))}% ${c < 0 ? 'abaixo' : 'acima'} da média` : 'em 30 dias',
+      note: anomaly ? `${c < 0 ? '▼' : c > 0 ? '▲' : '■'} ${formatDecimal(anomaly.latest.value.replace('-', ''))}% ${c < 0 ? 'abaixo' : 'acima'} da média · ${until}` : `em 30 dias · ${until}`,
       tone: c < 0 ? 'dry' : c > 0 ? 'wet' : 'flat',
     };
   });

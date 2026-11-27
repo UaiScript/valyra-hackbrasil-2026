@@ -122,7 +122,12 @@ export const NEUTRAL_PROFILE: Profile = {
   ticker: 'bolsa',
   alphaFocus: 'todos',
   newsThemes: [],
-  shortcuts: PROFILES[0].shortcuts,
+  // Não aparecem (sem perfil, a Central mostra o seletor), mas não dependem da ordem da lista.
+  shortcuts: [
+    { module: 'finance', route: 'overview', title: 'Central', hint: 'Saldo realizado, projeção e orçamento' },
+    { module: 'alpha', route: 'alpha', title: 'Radar econômico', hint: 'Juros, inflação, ações e clima' },
+    { module: 'ai', question: 'Onde estou gastando mais neste mês?', title: 'Pergunte ao Valyra', hint: 'Explicações com evidências citadas' },
+  ],
   questions: [],
 };
 

@@ -423,6 +423,8 @@ const Board: FC<{ r: RadarOut }> = ({ r }) => {
 };
 
 export const Alpha: FC = () => {
+  // Trocar de perfil com a tela aberta reabre o radar no tema do novo perfil.
+  const { profile } = useProfile();
   const [local, setLocal] = useState('');
   const asOf = localToIso(local);
   const radar = useApi((sig) => api.getAlphaRadar(asOf, sig), [asOf]);
@@ -447,7 +449,7 @@ export const Alpha: FC = () => {
       </section>
 
       <Async state={radar.state} onRetry={radar.reload}>
-        {(r) => <Board r={r} />}
+        {(r) => <Board key={profile.id} r={r} />}
       </Async>
     </div>
   );
