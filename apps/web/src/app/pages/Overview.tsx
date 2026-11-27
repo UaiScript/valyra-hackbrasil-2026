@@ -10,6 +10,7 @@ import { ROUTES } from '../router';
 import { TransactionSummary } from '../TransactionRow';
 import { Async, Card, Empty, NoticeBar } from '../ui';
 import type { Notice } from '../ui';
+import { MODULES } from '../modules';
 import { useApi } from '../useApi';
 
 /**
@@ -148,7 +149,7 @@ const SignalRadar: FC = () => {
       </ul>
       <a className="cx-ask" href={ROUTES.ai}>
         <Sparkles size={16} aria-hidden="true" />
-        <span><b>Pergunte ao Valyra</b><small>Explicações em linguagem simples, com evidências citadas</small></span>
+        <span><b>{MODULES.ai.title} · Pergunte ao Valyra</b><small>{MODULES.ai.subtitle}: explicações em linguagem simples, com evidências citadas</small></span>
         <ArrowUpRight size={16} aria-hidden="true" />
       </a>
     </section>

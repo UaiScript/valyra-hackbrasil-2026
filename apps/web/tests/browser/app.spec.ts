@@ -135,6 +135,18 @@ test('central separa saldo realizado de hoje e projeção dos próximos 30 dias'
   await expect(page.getByText('Saldo previsto negativo')).toBeVisible();
 });
 
+test('app usa os nomes dos módulos da landing no menu e no cabeçalho', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/#/app');
+  await expect(page.locator('.cx-crumb')).toContainText('Valyra Finance');
+  await expect(page.locator('.cx-crumb')).toContainText('Planejar o orçamento');
+  const titles = page.locator('.cx-nav__title');
+  await expect(titles).toHaveText(['Valyra Finance', 'Valyra AI', 'Alternative Alpha']);
+  await page.goto('/#/app/valyra-ai');
+  await expect(page.locator('.cx-crumb')).toContainText('Valyra AI');
+  await expect(page.locator('.cx-crumb')).toContainText('Compreender evidências');
+});
+
 test('orçamento mostra consumo, status e envia limite em centavos', async ({ page }) => {
   const calls = await mockApi(page);
   await page.goto('/#/app/orcamento');

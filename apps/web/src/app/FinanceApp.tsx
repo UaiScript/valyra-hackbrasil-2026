@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FC } from 'react';
-import { ArrowLeft, Bell, ChartPie, ChartSpline, Command, FlaskConical, LayoutDashboard, ListOrdered, Menu, Sparkles, Target, Upload, X } from 'lucide-react';
+import { ArrowLeft, Bell, ChartPie, ChartSpline, Command, Compass, LayoutDashboard, ListOrdered, Menu, Sparkles, Target, Upload, X } from 'lucide-react';
 import { api } from './api/client';
 import { ROUTES, routeFromHash, useHash } from './router';
 import type { AppRoute } from './router';
@@ -14,37 +14,34 @@ import { Alerts, ALERTS_CHANGED } from './pages/Alerts';
 import { Budgets } from './pages/Budgets';
 import { AskValyra } from './pages/AskValyra';
 import { LogoMark } from '../components/LogoMark';
+import { MODULES, ModuleBadge } from './modules';
+import type { ModuleId } from './modules';
 import './cockpit.css';
 import './app.css';
 
 type NavItem = { route: AppRoute; label: string; icon: typeof LayoutDashboard };
 
-// Agrupado por módulo: a navegação mostra que Finance e a camada de inteligência são
-// partes de uma mesma ferramenta, não telas soltas.
-const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
+// Agrupado pelos módulos da landing, com os mesmos nomes: a navegação mostra que as telas
+// são partes de três produtos (Valyra Finance, Alternative Alpha e Valyra AI), não telas soltas.
+const NAV_GROUPS: { module: ModuleId; items: NavItem[] }[] = [
   {
-    title: 'Finance',
+    module: 'finance',
     items: [
       { route: 'overview', label: 'Central', icon: LayoutDashboard },
       { route: 'summary', label: 'Resumo do mês', icon: ChartPie },
       { route: 'budgets', label: 'Orçamento', icon: Target },
       { route: 'projection', label: 'Projeção de caixa', icon: ChartSpline },
       { route: 'transactions', label: 'Transações', icon: ListOrdered },
-    ],
-  },
-  {
-    title: 'Inteligência',
-    items: [
-      { route: 'ai', label: 'Pergunte ao Valyra', icon: Sparkles },
       { route: 'alerts', label: 'Alertas', icon: Bell },
+      { route: 'import', label: 'Importar CSV', icon: Upload },
     ],
   },
   {
-    title: 'Dados',
-    items: [{ route: 'import', label: 'Importar CSV', icon: Upload }],
+    module: 'ai',
+    items: [{ route: 'ai', label: 'Pergunte ao Valyra', icon: Sparkles }],
   },
 ];
-const NAV: (NavItem & { group: string })[] = NAV_GROUPS.flatMap((g) => g.items.map((i) => ({ ...i, group: g.title })));
+const NAV: (NavItem & { module: ModuleId })[] = NAV_GROUPS.flatMap((g) => g.items.map((i) => ({ ...i, module: g.module })));
 
 // No plano gratuito (Render + Neon) a API e o banco dormem: a primeira checagem pode
 // falhar ou voltar 503 enquanto acordam, e logo depois tudo responde. Por isso o
@@ -115,20 +112,20 @@ export default function FinanceApp() {
         </a>
         <nav className="cx-nav">
           {NAV_GROUPS.map((group) => (
-            <div key={group.title} className="cx-nav__group">
-              <span className="cx-nav__title">{group.title}</span>
+            <div key={group.module} className={`cx-nav__group cx-nav__group--${group.module}`}>
+              <span className="cx-nav__title"><ModuleBadge id={group.module} compact /></span>
               {group.items.map(({ route: r, label, icon: Icon }) => (
-                <a key={r} href={ROUTES[r]} aria-current={r === route ? 'page' : undefined} data-tip={label}>
+                <a key={r} href={ROUTES[r]} aria-current={r === route ? 'page' : undefined} data-tip={`${MODULES[group.module].title} · ${label}`}>
                   <Icon size={19} aria-hidden="true" /><span className="cx-nav__label">{label}</span>
                   {r === 'alerts' && newAlerts > 0 && <span className="app-nav__count" aria-label={`${newAlerts} novos`}>{newAlerts}</span>}
                 </a>
               ))}
             </div>
           ))}
-          <div className="cx-nav__group">
-            <span className="cx-nav__title">Pesquisa</span>
-            <span className="cx-nav__soon" data-tip="Alternative Alpha · em breve" title="Módulo em pesquisa; ainda sem dados conectados">
-              <FlaskConical size={19} aria-hidden="true" /><span className="cx-nav__label">Alternative Alpha</span><em>em breve</em>
+          <div className="cx-nav__group cx-nav__group--alpha">
+            <span className="cx-nav__title"><ModuleBadge id="alpha" compact /></span>
+            <span className="cx-nav__soon" data-tip={`${MODULES.alpha.title} · em breve`} title="Módulo em pesquisa; ainda sem dados conectados">
+              <Compass size={19} aria-hidden="true" /><span className="cx-nav__label">Radar · em breve</span>
             </span>
           </div>
         </nav>
@@ -142,7 +139,7 @@ export default function FinanceApp() {
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="cx-header__title">
-            <span className="cx-crumb">{current.group}</span>
+            <span className="cx-crumb"><ModuleBadge id={current.module} /></span>
             <h1>{current.label}</h1>
           </div>
           <a className="cx-command" href={ROUTES.ai} aria-label="Pergunte ao Valyra (Ctrl+K)">
