@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import type { FC } from 'react';
 import { ArrowLeft, Bell, ChartPie, ChartSpline, Command, Compass, LayoutDashboard, ListOrdered, Menu, Newspaper, Sparkles, Target, Upload, X } from 'lucide-react';
 import { api } from './api/client';
@@ -6,15 +6,7 @@ import { ROUTES, routeFromHash, useHash } from './router';
 import type { AppRoute } from './router';
 import { useApi } from './useApi';
 import { Overview } from './pages/Overview';
-import { Transactions } from './pages/Transactions';
-import { ImportCsv } from './pages/ImportCsv';
-import { Summary } from './pages/Summary';
-import { Projection } from './pages/Projection';
-import { Alerts, ALERTS_CHANGED } from './pages/Alerts';
-import { Budgets } from './pages/Budgets';
-import { AskValyra } from './pages/AskValyra';
-import { Alpha } from './pages/Alpha';
-import { WeeklyNews } from './pages/WeeklyNews';
+import { ALERTS_CHANGED } from './alertsEvents';
 import { LogoMark } from '../components/LogoMark';
 import { MODULES, ModuleBadge } from './modules';
 import type { ModuleId } from './modules';
@@ -22,6 +14,37 @@ import { ProfileMenu } from './ProfileUI';
 import { ProfileProvider, useProfile } from './useProfile';
 import './cockpit.css';
 import './app.css';
+
+/*
+ * A Central vem no pacote inicial; as outras telas viram pedaços separados, carregados
+ * na primeira visita. Logo depois que a Central aparece, o navegador baixa esses pedaços
+ * no tempo ocioso: a primeira tela abre mais rápido e a navegação continua instantânea.
+ */
+const PAGE_LOADERS = {
+  transactions: () => import('./pages/Transactions').then((m) => ({ default: m.Transactions })),
+  summary: () => import('./pages/Summary').then((m) => ({ default: m.Summary })),
+  budgets: () => import('./pages/Budgets').then((m) => ({ default: m.Budgets })),
+  projection: () => import('./pages/Projection').then((m) => ({ default: m.Projection })),
+  alerts: () => import('./pages/Alerts').then((m) => ({ default: m.Alerts })),
+  ai: () => import('./pages/AskValyra').then((m) => ({ default: m.AskValyra })),
+  alpha: () => import('./pages/Alpha').then((m) => ({ default: m.Alpha })),
+  news: () => import('./pages/WeeklyNews').then((m) => ({ default: m.WeeklyNews })),
+  import: () => import('./pages/ImportCsv').then((m) => ({ default: m.ImportCsv })),
+} as const;
+const PAGES = Object.fromEntries(Object.entries(PAGE_LOADERS).map(([k, load]) => [k, lazy(load)])) as Record<keyof typeof PAGE_LOADERS, ReturnType<typeof lazy>>;
+
+function usePrefetchPages() {
+  useEffect(() => {
+    const run = () => { for (const load of Object.values(PAGE_LOADERS)) void load().catch(() => undefined); };
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(run, { timeout: 4000 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const id = window.setTimeout(run, 1500);
+    return () => window.clearTimeout(id);
+  }, []);
+}
 
 type NavItem = { route: AppRoute; label: string; icon: typeof LayoutDashboard };
 
@@ -102,6 +125,8 @@ function Shell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const current = NAV.find((n) => n.route === route)!;
   const newAlerts = useNewAlertCount(route);
+  usePrefetchPages();
+  const Page = route === 'overview' ? null : PAGES[route];
 
   useEffect(() => {
     document.documentElement.lang = 'pt-BR';
@@ -166,16 +191,11 @@ function Shell() {
           <ProfileMenu />
         </header>
         <main className="app-content" id="main">
-          {route === 'overview' && <Overview />}
-          {route === 'transactions' && <Transactions />}
-          {route === 'summary' && <Summary />}
-          {route === 'budgets' && <Budgets />}
-          {route === 'projection' && <Projection />}
-          {route === 'alerts' && <Alerts />}
-          {route === 'ai' && <AskValyra />}
-          {route === 'alpha' && <Alpha />}
-          {route === 'news' && <WeeklyNews />}
-          {route === 'import' && <ImportCsv />}
+          {Page ? (
+            <Suspense fallback={<div className="cx-page-loading" role="status" aria-label="Carregando tela" />}>
+              <Page />
+            </Suspense>
+          ) : <Overview />}
           <p className="cx-footnote" role="note">
             {route === 'alpha'
               ? 'Dados públicos do Banco Central, da brapi.dev e da Open-Meteo, com fonte e instante de coleta. Contexto econômico, não recomendação de investimento.'

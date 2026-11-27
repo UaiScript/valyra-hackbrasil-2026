@@ -10,6 +10,7 @@ import type { Profile, TickerMode } from './profiles';
  */
 const PROFILE_KEY = 'valyra:demo-profile';
 const TICKER_KEY = 'valyra:ticker-mode';
+const COLLAPSED_KEY = 'valyra:ticker-collapsed';
 
 function read(key: string): string | null {
   try { return window.localStorage.getItem(key); } catch { return null; }
@@ -29,6 +30,9 @@ type ProfileState = {
   setProfile: (id: string) => void;
   ticker: TickerMode;
   setTicker: (mode: TickerMode) => void;
+  /** Faixa recolhida: só o seletor de modo fica visível e nada é buscado nem animado. */
+  tickerCollapsed: boolean;
+  setTickerCollapsed: (collapsed: boolean) => void;
 };
 
 const ProfileContext = createContext<ProfileState | null>(null);
@@ -39,6 +43,7 @@ export const ProfileProvider: FC<{ children: ReactNode }> = ({ children }) => {
     const v = read(TICKER_KEY);
     return isTickerMode(v) ? v : null;
   });
+  const [tickerCollapsed, setCollapsedState] = useState(() => read(COLLAPSED_KEY) === '1');
   const saved = findProfile(profileId);
   const profile = saved ?? NEUTRAL_PROFILE;
 
@@ -54,13 +59,20 @@ export const ProfileProvider: FC<{ children: ReactNode }> = ({ children }) => {
     write(TICKER_KEY, mode);
   }, []);
 
+  const setTickerCollapsed = useCallback((collapsed: boolean) => {
+    setCollapsedState(collapsed);
+    write(COLLAPSED_KEY, collapsed ? '1' : null);
+  }, []);
+
   const value = useMemo<ProfileState>(() => ({
     profile,
     chosen: saved !== null,
     setProfile,
     ticker: override ?? profile.ticker,
     setTicker,
-  }), [profile, saved, override, setProfile, setTicker]);
+    tickerCollapsed,
+    setTickerCollapsed,
+  }), [profile, saved, override, setProfile, setTicker, tickerCollapsed, setTickerCollapsed]);
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 };

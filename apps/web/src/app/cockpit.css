@@ -437,6 +437,9 @@ body:has(.cx) { background: #0a0c13; }
 .cx .app-notice,
 .cx .app-state--error { border-radius: var(--cx-radius-sm); }
 
+/* Lugar da tela enquanto o pedaço dela chega (normalmente já veio no tempo ocioso). */
+.cx-page-loading { min-height: 60vh; border-radius: var(--cx-radius-sm); background: linear-gradient(160deg, rgb(255 255 255 / 0.04), rgb(255 255 255 / 0.015)); }
+
 /* ---------- Central ---------- */
 .cx-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 18px; }
 .cx-grid > * { grid-column: span 6; }
@@ -506,6 +509,26 @@ a.cx-ticker__item:focus-visible { outline: 2px solid var(--cx-cyan); outline-off
 .cx-ticker__item--wet em { color: var(--ax-rain, #7cc4ff); }
 .cx-ticker__source { color: var(--cx-subtle); font-size: 0.7rem; white-space: nowrap; }
 @keyframes cx-ticker { to { transform: translateX(-50%); } }
+.cx-ticker__viewport--idle .cx-ticker__track { animation-play-state: paused; }
+.cx-ticker__toggle {
+  display: grid;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.05);
+  color: var(--cx-subtle);
+  cursor: pointer;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+.cx-ticker__toggle:hover { background: rgb(255 255 255 / 0.1); color: var(--cx-text); }
+.cx-ticker__toggle:focus-visible { outline: 2px solid var(--cx-cyan); outline-offset: 1px; }
+/* Recolhida: vira uma pílula compacta à esquerda, sem ocupar a largura da Central. */
+.cx-grid > .cx-ticker--collapsed { justify-self: start; }
+.cx-ticker--collapsed { min-height: 0; }
+.cx-ticker--collapsed .cx-ticker__mode[aria-pressed="false"] span { display: none; }
 
 /* Perfis da demonstração: seletor, faixa "Para você" e menu do cabeçalho. */
 .cx-grid > .cx-profiles,
@@ -1011,7 +1034,11 @@ a.cx-card:hover { border-color: var(--cx-glass-line-strong); transform: translat
 }
 @media (max-width: 560px) {
   .cx-module small { display: none; }
-  .cx-ticker { flex-direction: column; align-items: stretch; border-radius: 22px; }
+  .cx-ticker { flex-direction: column; align-items: stretch; border-radius: 22px; position: relative; }
+  .cx-ticker:not(.cx-ticker--collapsed) .cx-ticker__modes { margin-right: 36px; }
+  .cx-ticker__toggle { position: absolute; top: 7px; right: 6px; }
+  .cx-ticker--collapsed { flex-direction: row; border-radius: 999px; }
+  .cx-ticker--collapsed .cx-ticker__toggle { position: static; }
   .cx-ticker__modes { align-self: stretch; justify-content: space-between; }
   .cx-ticker__mode { flex: 1; justify-content: center; }
   .cx-ticker__viewport { padding: 6px 0; }

@@ -529,3 +529,29 @@ test('perfil da demo adapta menu, atalhos, faixa, radar e perguntas da IA', asyn
   await page.goto('/#/app');
   await expect(page.locator('.cx-ticker').getByRole('button', { name: 'Bolsa' })).toHaveAttribute('aria-pressed', 'true');
 });
+
+test('faixa recolhe, para de buscar dados e lembra a escolha', async ({ page }) => {
+  const calls = await mockApi(page);
+  await page.goto('/#/app');
+  const bar = page.locator('.cx-ticker');
+  await expect(bar.locator('.cx-ticker__item').first()).toBeVisible();
+  await bar.getByRole('button', { name: 'Recolher a faixa' }).click();
+  await expect(bar.locator('.cx-ticker__item')).toHaveCount(0);
+  await page.reload();
+  const radarBefore = calls.filter((c) => c.url.startsWith('/api/v1/alpha/radar')).length;
+  await expect(page.locator('.cx-ticker').getByRole('button', { name: 'Mostrar a faixa' })).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByText('R$ 4.870,10', { exact: true })).toBeVisible();
+  expect(calls.filter((c) => c.url.startsWith('/api/v1/alpha/radar')).length).toBe(radarBefore);
+  // Escolher um modo com a faixa recolhida já a abre.
+  await page.locator('.cx-ticker').getByRole('button', { name: 'Clima' }).click();
+  await expect(page.locator('.cx-ticker__item', { hasText: 'SORRISO (MT)' }).first()).toBeVisible();
+});
+
+test('leituras iguais e simultâneas viram uma só requisição', async ({ page }) => {
+  const calls = await mockApi(page);
+  await page.goto('/#/app');
+  await expect(page.getByRole('heading', { name: 'Orçamento do mês' })).toBeVisible();
+  await page.waitForTimeout(500);
+  // Destaque, cartão e painel de orçamento pedem o mesmo GET: chega um só à API.
+  expect(calls.filter((c) => c.url === '/api/v1/finance/budgets').length).toBe(1);
+});

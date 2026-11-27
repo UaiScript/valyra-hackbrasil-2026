@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FC } from 'react';
-import { CandlestickChart, CloudSun, Newspaper } from 'lucide-react';
+import { CandlestickChart, ChevronsLeft, ChevronsRight, CloudSun, Newspaper } from 'lucide-react';
 import { api } from './api/client';
 import type { RadarOut, WeeklyNewsOut } from '../lib/api/schema';
 import { compareDecimal, formatDecimal, formatShortDate } from './money';
@@ -89,6 +89,23 @@ const EMPTY_NOTE: Record<TickerMode, string> = {
   clima: 'Sem dados de chuva coletados até agora. A coleta roda uma vez por dia.',
 };
 
+/**
+ * Pausa a animação quando a faixa sai da tela ou a aba fica em segundo plano: o laço
+ * infinito não gasta quadro de composição enquanto ninguém está vendo.
+ */
+function useVisible<T extends Element>() {
+  const ref = useRef<T>(null);
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return [ref, visible] as const;
+}
+
 const ModeSwitch: FC<{ mode: TickerMode; onChange: (m: TickerMode) => void }> = ({ mode, onChange }) => (
   <div className="cx-ticker__modes" role="group" aria-label="O que a faixa mostra">
     {TICKER_MODES.map((m) => {
@@ -123,8 +140,9 @@ const Track: FC<{ items: Item[]; mode: TickerMode }> = ({ items, mode }) => {
   );
   // Poucos itens não enchem a faixa: o laço fica curto e a velocidade acompanha o tamanho.
   const seconds = Math.max(28, items.length * (mode === 'manchetes' ? 9 : 5));
+  const [ref, visible] = useVisible<HTMLDivElement>();
   return (
-    <div className="cx-ticker__viewport">
+    <div className={`cx-ticker__viewport${visible ? '' : ' cx-ticker__viewport--idle'}`} ref={ref}>
       <div className="cx-ticker__track" style={{ animationDuration: `${seconds}s` }}>
         {row(false)}
         {row(true)}
@@ -158,11 +176,24 @@ const Feed: FC<{ mode: TickerMode }> = ({ mode }) => {
 };
 
 export const TickerBar: FC = () => {
-  const { ticker, setTicker } = useProfile();
+  const { ticker, setTicker, tickerCollapsed, setTickerCollapsed } = useProfile();
+  // Escolher um modo com a faixa recolhida já a abre: a pessoa quer ver o que escolheu.
+  const pick = (m: TickerMode) => { setTicker(m); if (tickerCollapsed) setTickerCollapsed(false); };
   return (
-    <section className={`cx-ticker cx-ticker--${ticker}`} aria-label={MODE_META[ticker].aria}>
-      <ModeSwitch mode={ticker} onChange={setTicker} />
-      <Feed mode={ticker} />
+    <section className={`cx-ticker cx-ticker--${ticker}${tickerCollapsed ? ' cx-ticker--collapsed' : ''}`} aria-label={MODE_META[ticker].aria}>
+      <ModeSwitch mode={ticker} onChange={pick} />
+      {/* Recolhida, a faixa não busca dados nem anima: some o custo, fica o atalho. */}
+      {!tickerCollapsed && <Feed mode={ticker} />}
+      <button
+        type="button"
+        className="cx-ticker__toggle"
+        aria-expanded={!tickerCollapsed}
+        aria-label={tickerCollapsed ? 'Mostrar a faixa' : 'Recolher a faixa'}
+        title={tickerCollapsed ? 'Mostrar a faixa' : 'Recolher a faixa'}
+        onClick={() => setTickerCollapsed(!tickerCollapsed)}
+      >
+        {tickerCollapsed ? <ChevronsRight size={15} aria-hidden="true" /> : <ChevronsLeft size={15} aria-hidden="true" />}
+      </button>
     </section>
   );
 };
