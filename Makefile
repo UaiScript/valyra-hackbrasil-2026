@@ -12,7 +12,7 @@ test:
 	$(RUN) pytest
 test-domain:
 	$(RUN) pytest tests/finance/test_domain.py tests/finance/test_analytics.py tests/core/test_clock.py \
-		tests/alerts/test_alerts_domain.py
+		tests/alerts/test_alerts_domain.py tests/alpha/test_domain.py
 test-ai:
 	$(RUN) pytest tests/ai
 lint:

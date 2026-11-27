@@ -124,6 +124,29 @@ source_modules = ["valyra.ai.domain"]
 forbidden_modules = ["sqlalchemy", "fastapi", "httpx", "requests", "openai", "google", "valyra.core", "valyra.ai.llm_client"]
 
 [[tool.importlinter.contracts]]
+name = "Domínio Alpha sem banco, HTTP, IA ou configuração"
+type = "forbidden"
+source_modules = ["valyra.alpha.domain"]
+forbidden_modules = [
+    "sqlalchemy", "fastapi", "httpx", "requests", "openai", "google", "valyra.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "Camadas do Alpha"
+type = "layers"
+layers = [
+    "valyra.alpha.router",
+    "valyra.alpha.service",
+    "valyra.alpha.domain | valyra.alpha.repository",
+]
+
+[[tool.importlinter.contracts]]
+name = "Alpha não importa Finance nem IA"
+type = "forbidden"
+source_modules = ["valyra.alpha"]
+forbidden_modules = ["valyra.finance", "valyra.ai", "valyra.alerts"]
+
+[[tool.importlinter.contracts]]
 name = "Camadas IA"
 type = "layers"
 layers = [

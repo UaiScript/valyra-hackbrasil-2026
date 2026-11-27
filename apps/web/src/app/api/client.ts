@@ -21,6 +21,7 @@ import type {
   PageCategoryOut,
   PageImportBatchSummaryOut,
   PageTransactionOut,
+  RadarOut,
   TransactionOut,
 } from '../../lib/api/schema';
 
@@ -131,6 +132,10 @@ export const api = {
 
   explain: (body: ExplainRequest, signal?: AbortSignal) =>
     request<ExplainResponse>('POST', '/api/v1/ai/explain', { json: body, signal }),
+
+  // Sem as_of a API usa o instante atual; com as_of, só o publicado até ele (ADR-0012).
+  getAlphaRadar: (asOf?: string, signal?: AbortSignal) =>
+    request<RadarOut>('GET', '/api/v1/alpha/radar', { query: { as_of: asOf }, signal }),
 
   markAlertRead: (alertId: string) =>
     request<AlertOut>('PATCH', `/api/v1/alerts/${id(alertId)}`, { json: { status: 'read' } }),

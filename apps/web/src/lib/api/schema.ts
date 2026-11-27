@@ -118,6 +118,18 @@ export type DecimalValue = {
   value_decimal: string;
 };
 
+export type DerivedSignalOut = {
+  evidence_keys: string[];
+  key: string;
+  limitations: string[];
+  /** date */ observation_date: string;
+  /** date-time */ published_at: string;
+  rule: string;
+  summary: string;
+  theme: "juros" | "inflacao" | "acoes" | "clima";
+  title: string;
+};
+
 export type ErrorBody = {
   code: string;
   details: Record<string, unknown>;
@@ -172,6 +184,11 @@ export type HealthResponse = {
   status: "ok" | "degraded";
 };
 
+export type HistoryPointOut = {
+  /** date */ observation_date: string;
+  value: string;
+};
+
 export type ImportBatchCreatedOut = {
   alerts_created: number;
   /** uuid */ id: string;
@@ -206,6 +223,21 @@ export type ImportRejectionOut = {
   line_number: number;
   raw_line: string;
   reason: string;
+};
+
+export type IndicatorOut = {
+  history: HistoryPointOut[];
+  key: string;
+  kind: string;
+  latest: PointOut;
+  periodicity: "daily" | "monthly";
+  previous: PointOut | null;
+  region: RegionOut | null;
+  source: SourceOut;
+  theme: "juros" | "inflacao" | "acoes" | "clima";
+  title: string;
+  unit: string;
+  unit_label: string;
 };
 
 export type IntegerValue = {
@@ -255,6 +287,17 @@ export type PageTransactionOut = {
   total: number;
 };
 
+export type PointOut = {
+  /** date-time */ ingested_at: string;
+  /** date */ observation_date: string;
+  /** date-time */ published_at: string;
+  published_at_estimated: boolean;
+  revision_id: number;
+  signal_key: string;
+  source_url: string;
+  value: string;
+};
+
 export type ProjectedRecurrenceOut = {
   amount_cents: number;
   description: string;
@@ -278,6 +321,34 @@ export type ProjectionOut = {
   start_balance_cents: number;
   /** date */ today: string;
   variable_daily_cents: number;
+};
+
+/** Radar econômico no corte `as_of`: só revisões publicadas até esse instante. */
+export type RadarOut = {
+  /** date-time */ as_of: string;
+  indicators: IndicatorOut[];
+  last_ingested_at: string | null;
+  signals: DerivedSignalOut[];
+  sources: SourceStatusOut[];
+};
+
+export type RegionOut = {
+  name: string;
+  production: string;
+  slug: string;
+};
+
+export type SourceOut = {
+  license: string;
+  name: string;
+  slug: string;
+  url: string;
+};
+
+export type SourceStatusOut = {
+  last_ingested_at: string | null;
+  series_count: number;
+  source: SourceOut;
 };
 
 /** Resumo da Issue #43: saldo realizado de hoje e movimentações realizadas do mês. */
@@ -327,6 +398,10 @@ export type AlertsListQuery = {
   offset?: number;
 };
 
+export type AlphaGetRadarQuery = {
+  as_of?: string | null;
+};
+
 export type FinanceListAccountsQuery = {
   limit?: number;
   offset?: number;
@@ -370,6 +445,7 @@ export const OPERATIONS = {
   ai_explain: { method: 'POST', path: '/api/v1/ai/explain' },
   alerts_list: { method: 'GET', path: '/api/v1/alerts' },
   alerts_update: { method: 'PATCH', path: '/api/v1/alerts/{id}' },
+  alpha_get_radar: { method: 'GET', path: '/api/v1/alpha/radar' },
   finance_list_accounts: { method: 'GET', path: '/api/v1/finance/accounts' },
   finance_create_import_batch: { method: 'POST', path: '/api/v1/finance/accounts/{account_id}/import-batches' },
   finance_update_account: { method: 'PATCH', path: '/api/v1/finance/accounts/{id}' },

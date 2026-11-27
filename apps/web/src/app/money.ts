@@ -70,3 +70,42 @@ export function formatScore(score: string): string {
   const [int = '0', frac = ''] = score.split('.');
   return `${int},${frac.padEnd(2, '0').slice(0, 2)}`;
 }
+
+/**
+ * Decimal Alpha chega como texto ("0.055131", "-1.2345"). Trocamos o ponto por vírgula
+ * sem converter para float, para nunca exibir um valor diferente do que a fonte publicou.
+ */
+export function formatDecimal(value: string): string {
+  const negative = value.startsWith('-');
+  const [int = '0', frac = ''] = (negative ? value.slice(1) : value).split('.');
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${negative ? '-' : ''}${grouped}${frac ? `,${frac}` : ''}`;
+}
+
+/** Instante UTC da API mostrado no horário de Brasília, ex.: "27/11/2026, 14:07". */
+export function formatInstant(iso: string): string {
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  }).format(new Date(iso));
+}
+
+/** Compara dois decimais em texto ("15", "-1.2345") alinhando as casas, sem converter para float. */
+export function compareDecimal(a: string, b: string): number {
+  const split = (v: string) => {
+    const neg = v.startsWith('-');
+    const [int = '0', frac = ''] = (neg ? v.slice(1) : v).split('.');
+    return { neg, int: int.replace(/^0+(?=\d)/, ''), frac };
+  };
+  const x = split(a);
+  const y = split(b);
+  const width = Math.max(x.frac.length, y.frac.length);
+  const mag = (p: { int: string; frac: string }) => `${p.int}${p.frac.padEnd(width, '0')}`;
+  const mx = mag(x).replace(/^0+(?=\d)/, '');
+  const my = mag(y).replace(/^0+(?=\d)/, '');
+  const absCmp = mx.length !== my.length ? Math.sign(mx.length - my.length) : (mx === my ? 0 : mx > my ? 1 : -1);
+  const zero = (m: string) => /^0+$/.test(m);
+  const sx = zero(mx) ? 0 : x.neg ? -1 : 1;
+  const sy = zero(my) ? 0 : y.neg ? -1 : 1;
+  if (sx !== sy) return Math.sign(sx - sy);
+  return sx >= 0 ? absCmp : -absCmp;
+}

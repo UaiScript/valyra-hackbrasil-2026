@@ -503,7 +503,7 @@ O enum `failed` no modelo não garante que toda tentativa fracassada produza uma
 | `signal_key` | VARCHAR | Identidade lógica, ex.: `conab:soja:mt:2025-26:produtividade` **[Altera fundação]** |
 | `revision_id` | INT | 1, 2, 3… por `signal_key` |
 | `source_id` | UUID | FK `sources` (a fonte) **[Altera fundação]** |
-| `kind` | VARCHAR | `climate_anomaly` \| `crop_estimate` \| `export` \| `price_move` \| `news_event` |
+| `kind` | VARCHAR | `macro_indicator` (ADR-0012) \| `climate_anomaly` \| `crop_estimate` \| `export` \| `price_move` \| `news_event` |
 | `title` | VARCHAR | |
 | `summary` | TEXT | |
 | `observation_date` | DATE | |
@@ -523,6 +523,8 @@ Constraints e índices:
 - Índices: `(signal_key, published_at)`, `(published_at)`, `(kind)`
 
 ### 5.2 Regras dos sinais
+
+> **[Implementado, ADR-0012]** A migração `0004_alpha` cria `sources` e `signals` como acima, com `kind` ampliado para `macro_indicator` (o clima da Open-Meteo usa `climate_anomaly`) e o trigger `signals_insert_only`. O corte `as_of` é feito no banco por `alpha/repository.list_visible` (`DISTINCT ON`, prefixo da série com `LIKE` escapado), com a mesma regra de `alpha/domain.visible_at`, mantida como referência pura nos testes. O trigger não cobre `TRUNCATE`, que só os testes usam. A view `signals_current` e as tabelas de setores, ativos e carteira continuam planejadas.
 
 - **Somente inserção**: trigger previsto para bloquear `UPDATE` e `DELETE` em `signals`. Revisão nova = linha nova com o mesmo `signal_key` e `revision_id` maior.
 - **View `signals_current` prevista**: revisão mais recente de cada `signal_key`, para uso no radar ao vivo.

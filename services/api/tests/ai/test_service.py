@@ -27,7 +27,12 @@ from valyra.ai.schemas import (
     HistoryMessage,
     LLMPayload,
 )
+from valyra.alpha.service import Radar
 from valyra.core.errors import AppError
+
+EMPTY_RADAR = Radar(
+    as_of=datetime(2026, 1, 1, tzinfo=UTC), indicators=[], signals=[], last_ingested_at=None
+)
 
 CUT = datetime.fromisoformat(AS_OF.replace("Z", "+00:00"))
 BUILT = datetime.fromisoformat(BUILT_AT.replace("Z", "+00:00"))
@@ -79,6 +84,8 @@ def finance(monkeypatch):
     batches = Mock(return_value=[])
     monkeypatch.setattr(service.finance_service, "list_completed_import_batches", batches)
     monkeypatch.setattr(service.finance_service, "is_anomalous", Mock(return_value=False))
+    # Radar vazio: sem coletas Alpha, o contexto declara a ausência como limitação.
+    monkeypatch.setattr(service.alpha_service, "get_radar", Mock(return_value=EMPTY_RADAR))
     return SimpleNamespace(
         account=account,
         get=get,
@@ -421,3 +428,55 @@ def test_relogio_invalido_falha_sem_chamar_cliente(finance, times):
             finance.session, USER_ID, request(), client=client, clock=Mock(side_effect=times)
         )
     client.assert_not_called()
+
+
+def _alpha_radar(points_per_series: int, *, estimated: bool) -> Radar:
+    from decimal import Decimal
+
+    from valyra.alpha.domain import ALL_SERIES
+    from valyra.alpha.service import IndicatorView, Point
+
+    at = datetime(2026, 11, 20, 15, tzinfo=UTC)
+    views = []
+    for series in ALL_SERIES:
+        history = [
+            Point(
+                signal_id=uuid4(),
+                signal_key=f"{series.key}:2026-11-{day:02d}",
+                revision_id=1,
+                observation_date=date(2026, 11, day),
+                value=Decimal("1.5"),
+                published_at=at,
+                published_at_estimated=estimated,
+                ingested_at=at,
+                source_url="https://api.bcb.gov.br/dados/serie/",
+            )  # fmt: skip
+            for day in range(1, points_per_series + 1)
+        ]
+        views.append(
+            IndicatorView(series=series, source=SimpleNamespace(id=uuid4()), history=history)
+        )
+    return Radar(as_of=at, indicators=views, signals=[], last_ingested_at=at)
+
+
+def test_alpha_respeita_o_espaco_restante_e_avisa_publicacao_estimada(monkeypatch):
+    monkeypatch.setattr(
+        service.alpha_service, "get_radar", Mock(return_value=_alpha_radar(2, estimated=True))
+    )
+    limitations: list[str] = []
+    items = service._alpha_evidences(Mock(), datetime(2026, 11, 21, tzinfo=UTC), limitations, 5)
+    # Sem espaço para as 26 evidências, entram só 5 e o corte vira limitação.
+    assert len(items) == 5
+    assert service._ALPHA_TRIMMED in limitations
+    assert service._ALPHA_ESTIMATED in limitations
+    assert items[0].value.value_decimal == "1.5"
+
+
+def test_alpha_completo_cabe_no_teto_sem_limitacao_de_corte(monkeypatch):
+    monkeypatch.setattr(
+        service.alpha_service, "get_radar", Mock(return_value=_alpha_radar(3, estimated=False))
+    )
+    limitations: list[str] = []
+    items = service._alpha_evidences(Mock(), datetime(2026, 11, 21, tzinfo=UTC), limitations)
+    assert len(items) == 26  # 13 séries x 2 pontos, mesmo com histórico maior
+    assert limitations == [service._ALPHA_NOT_CAUSE]

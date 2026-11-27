@@ -566,6 +566,73 @@
         "title": "DecimalValue",
         "type": "object"
       },
+      "DerivedSignalOut": {
+        "properties": {
+          "evidence_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Keys",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "observation_date": {
+            "format": "date",
+            "title": "Observation Date",
+            "type": "string"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "theme": {
+            "enum": [
+              "juros",
+              "inflacao",
+              "acoes",
+              "clima"
+            ],
+            "title": "Theme",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "summary",
+          "observation_date",
+          "published_at",
+          "rule",
+          "theme",
+          "evidence_keys",
+          "limitations"
+        ],
+        "title": "DerivedSignalOut",
+        "type": "object"
+      },
       "ErrorBody": {
         "properties": {
           "code": {
@@ -864,6 +931,25 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "HistoryPointOut": {
+        "properties": {
+          "observation_date": {
+            "format": "date",
+            "title": "Observation Date",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "observation_date",
+          "value"
+        ],
+        "title": "HistoryPointOut",
+        "type": "object"
+      },
       "ImportBatchCreatedOut": {
         "properties": {
           "alerts_created": {
@@ -1038,6 +1124,97 @@
           "raw_line"
         ],
         "title": "ImportRejectionOut",
+        "type": "object"
+      },
+      "IndicatorOut": {
+        "properties": {
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryPointOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "latest": {
+            "$ref": "#/components/schemas/PointOut"
+          },
+          "periodicity": {
+            "enum": [
+              "daily",
+              "monthly"
+            ],
+            "title": "Periodicity",
+            "type": "string"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PointOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "region": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceOut"
+          },
+          "theme": {
+            "enum": [
+              "juros",
+              "inflacao",
+              "acoes",
+              "clima"
+            ],
+            "title": "Theme",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "unit_label": {
+            "title": "Unit Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "unit",
+          "unit_label",
+          "kind",
+          "theme",
+          "periodicity",
+          "region",
+          "source",
+          "latest",
+          "previous",
+          "history"
+        ],
+        "title": "IndicatorOut",
         "type": "object"
       },
       "IntegerValue": {
@@ -1247,6 +1424,57 @@
         "title": "Page[TransactionOut]",
         "type": "object"
       },
+      "PointOut": {
+        "properties": {
+          "ingested_at": {
+            "format": "date-time",
+            "title": "Ingested At",
+            "type": "string"
+          },
+          "observation_date": {
+            "format": "date",
+            "title": "Observation Date",
+            "type": "string"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "published_at_estimated": {
+            "title": "Published At Estimated",
+            "type": "boolean"
+          },
+          "revision_id": {
+            "title": "Revision Id",
+            "type": "integer"
+          },
+          "signal_key": {
+            "title": "Signal Key",
+            "type": "string"
+          },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signal_key",
+          "revision_id",
+          "observation_date",
+          "value",
+          "published_at",
+          "published_at_estimated",
+          "ingested_at",
+          "source_url"
+        ],
+        "title": "PointOut",
+        "type": "object"
+      },
       "ProjectedRecurrenceOut": {
         "properties": {
           "amount_cents": {
@@ -1355,6 +1583,139 @@
           "min_balance_date"
         ],
         "title": "ProjectionOut",
+        "type": "object"
+      },
+      "RadarOut": {
+        "description": "Radar econ\u00f4mico no corte `as_of`: s\u00f3 revis\u00f5es publicadas at\u00e9 esse instante.",
+        "properties": {
+          "as_of": {
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "indicators": {
+            "items": {
+              "$ref": "#/components/schemas/IndicatorOut"
+            },
+            "title": "Indicators",
+            "type": "array"
+          },
+          "last_ingested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Ingested At"
+          },
+          "signals": {
+            "items": {
+              "$ref": "#/components/schemas/DerivedSignalOut"
+            },
+            "title": "Signals",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceStatusOut"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "as_of",
+          "last_ingested_at",
+          "indicators",
+          "signals",
+          "sources"
+        ],
+        "title": "RadarOut",
+        "type": "object"
+      },
+      "RegionOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "production": {
+            "title": "Production",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "production"
+        ],
+        "title": "RegionOut",
+        "type": "object"
+      },
+      "SourceOut": {
+        "properties": {
+          "license": {
+            "title": "License",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "url",
+          "license"
+        ],
+        "title": "SourceOut",
+        "type": "object"
+      },
+      "SourceStatusOut": {
+        "properties": {
+          "last_ingested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Ingested At"
+          },
+          "series_count": {
+            "title": "Series Count",
+            "type": "integer"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceOut"
+          }
+        },
+        "required": [
+          "source",
+          "last_ingested_at",
+          "series_count"
+        ],
+        "title": "SourceStatusOut",
         "type": "object"
       },
       "SummaryOut": {
@@ -1777,6 +2138,58 @@
         "summary": "Alerts Update",
         "tags": [
           "alerts"
+        ]
+      }
+    },
+    "/api/v1/alpha/radar": {
+      "get": {
+        "operationId": "alpha_get_radar",
+        "parameters": [
+          {
+            "description": "Corte do replay, com fuso; ausente usa o instante atual",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Corte do replay, com fuso; ausente usa o instante atual",
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RadarOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Alpha Get Radar",
+        "tags": [
+          "alpha"
         ]
       }
     },

@@ -79,5 +79,26 @@ Proposta para o time aprovar:
 
 ## Status
 
-Proposta, 27/11/2026, a pedido de Willian. Aguarda aprovação do time antes de
-qualquer código do módulo `alpha` ou do pipeline.
+Aceita em 27/11/2026 por Willian, no thread do projeto, para o radar Alpha mínimo
+(SGS e brapi, com as regras temporais acima). Proposta registrada no mesmo dia.
+Ainda não verificados antes do uso em produção: `^BVSP` no plano gratuito da brapi e
+o código SGS do IPCA acumulado em 12 meses.
+
+Escopo implementado no primeiro incremento: Selic meta (432), CDI diário (12) e
+IPCA mensal (433) pelo SGS; variação diária de PETR4, VALE3, ITUB4 e MGLU3 pela
+brapi, guardada em `%` para não abrir o contrato de dinheiro Alpha. Na carga histórica,
+ainda sem calendário versionado, a publicação estimada é conservadora: dia seguinte ao
+meio-dia para séries diárias e último dia do mês seguinte para o IPCA, que a IA recebe
+com limitação de publicação estimada. Cada variação intradiária da brapi é uma revisão
+nova da chave do dia, para o replay mostrar o valor conhecido em cada hora.
+
+Adendo de 27/11/2026, aprovado por Willian no thread do projeto: clima como dado
+alternativo pela [Open-Meteo](https://open-meteo.com/) (sem chave; dados CC BY 4.0; API
+gratuita para uso não comercial). Para três regiões produtoras (Sorriso-MT, Rio Verde-GO e
+Mogi das Cruzes-SP), a coleta diária grava a chuva acumulada em 30 dias até ontem (endpoint
+de previsão, que devolve dias passados) e a anomalia contra a mesma janela nos 10 anos
+anteriores (arquivo histórico), com `kind = climate_anomaly` e `published_at` igual ao
+instante da coleta. Ano com dia faltante sai da média, e com menos de 7 anos não há
+comparação. Os sinais `climate_dry_spell_v1` (anomalia de -30% ou menos) e
+`climate_wet_spell_v1` (+50% ou mais) são hipóteses de acompanhamento, sem previsão de
+preço nem causa. O INMET, fonte oficial de estações, ficou como alternativa.

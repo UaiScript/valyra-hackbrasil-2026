@@ -303,3 +303,41 @@ def test_orcamento_com_muitas_categorias_prioriza_pressao_e_respeita_teto(
     over = {f"budget_status_{c.id.hex}" for c in categories[:2]}
     assert over <= {e.evidence_id for e in statuses}
     assert any("Orçamento parcial" in text for text in response.limitations)
+
+
+def test_sinais_alpha_publicados_ate_o_corte_viram_evidencias_citaveis(
+    db_session, reference_rows, insert_transaction
+):
+    from decimal import Decimal
+
+    from valyra.alpha import service as alpha_service
+    from valyra.alpha.domain import SGS_SERIES
+
+    selic = SGS_SERIES[0]
+    tx = insert_transaction()
+    account, user = reference_rows["account"], reference_rows["user"]
+    cut = current_cutoff(account, tx)
+    url = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados"
+    alpha_service.record_observation(
+        db_session, selic, date(2026, 11, 3), Decimal("15"),
+        ingested_at=cut - timedelta(days=1), source_url=url,
+    )  # fmt: skip
+    # Coletada depois do corte: não pode chegar ao LLM (regra de data leakage).
+    alpha_service.record_observation(
+        db_session, selic, date(2026, 11, 3), Decimal("14.75"),
+        ingested_at=cut + timedelta(days=1), source_url=url,
+    )  # fmt: skip
+    db_session.flush()
+    client = Mock(side_effect=reference_reply)
+    response = explain_for_account(
+        db_session,
+        user.id,
+        ExplainRequest(question="E a Selic?", account_id=account.id),
+        client=client,
+        clock=lambda: cut,
+    )
+    sent = client.call_args.args[0].context_data
+    [alpha] = [e for e in sent.evidences if e.source.kind == "alpha_signal"]
+    assert alpha.value.value_decimal == "15" and alpha.value.unit == "%"
+    assert alpha.source.published_at <= cut
+    assert any("não demonstra causa" in text for text in response.limitations)

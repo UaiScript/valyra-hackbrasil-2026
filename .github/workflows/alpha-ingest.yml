@@ -1,0 +1,76 @@
+name: Coleta Alpha
+
+# ADR-0012: o Render Free dorme sem tráfego, então a coleta periódica roda aqui e grava no Neon.
+# A API só lê os sinais; este workflow é o único escritor.
+on:
+  schedule:
+    # De hora em hora no pregão (10h às 18h em São Paulo, UTC-3), dias úteis.
+    # Quatro tickers da brapi x 9 execuções x 22 dias ficam perto de 800 requisições/mês (cota: 15 mil).
+    - cron: "7 13-21 * * 1-5"
+    # Clima uma vez por dia (07h17 em São Paulo): a chuva acumulada muda devagar e a
+    # Open-Meteo gratuita pede uso moderado. Seis chamadas por execução.
+    - cron: "17 10 * * *"
+  workflow_dispatch:
+    inputs:
+      backfill_days:
+        description: "Carga histórica em dias (vazio = só coleta recente)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+# Duas coletas simultâneas poderiam gravar a mesma revisão; a fila evita a corrida.
+concurrency:
+  group: alpha-ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    name: SGS e brapi
+    runs-on: ubuntu-24.04
+    # Folga para a carga histórica de até 10 anos (uma consulta por observação).
+    timeout-minutes: 20
+    # Só roda com a variável de repositório ALPHA_INGEST_ENABLED=true, configurada junto com o
+    # secret do banco; sem ela (forks, repositório recém-clonado) o job é pulado em vez de falhar.
+    if: ${{ vars.ALPHA_INGEST_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: '0.13.7'
+          python-version: '3.12'
+          enable-cache: false
+      - name: Instalar dependências oficiais
+        run: make sync
+      - name: Coletar indicadores e cotações
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          # Opcional: sem token, a brapi atende PETR4, VALE3, ITUB4 e MGLU3.
+          BRAPI_TOKEN: ${{ secrets.BRAPI_TOKEN }}
+          BACKFILL_DAYS: ${{ inputs.backfill_days }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          : "${NEON_DATABASE_URL:?configure o secret NEON_DATABASE_URL}"
+          # Mesma conversão do deploy/start.sh: o SQLAlchemy precisa do driver psycopg explícito.
+          case "$NEON_DATABASE_URL" in
+            postgres://*) DATABASE_URL="postgresql+psycopg://${NEON_DATABASE_URL#postgres://}" ;;
+            postgresql://*) DATABASE_URL="postgresql+psycopg://${NEON_DATABASE_URL#postgresql://}" ;;
+            *) DATABASE_URL="$NEON_DATABASE_URL" ;;
+          esac
+          export DATABASE_URL
+          # As migrações rodam no deploy do Render (start.sh); aqui só se coleta.
+          # Agendamento horário coleta mercado; o diário, clima; disparo manual, tudo.
+          case "$SCHEDULE" in
+            "17 10 * * *") args="--sources clima" ;;
+            "") args="" ;;
+            *) args="--sources bcb,brapi" ;;
+          esac
+          if [ -n "$BACKFILL_DAYS" ]; then
+            # Entrada manual: só dígitos chegam ao comando; o script valida a faixa (1 a 3650).
+            case "$BACKFILL_DAYS" in *[!0-9]*) echo "backfill_days deve ser inteiro" >&2; exit 1 ;; esac
+            args="$args --backfill-days $BACKFILL_DAYS"
+          fi
+          uv run --locked --directory services/api python -m valyra.scripts.ingest_alpha $args
