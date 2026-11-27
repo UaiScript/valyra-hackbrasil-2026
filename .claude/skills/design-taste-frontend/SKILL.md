@@ -16,8 +16,12 @@ repositório fica leve e nenhum comando roda sem alguém pedir.
 
 # Como usar esta skill na Valyra
 
-Leia este bloco antes do texto original, que vem logo abaixo e foi mantido sem alterações.
-Onde os dois divergem, este bloco vale.
+Leia este bloco antes do texto original. O corpo original vem logo abaixo, sem alterações; só
+o frontmatter foi reescrito (nova `description`, sem o hook `Stop`). Este bloco vale sobre todo o
+resto, incluindo as "House rules" do original e qualquer arquivo de `references/` lido sozinho.
+
+0. **Quando usar.** Só quando o time pedir uma mudança visual. A skill orienta a mudança pedida;
+   ela não justifica repaginar a landing ou o app por conta própria.
 
 1. **Identidade Valyra primeiro.** Logo, cores e tema já decididos (V azul em
    `apps/web/src/components/LogoMark.tsx`, tema aurora em `apps/web/src/app/cockpit.css`, estilos
@@ -30,9 +34,12 @@ Onde os dois divergem, este bloco vale.
    página de marketing (uma seção por tela, contagem de fotos, momentos, cenas, efeitos).
 3. **Kit e scripts não estão aqui.** O texto cita `<skill>/scripts/*.mjs`, `assets/`,
    `starter.html`, `system.css`, `gate.mjs` e a pasta `.taste-skill`. Nada disso foi copiado.
-   Trate essas menções como descrição da intenção da regra e confira pelos meios do projeto:
+   As seções de comandos Node e o gate (`GATE: PASS`, `GATE: DONE`, "every finding fails the
+   page") não se aplicam aqui: nenhum gate é exigido e nenhum relatório deve citar esses
+   resultados. Use as regras como intenção de design e verifique só com os comandos do projeto:
    `npm --prefix apps/web run check`, `npm --prefix apps/web test`, `npm --prefix apps/web run build`
-   e prints com o Playwright já instalado. Não baixe nem instale o kit sem o time pedir.
+   e prints com o Playwright já instalado. Relate apenas o que de fato rodou. Não baixe, recrie
+   nem instale o kit sem o time pedir.
 4. **Stack do projeto.** O front é React + Vite em `apps/web`; construa nos componentes e no CSS
    que já existem, sem criar página estática paralela.
 5. **Regras do repositório continuam valendo** (AGENTS.md): texto público em português com o nome
