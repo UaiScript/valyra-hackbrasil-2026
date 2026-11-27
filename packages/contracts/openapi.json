@@ -1269,6 +1269,139 @@
         "title": "MoneyValue",
         "type": "object"
       },
+      "NewsItemOut": {
+        "properties": {
+          "image_credit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Credit"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "ingested_at": {
+            "format": "date-time",
+            "title": "Ingested At",
+            "type": "string"
+          },
+          "observation_date": {
+            "format": "date",
+            "title": "Observation Date",
+            "type": "string"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "signal_key": {
+            "title": "Signal Key",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceOut"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tickers",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signal_key",
+          "title",
+          "summary",
+          "url",
+          "source",
+          "observation_date",
+          "published_at",
+          "ingested_at",
+          "tickers",
+          "image_url",
+          "image_credit"
+        ],
+        "title": "NewsItemOut",
+        "type": "object"
+      },
+      "NewsThemeOut": {
+        "properties": {
+          "category_slugs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Category Slugs",
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NewsItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "radar_theme": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radar Theme"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "why": {
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "why",
+          "category_slugs",
+          "radar_theme",
+          "items"
+        ],
+        "title": "NewsThemeOut",
+        "type": "object"
+      },
       "Page_AccountOut_": {
         "properties": {
           "items": {
@@ -1931,6 +2064,71 @@
         ],
         "title": "TransactionUpdate",
         "type": "object"
+      },
+      "WeeklyNewsOut": {
+        "description": "Not\u00edcias publicadas nos 7 dias at\u00e9 `as_of`, agrupadas por tema pela regra `rule`.",
+        "properties": {
+          "as_of": {
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "last_ingested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Ingested At"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceOut"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "themes": {
+            "items": {
+              "$ref": "#/components/schemas/NewsThemeOut"
+            },
+            "title": "Themes",
+            "type": "array"
+          },
+          "total_items": {
+            "title": "Total Items",
+            "type": "integer"
+          },
+          "unmatched_items": {
+            "title": "Unmatched Items",
+            "type": "integer"
+          },
+          "week_start": {
+            "format": "date-time",
+            "title": "Week Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "as_of",
+          "week_start",
+          "rule",
+          "total_items",
+          "unmatched_items",
+          "themes",
+          "sources",
+          "last_ingested_at"
+        ],
+        "title": "WeeklyNewsOut",
+        "type": "object"
       }
     }
   },
@@ -2138,6 +2336,58 @@
         "summary": "Alerts Update",
         "tags": [
           "alerts"
+        ]
+      }
+    },
+    "/api/v1/alpha/news/weekly": {
+      "get": {
+        "operationId": "alpha_get_weekly_news",
+        "parameters": [
+          {
+            "description": "Fim da semana do relat\u00f3rio, com fuso; ausente usa o instante atual",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Fim da semana do relat\u00f3rio, com fuso; ausente usa o instante atual",
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyNewsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Alpha Get Weekly News",
+        "tags": [
+          "alpha"
         ]
       }
     },

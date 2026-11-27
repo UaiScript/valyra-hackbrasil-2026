@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Feed sintético de teste</title>
+    <link>https://exemplo.test/</link>
+    <item>
+      <title>Copom mantém a taxa Selic na reunião desta semana</title>
+      <link>https://agenciabrasil.ebc.com.br/economia/noticia/teste-copom</link>
+      <description><![CDATA[<p>Comitê de Política Monetária &amp; o comunicado da reunião.</p>]]></description>
+      <pubDate>Wed, 25 Nov 2026 21:30:00 -0300</pubDate>
+      <media:content url="https://imagens.ebc.com.br/teste/copom.jpg" medium="image">
+        <media:credit>Fotógrafo/Agência Brasil</media:credit>
+      </media:content>
+    </item>
+    <item>
+      <title>Gasolina fica mais cara nos postos, diz levantamento</title>
+      <link>https://agenciabrasil.ebc.com.br/economia/noticia/teste-gasolina</link>
+      <description><![CDATA[<img src="https://rastreio.exemplo.test/pixel.gif"/>Preço médio do combustível subiu na semana.]]></description>
+      <pubDate>Tue, 24 Nov 2026 10:00:00 -0300</pubDate>
+    </item>
+    <item>
+      <title>Feira de tecnologia reúne startups em São Paulo</title>
+      <link>https://agenciabrasil.ebc.com.br/economia/noticia/teste-feira</link>
+      <pubDate>Mon, 23 Nov 2026 09:00:00 -0300</pubDate>
+    </item>
+    <item>
+      <title>Item sem link é ignorado</title>
+    </item>
+  </channel>
+</rss>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 // Hash routing: a build usa base './' e é servida como arquivos estáticos, sem
 // reescrita de rotas no servidor. Âncoras da landing (#capacidades) não começam com #/.
-export type AppRoute = 'overview' | 'summary' | 'budgets' | 'projection' | 'transactions' | 'alerts' | 'ai' | 'import' | 'alpha';
+export type AppRoute = 'overview' | 'summary' | 'budgets' | 'projection' | 'transactions' | 'alerts' | 'ai' | 'import' | 'alpha' | 'news';
 
 export const ROUTES: Record<AppRoute, string> = {
   overview: '#/app',
@@ -14,6 +14,7 @@ export const ROUTES: Record<AppRoute, string> = {
   transactions: '#/app/transacoes',
   import: '#/app/importar',
   alpha: '#/app/alpha',
+  news: '#/app/alpha/semana',
 };
 
 export function isAppHash(hash: string): boolean {
@@ -28,6 +29,8 @@ export function routeFromHash(hash: string): AppRoute {
   if (hash.startsWith('#/app/alertas')) return 'alerts';
   if (hash.startsWith('#/app/orcamento')) return 'budgets';
   if (hash.startsWith('#/app/valyra-ai')) return 'ai';
+  // Antes de '#/app/alpha': o relatório da semana é uma sub-rota do Alpha.
+  if (hash.startsWith('#/app/alpha/semana')) return 'news';
   if (hash.startsWith('#/app/alpha')) return 'alpha';
   return 'overview';
 }

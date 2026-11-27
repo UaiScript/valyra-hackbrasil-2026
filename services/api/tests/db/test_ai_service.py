@@ -341,3 +341,41 @@ def test_sinais_alpha_publicados_ate_o_corte_viram_evidencias_citaveis(
     assert alpha.value.value_decimal == "15" and alpha.value.unit == "%"
     assert alpha.source.published_at <= cut
     assert any("não demonstra causa" in text for text in response.limitations)
+
+
+def test_manchetes_da_semana_viram_evidencia_textual_com_fonte(
+    db_session, reference_rows, insert_transaction
+):
+    from valyra.alpha import news_service
+    from valyra.alpha.news import FeedItem
+
+    tx = insert_transaction()
+    account, user = reference_rows["account"], reference_rows["user"]
+    cut = current_cutoff(account, tx)
+    link = "https://agenciabrasil.ebc.com.br/economia/noticia/teste-gasolina"
+    news_service.record_news(
+        db_session,
+        FeedItem("agencia-brasil", "Gasolina sobe nos postos", "", link, cut - timedelta(days=1)),
+        ingested_at=cut - timedelta(hours=12),
+    )
+    # Publicada depois do corte: não pode chegar ao LLM.
+    news_service.record_news(
+        db_session,
+        FeedItem("agencia-brasil", "Selic muda", "", link + "-2", cut + timedelta(hours=1)),
+        ingested_at=cut + timedelta(hours=2),
+    )
+    db_session.flush()
+    client = Mock(side_effect=reference_reply)
+    response = explain_for_account(
+        db_session,
+        user.id,
+        ExplainRequest(question="O que saiu na semana?", account_id=account.id),
+        client=client,
+        clock=lambda: cut,
+    )
+    sent = client.call_args.args[0].context_data
+    [news] = [e for e in sent.evidences if e.metric_key.startswith("alpha.news.")]
+    assert news.metric_key == "alpha.news.combustiveis"
+    assert news.value.value_text == "Gasolina sobe nos postos"
+    assert str(news.source.source_url) == link
+    assert any("news_theme_v2" in text for text in response.limitations)
