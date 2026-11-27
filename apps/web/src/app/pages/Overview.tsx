@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import type { FC, FormEvent } from 'react';
-import { ArrowUpRight, BellRing, Pencil } from 'lucide-react';
+import { Activity, ArrowUpRight, BellRing, ChartSpline, Pencil, Radar, Repeat, Sparkles, Target, TrendingUp, Wallet } from 'lucide-react';
 import { api, describeError } from '../api/client';
 import type { AccountOut, AccountUpdate } from '../../lib/api/schema';
 import { centsToInput, formatCents, formatIsoDate, formatMonth, formatShortDate, parseReaisToCents } from '../money';
+import { BudgetList, usedPercent } from '../Budget';
 import { ProjectionChart } from '../ProjectionChart';
 import { ROUTES } from '../router';
 import { TransactionSummary } from '../TransactionRow';
@@ -11,57 +12,110 @@ import { Async, Card, Empty, NoticeBar } from '../ui';
 import type { Notice } from '../ui';
 import { useApi } from '../useApi';
 
-// Painel do topo: o realizado (resumo) ao lado do previsto (projeção), sempre rotulados
-// separadamente para não confundir saldo de hoje com saldo estimado.
-// Realizado e previsto usam a mesma conta, para que os dois números tenham o mesmo escopo.
-const OverviewHero: FC<{ account: AccountOut; showName: boolean; reloadKey: number }> = ({ account, showName, reloadKey }) => {
+/**
+ * Linha de indicadores da central. Realizado e previsto ficam em blocos separados e
+ * rotulados, para não confundir saldo de hoje com saldo estimado; todos os números vêm
+ * prontos da API (resumo, projeção e orçamento), sem cálculo financeiro no navegador.
+ */
+const CommandKpis: FC<{ account: AccountOut; reloadKey: number }> = ({ account, reloadKey }) => {
   const summary = useApi((s) => api.getSummary({ account_id: account.id }, s), [account.id, reloadKey]);
   const projection = useApi((s) => api.getProjection(account.id, 30, s), [account.id, reloadKey]);
+  const budgets = useApi((s) => api.getBudgets({}, s), [reloadKey]);
   const s = summary.state.data;
   const p = projection.state.data;
-  const quiet = s && s.income_cents === 0 && s.expenses_cents === 0;
+  const b = budgets.state.data;
+  const pending = (st: { status: string }) => (st.status === 'error' ? 'Indisponível' : '—');
+  const budgetPct = b && b.total_limit_cents > 0 ? usedPercent(b.total_spent_cents, b.total_limit_cents) : null;
+  const overCount = b?.items.filter((i) => i.status === 'over').length ?? 0;
   return (
-    <section className="vx-hero vx-hero--overview" aria-label="Saldo de hoje e próximos 30 dias">
-      <div className="vx-hero__lead">
-        <span className="vx-hero__label">Saldo realizado hoje{s ? `, ${formatIsoDate(s.today)}` : ''}{showName ? ` · ${account.name}` : ''}</span>
-        {summary.state.status === 'error' && !s ? <span className="app-muted">Resumo indisponível.</span> : (
-          <strong className={`vx-figure${s?.realized_balance_cents === null ? ' vx-figure--muted' : ''}`}>
-            {s ? (s.realized_balance_cents === null ? 'Indisponível' : formatCents(s.realized_balance_cents)) : '—'}
-          </strong>
-        )}
-        {s && (
-          <a className="vx-hero__month" href={ROUTES.summary}>
-            {quiet
-              ? <>Sem movimentações em {formatMonth(s.month)} até agora</>
-              : <>Resultado de {formatMonth(s.month)}: <b className={s.net_cents < 0 ? 'vx-totals__neg' : 'vx-totals__in'}>{formatCents(s.net_cents)}</b></>}
-            <ArrowUpRight size={14} aria-hidden="true" />
-          </a>
-        )}
-      </div>
-      <a className="vx-hero__forecast" href={ROUTES.projection} aria-label="Abrir projeção de caixa">
-        <span className="vx-hero__label">Próximos 30 dias, previsto</span>
-        {p ? (
-          <>
-            <ProjectionChart projection={p} height={120} compact />
-            <span className="vx-hero__caption">
-              Menor saldo <b className={p.min_balance_cents < 0 ? 'vx-totals__neg' : undefined}>{formatCents(p.min_balance_cents)}</b> em {formatShortDate(p.min_balance_date)}
-            </span>
-          </>
-        ) : <span className="app-muted vx-hero__placeholder">{projection.state.status === 'error' ? 'Projeção indisponível.' : 'Calculando projeção…'}</span>}
+    <section className="cx-kpis cx-span" aria-label="Indicadores principais">
+      <a className="cx-kpi cx-kpi--lead" href={ROUTES.summary}>
+        <span className="cx-kpi__label"><Wallet size={13} aria-hidden="true" />Saldo realizado · {s ? formatIsoDate(s.today) : 'hoje'}</span>
+        <strong className="cx-kpi__value">{s ? (s.realized_balance_cents === null ? 'Indisponível' : formatCents(s.realized_balance_cents)) : pending(summary.state)}</strong>
+        <span className="cx-kpi__hint">{account.name}</span>
+      </a>
+      <a className={`cx-kpi${s && s.net_cents < 0 ? ' cx-kpi--danger' : ''}`} href={ROUTES.summary}>
+        <span className="cx-kpi__label"><Activity size={13} aria-hidden="true" />Resultado do mês</span>
+        <strong className="cx-kpi__value">{s ? formatCents(s.net_cents) : pending(summary.state)}</strong>
+        <span className="cx-kpi__hint">{s ? `${formatMonth(s.month)}, realizado` : 'entradas menos saídas'}</span>
+      </a>
+      <a className={`cx-kpi${p && p.min_balance_cents < 0 ? ' cx-kpi--danger' : ''}`} href={ROUTES.projection}>
+        <span className="cx-kpi__label"><ChartSpline size={13} aria-hidden="true" />Menor saldo · 30 dias</span>
+        <strong className="cx-kpi__value">{p ? formatCents(p.min_balance_cents) : pending(projection.state)}</strong>
+        <span className="cx-kpi__hint">{p ? `em ${formatShortDate(p.min_balance_date)} · previsão` : 'projeção de caixa'}</span>
+      </a>
+      <a className={`cx-kpi${overCount ? ' cx-kpi--danger' : budgetPct !== null && budgetPct >= 80 ? ' cx-kpi--warning' : ''}`} href={ROUTES.budgets}>
+        <span className="cx-kpi__label"><Target size={13} aria-hidden="true" />Orçamento do mês</span>
+        <strong className="cx-kpi__value">{budgetPct === null ? (b ? 'Sem limites' : pending(budgets.state)) : `${budgetPct}%`}</strong>
+        <span className="cx-kpi__hint">{b && budgetPct !== null ? `${formatCents(b.total_spent_cents)} de ${formatCents(b.total_limit_cents)}${overCount ? ` · ${overCount} estourado${overCount > 1 ? 's' : ''}` : ''}` : 'defina tetos por categoria'}</span>
       </a>
     </section>
   );
 };
 
-const NewAlertsBanner: FC = () => {
-  const alerts = useApi((s) => api.listAlerts(s), []);
-  const fresh = alerts.state.data?.items.filter((a) => a.status === 'new') ?? [];
-  if (fresh.length === 0) return null;
+const ForecastPanel: FC<{ account: AccountOut; reloadKey: number }> = ({ account, reloadKey }) => {
+  const projection = useApi((s) => api.getProjection(account.id, 30, s), [account.id, reloadKey]);
+  const p = projection.state.data;
   return (
-    <a className="app-inline-alert" href={ROUTES.alerts}>
-      <BellRing size={18} aria-hidden="true" />
-      <span><strong>{fresh[0].title}</strong>{fresh.length > 1 ? ` e mais ${fresh.length - 1}` : ''}. Ver alertas</span>
-    </a>
+    <section className="app-card cx-panel cx-panel--chart">
+      <header className="app-card__header">
+        <h2>Fluxo de caixa previsto · 30 dias</h2>
+        <a className="app-link" href={ROUTES.projection}>Detalhar<ArrowUpRight size={14} aria-hidden="true" /></a>
+      </header>
+      {p ? (
+        <>
+          <ProjectionChart projection={p} height={250} />
+          <p className="cx-caption">Previsão a partir do saldo realizado de hoje ({formatCents(p.start_balance_cents)}), das recorrências detectadas e da média de gastos variáveis ({formatCents(p.variable_daily_cents)}/dia).</p>
+        </>
+      ) : <span className="app-muted vx-hero__placeholder">{projection.state.status === 'error' ? 'Projeção indisponível.' : 'Calculando projeção…'}</span>}
+    </section>
+  );
+};
+
+/** Radar: o que os cálculos sinalizaram, com atalho para pedir explicação à IA. */
+const SignalRadar: FC = () => {
+  const alerts = useApi((s) => api.listAlerts(s), []);
+  const anomalies = useApi((s) => api.listTransactions({ is_anomaly: true, limit: 3 }, s), []);
+  const recurring = useApi((s) => api.listTransactions({ is_recurring: true, limit: 1 }, s), []);
+  const fresh = alerts.state.data?.items.filter((a) => a.status === 'new') ?? [];
+  const atypical = anomalies.state.data;
+  return (
+    <section className="app-card cx-panel cx-radar">
+      <header className="app-card__header"><h2><Radar size={14} aria-hidden="true" />Radar de sinais</h2></header>
+      <ul className="cx-signals">
+        <li className={fresh.length ? 'cx-signal cx-signal--warning' : 'cx-signal'}>
+          <BellRing size={16} aria-hidden="true" />
+          <a href={ROUTES.alerts}><span><b>{fresh.length}</b> {fresh.length === 1 ? 'alerta novo' : 'alertas novos'}</span>{fresh[0] ? <small>{fresh[0].title}</small> : <small>Nenhuma pressão de caixa</small>}</a>
+        </li>
+        <li className={atypical?.total ? 'cx-signal cx-signal--warning' : 'cx-signal'}>
+          <TrendingUp size={16} aria-hidden="true" />
+          <a href={ROUTES.transactions}><span><b>{atypical?.total ?? '—'}</b> {atypical?.total === 1 ? 'gasto atípico' : 'gastos atípicos'}</span>{atypical?.items[0] ? <small>{atypical.items[0].description} · {formatCents(atypical.items[0].amount_cents)}</small> : <small>Acima do padrão da categoria</small>}</a>
+        </li>
+        <li className="cx-signal cx-signal--info">
+          <Repeat size={16} aria-hidden="true" />
+          <a href={ROUTES.transactions}><span><b>{recurring.state.data?.total ?? '—'}</b> lançamentos recorrentes</span><small>Base das previsões de caixa</small></a>
+        </li>
+      </ul>
+      <a className="cx-ask" href={ROUTES.ai}>
+        <Sparkles size={16} aria-hidden="true" />
+        <span><b>Pergunte ao Valyra</b><small>Explicações em linguagem simples, com evidências citadas</small></span>
+        <ArrowUpRight size={16} aria-hidden="true" />
+      </a>
+    </section>
+  );
+};
+
+const BudgetPanel: FC<{ reloadKey: number }> = ({ reloadKey }) => {
+  const budgets = useApi((s) => api.getBudgets({}, s), [reloadKey]);
+  return (
+    <section className="app-card cx-panel">
+      <header className="app-card__header"><h2>Orçamento do mês</h2><a className="app-link" href={ROUTES.budgets}>Gerenciar</a></header>
+      <Async state={budgets.state} onRetry={budgets.reload}>
+        {(b) => b.items.length === 0
+          ? <Empty>Nenhum limite definido. <a className="app-link" href={ROUTES.budgets}>Definir tetos por categoria</a>.</Empty>
+          : <BudgetList items={b.items} max={5} />}
+      </Async>
+    </section>
   );
 };
 
@@ -119,15 +173,16 @@ export const Overview: FC = () => {
   // Editar o saldo de referência muda o realizado e a projeção: recarrega o painel.
   const [heroKey, setHeroKey] = useState(0);
 
+  const account = accounts.state.data?.items[0];
+
   return (
-    <div className="app-grid">
-      <NewAlertsBanner />
-      {accounts.state.data?.items[0] && (
-        <OverviewHero account={accounts.state.data.items[0]} showName={accounts.state.data.items.length > 1} reloadKey={heroKey} />
-      )}
+    <div className="cx-grid">
+      {account && <CommandKpis account={account} reloadKey={heroKey} />}
+      {account && <ForecastPanel account={account} reloadKey={heroKey} />}
+      <SignalRadar />
+      <BudgetPanel reloadKey={heroKey} />
       <NoticeBar notice={notice} onClose={() => setNotice(null)} />
-      <div className="app-stack app-stack--loose">
-      <Card title="Contas">
+      <Card title="Contas" className="cx-order-accounts">
         <Async state={accounts.state} onRetry={accounts.reload}>
           {(page) => page.items.length === 0 ? <Empty>Nenhuma conta cadastrada. Rode o seed da API.</Empty> : (
             <ul className="app-accounts">
@@ -163,7 +218,7 @@ export const Overview: FC = () => {
         </Async>
       </Card>
 
-      <Card title="Importações recentes" action={<a className="app-link" href={ROUTES.import}>Importar</a>}>
+      <Card title="Importações recentes" className="cx-order-imports" action={<a className="app-link" href={ROUTES.import}>Importar</a>}>
         <Async state={batches.state} onRetry={batches.reload}>
           {(page) => page.items.length === 0 ? <Empty>Nenhuma importação feita.</Empty> : (
             <div className="app-table-wrap">
@@ -182,8 +237,7 @@ export const Overview: FC = () => {
           )}
         </Async>
       </Card>
-      </div>
-      <Card title="Últimas transações" action={<a className="app-link" href={ROUTES.transactions}>Ver todas</a>}>
+      <Card title="Últimas transações" className="cx-order-recent" action={<a className="app-link" href={ROUTES.transactions}>Ver todas</a>}>
         <Async state={recent.state} onRetry={recent.reload}>
           {(page) => page.items.length === 0
             ? <Empty>Sem transações ainda. <a className="app-link" href={ROUTES.import}>Importe um CSV</a>.</Empty>

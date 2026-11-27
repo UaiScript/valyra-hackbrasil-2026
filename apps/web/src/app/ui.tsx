@@ -41,8 +41,8 @@ export const NoticeBar: FC<{ notice: Notice; onClose: () => void }> = ({ notice,
     </div>
   ) : null;
 
-export const Card: FC<{ title: string; action?: ReactNode; children: ReactNode }> = ({ title, action, children }) => (
-  <section className="app-card">
+export const Card: FC<{ title: string; action?: ReactNode; children: ReactNode; className?: string }> = ({ title, action, children, className }) => (
+  <section className={`app-card${className ? ` ${className}` : ''}`}>
     <header className="app-card__header"><h2>{title}</h2>{action}</header>
     {children}
   </section>
