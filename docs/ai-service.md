@@ -80,7 +80,8 @@ Regras de corte:
 
 Alpha entra pelo service público `alpha.service.get_radar(as_of)`: para cada série,
 os dois últimos pontos publicados até o corte viram evidências `alpha_signal`
-(`DecimalValue` com unidade `%`, procedência da fonte e `published_at`). Com
+(`DecimalValue` com unidade `%` ou `mm`, primeiro o último ponto de cada série e
+depois os anteriores, dentro do espaço restante do teto de 100; procedência da fonte e `published_at`). Com
 evidências Alpha, uma limitação lembra que indicador e gasto juntos não
 demonstram causa; sem coletas até o corte, a ausência vira limitação. Saldo zero
 informado é evidência válida; ausência de dados não significa zero. Sem nenhuma

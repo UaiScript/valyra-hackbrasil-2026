@@ -1,6 +1,6 @@
 """Casos de uso do Alpha: gravar observações coletadas e montar o radar num corte `as_of`."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
@@ -13,6 +13,7 @@ from valyra.alpha.domain import (
     SGS_SERIES,
     DerivedSignal,
     Series,
+    climate_signal,
     estimated_publication,
     format_decimal,
     ipca_signal,
@@ -32,6 +33,11 @@ SOURCES = {
         "name": "brapi.dev",
         "url": "https://brapi.dev/",
         "license": "Plano gratuito da brapi.dev; cotação com atraso",
+    },
+    "open-meteo": {
+        "name": "Open-Meteo",
+        "url": "https://open-meteo.com/",
+        "license": "CC BY 4.0; API gratuita para uso não comercial",
     },
 }
 # Histórico curto basta para o radar e mantém a leitura barata no plano gratuito do banco.
@@ -122,11 +128,21 @@ class IndicatorView:
 
 
 @dataclass(frozen=True)
+class SourceStatus:
+    """Fonte com a última coleta visível no corte: a tela mostra se está atualizada."""
+
+    source: Source
+    last_ingested_at: datetime | None
+    series_count: int
+
+
+@dataclass(frozen=True)
 class Radar:
     as_of: datetime
     indicators: list[IndicatorView]
     signals: list[DerivedSignal]
     last_ingested_at: datetime | None
+    sources: list[SourceStatus] = field(default_factory=list)
 
 
 def get_radar(session: Session, as_of: datetime) -> Radar:
@@ -167,12 +183,37 @@ def get_radar(session: Session, as_of: datetime) -> Radar:
             derived = selic_signal(series, history)
         elif series is SGS_SERIES[2]:
             derived = ipca_signal(series, history)
+        elif series.theme == "clima" and series.unit == "%":
+            derived = climate_signal(series, history)
         else:
             derived = None
         if derived is not None:
             signals.append(derived)
     signals.sort(key=lambda s: s.observation_date, reverse=True)
-    return Radar(as_of=as_of, indicators=indicators, signals=signals, last_ingested_at=last)
+    return Radar(
+        as_of=as_of,
+        indicators=indicators,
+        signals=signals,
+        last_ingested_at=last,
+        sources=_source_statuses(indicators, as_of),
+    )
+
+
+def _source_statuses(indicators: list[IndicatorView], as_of: datetime) -> list[SourceStatus]:
+    grouped: dict[str, list[IndicatorView]] = {}
+    for view in indicators:
+        grouped.setdefault(view.source.slug, []).append(view)
+    statuses = []
+    for views in grouped.values():
+        seen = [p.ingested_at for v in views for p in v.history if p.ingested_at <= as_of]
+        statuses.append(
+            SourceStatus(
+                source=views[0].source,
+                last_ingested_at=max(seen, default=None),
+                series_count=len(views),
+            )
+        )
+    return statuses
 
 
 def format_value(value: Decimal) -> str:

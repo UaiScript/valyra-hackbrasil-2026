@@ -15,6 +15,8 @@ from zoneinfo import ZoneInfo
 
 BUSINESS_ZONE = ZoneInfo("America/Sao_Paulo")
 Periodicity = Literal["daily", "monthly"]
+# Temas da tela e dos filtros; um indicador pertence a um só tema.
+Theme = Literal["juros", "inflacao", "acoes", "clima"]
 
 
 @dataclass(frozen=True)
@@ -29,8 +31,10 @@ class Series:
     periodicity: Periodicity
     metric_key: str
     kind: str
+    theme: Theme
     sgs_code: int | None = None
     ticker: str | None = None
+    region: Region | None = None
 
 
 SGS_SERIES: tuple[Series, ...] = (
@@ -43,6 +47,7 @@ SGS_SERIES: tuple[Series, ...] = (
         periodicity="daily",
         metric_key="alpha.bcb.selic_meta",
         kind="macro_indicator",
+        theme="juros",
         sgs_code=432,
     ),
     Series(
@@ -54,6 +59,7 @@ SGS_SERIES: tuple[Series, ...] = (
         periodicity="daily",
         metric_key="alpha.bcb.cdi_daily",
         kind="macro_indicator",
+        theme="juros",
         sgs_code=12,
     ),
     Series(
@@ -65,6 +71,7 @@ SGS_SERIES: tuple[Series, ...] = (
         periodicity="monthly",
         metric_key="alpha.bcb.ipca_month",
         kind="macro_indicator",
+        theme="inflacao",
         sgs_code=433,
     ),
 )
@@ -80,11 +87,74 @@ STOCK_SERIES: tuple[Series, ...] = tuple(
         periodicity="daily",
         metric_key=f"alpha.brapi.{ticker.lower()}.change_pct",
         kind="price_move",
+        theme="acoes",
         ticker=ticker,
     )
     for ticker in BRAPI_TICKERS
 )
-ALL_SERIES = SGS_SERIES + STOCK_SERIES
+
+
+@dataclass(frozen=True)
+class Region:
+    """Região produtora acompanhada pelo clima (Open-Meteo, por coordenada)."""
+
+    slug: str
+    name: str
+    production: str
+    latitude: Decimal
+    longitude: Decimal
+
+
+# Três polos de alimentos com perfis diferentes: grãos no Centro-Oeste e hortaliças perto de SP.
+_D = Decimal
+REGIONS: tuple[Region, ...] = (
+    Region("sorriso-mt", "Sorriso (MT)", "soja e milho", _D("-12.545"), _D("-55.711")),
+    Region("rio-verde-go", "Rio Verde (GO)", "grãos e carnes", _D("-17.797"), _D("-50.919")),
+    Region("mogi-sp", "Mogi das Cruzes (SP)", "hortaliças", _D("-23.522"), _D("-46.188")),
+)
+RAIN_WINDOW_DAYS = 30
+NORMAL_YEARS = 10
+# Com menos anos completos, a "média" fica frágil demais para virar comparação.
+MIN_NORMAL_YEARS = 7
+
+
+def _rain_series(region: Region) -> tuple[Series, Series]:
+    base = f"openmeteo:{region.slug}"
+    return (
+        Series(
+            key=f"{base}:rain_30d",
+            source_slug="open-meteo",
+            title=f"Chuva em 30 dias · {region.name}",
+            unit="mm",
+            unit_label="mm em 30 dias",
+            periodicity="daily",
+            metric_key=f"alpha.openmeteo.{region.slug}.rain_30d",
+            kind="climate_anomaly",
+            theme="clima",
+            region=region,
+        ),
+        Series(
+            key=f"{base}:rain_30d_anomaly",
+            source_slug="open-meteo",
+            title=f"Chuva contra a média · {region.name}",
+            unit="%",
+            unit_label=f"% vs. média de {NORMAL_YEARS} anos",
+            periodicity="daily",
+            metric_key=f"alpha.openmeteo.{region.slug}.rain_30d_anomaly",
+            kind="climate_anomaly",
+            theme="clima",
+            region=region,
+        ),
+    )
+
+
+CLIMATE_SERIES: tuple[Series, ...] = tuple(s for r in REGIONS for s in _rain_series(r))
+ALL_SERIES = SGS_SERIES + STOCK_SERIES + CLIMATE_SERIES
+
+
+def climate_pair(region: Region) -> tuple[Series, Series]:
+    rain, anomaly = (s for s in CLIMATE_SERIES if s.region == region)
+    return rain, anomaly
 
 
 def signal_key(series: Series, observation_date: date) -> str:
@@ -201,12 +271,19 @@ class DerivedSignal:
     published_at: datetime
     evidence_keys: tuple[str, ...]
     rule: str
+    theme: Theme
+    # Limites da leitura, exibidos junto ao sinal: a regra não é previsão nem causa.
+    limitations: tuple[str, ...] = ()
 
 
 _MONTHS = (
     "janeiro", "fevereiro", "março", "abril", "maio", "junho",
     "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
 )  # fmt: skip
+
+
+_WINDOW_ONLY = "Considera só o histórico coletado pela Valyra, não toda a série do Banco Central."
+_NO_FORECAST = "Descreve o que já aconteceu; não antecipa a próxima decisão do Copom."
 
 
 def _month_name(day: date) -> str:
@@ -241,12 +318,14 @@ def selic_signal(series: Series, history: Sequence[Revision]) -> DerivedSignal |
             ),
             summary=(
                 "Sem mudança da meta no histórico coletado, de "
-                f"{first.observation_date.isoformat()} a {last.observation_date.isoformat()}."
+                f"{_br_date(first.observation_date)} a {_br_date(last.observation_date)}."
             ),
             observation_date=last.observation_date,
             published_at=max(row.published_at for row in (first, last)),
             evidence_keys=(first.signal_key, last.signal_key),
             rule="selic_meta_stable_v1",
+            theme="juros",
+            limitations=(_WINDOW_ONLY, _NO_FORECAST),
         )
     before, after = change
     assert before.value is not None and after.value is not None
@@ -257,11 +336,13 @@ def selic_signal(series: Series, history: Sequence[Revision]) -> DerivedSignal |
             f"Selic meta {verb} de {display(before.value, series.unit_label)} "
             f"para {display(after.value, series.unit_label)}"
         ),
-        summary=f"Mudança registrada na observação de {after.observation_date.isoformat()}.",
+        summary=f"Mudança registrada na observação de {_br_date(after.observation_date)}.",
         observation_date=after.observation_date,
         published_at=max(before.published_at, after.published_at),
         evidence_keys=(before.signal_key, after.signal_key),
         rule="selic_meta_change_v1",
+        theme="juros",
+        limitations=(_WINDOW_ONLY, _NO_FORECAST),
     )
 
 
@@ -292,4 +373,98 @@ def ipca_signal(series: Series, history: Sequence[Revision]) -> DerivedSignal | 
         published_at=max(previous.published_at, last.published_at),
         evidence_keys=(previous.signal_key, last.signal_key),
         rule="ipca_month_compare_v1",
+        theme="inflacao",
+        limitations=("Compara só dois meses; não indica tendência nem o efeito no seu orçamento.",),
+    )
+
+
+def _same_day(day: date, years_back: int) -> date:
+    try:
+        return day.replace(year=day.year - years_back)
+    except ValueError:  # 29 de fevereiro em ano não bissexto
+        return day.replace(year=day.year - years_back, day=28)
+
+
+def _window_sum(daily: dict[date, Decimal], end: date) -> Decimal | None:
+    days = [end - timedelta(days=offset) for offset in range(RAIN_WINDOW_DAYS)]
+    if any(day not in daily for day in days):
+        return None
+    return sum((daily[day] for day in days), Decimal(0))
+
+
+@dataclass(frozen=True)
+class RainReading:
+    end: date
+    total_mm: Decimal
+    normal_mm: Decimal
+    years: int
+    anomaly_pct: Decimal | None
+
+
+def rain_reading(
+    recent: dict[date, Decimal], history: dict[date, Decimal], end: date
+) -> RainReading | None:
+    """Chuva acumulada nos 30 dias até `end` contra a média da mesma janela em 10 anos.
+
+    Só janelas completas contam: um dia faltando descarta aquele ano, em vez de virar zero.
+    """
+    total = _window_sum(recent, end)
+    if total is None:
+        return None
+    sums = [
+        value
+        for years_back in range(1, NORMAL_YEARS + 1)
+        if (value := _window_sum(history, _same_day(end, years_back))) is not None
+    ]
+    if len(sums) < MIN_NORMAL_YEARS:
+        return None
+    normal = sum(sums, Decimal(0)) / len(sums)
+    anomaly = None
+    if normal > 0:
+        anomaly = ((total - normal) * 100 / normal).quantize(Decimal("0.1"))
+    return RainReading(
+        end=end,
+        total_mm=total.quantize(Decimal("0.1")),
+        normal_mm=normal.quantize(Decimal("0.1")),
+        years=len(sums),
+        anomaly_pct=anomaly,
+    )
+
+
+DRY_THRESHOLD = Decimal(-30)
+WET_THRESHOLD = Decimal(50)
+
+
+def climate_signal(series: Series, history: Sequence[Revision]) -> DerivedSignal | None:
+    """Estiagem ou excesso de chuva relevante na região, pela última anomalia visível."""
+    points = [row for row in history if row.value is not None]
+    if not points or series.region is None:
+        return None
+    last = max(points, key=lambda r: r.observation_date)
+    assert last.value is not None
+    region = series.region
+    if last.value <= DRY_THRESHOLD:
+        word, rule = "abaixo", "climate_dry_spell_v1"
+    elif last.value >= WET_THRESHOLD:
+        word, rule = "acima", "climate_wet_spell_v1"
+    else:
+        return None
+    pct = format_decimal(abs(last.value)).replace(".", ",")
+    return DerivedSignal(
+        key=f"{series.key}:{rule}:{last.observation_date.isoformat()}",
+        title=f"Chuva em {region.name} {pct}% {word} da média de {NORMAL_YEARS} anos",
+        summary=(
+            f"Acumulado de {RAIN_WINDOW_DAYS} dias até {_br_date(last.observation_date)} em região "
+            f"de {region.production}. Hipótese a acompanhar: clima fora do padrão em polos "
+            "produtores costuma ser observado junto a pressões nos preços de alimentos."
+        ),
+        observation_date=last.observation_date,
+        published_at=last.published_at,
+        evidence_keys=(last.signal_key,),
+        rule=rule,
+        theme="clima",
+        limitations=(
+            "Dado modelado por coordenada (Open-Meteo), não medição de estação oficial.",
+            "Hipótese de acompanhamento: não prevê preços nem demonstra causa.",
+        ),
     )

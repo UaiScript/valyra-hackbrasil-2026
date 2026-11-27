@@ -7,13 +7,18 @@ from decimal import Decimal
 import pytest
 
 from valyra.alpha.domain import (
+    CLIMATE_SERIES,
+    REGIONS,
     SGS_SERIES,
     SgsFormatError,
+    climate_pair,
+    climate_signal,
     estimated_publication,
     format_decimal,
     ipca_signal,
     next_revision,
     parse_sgs,
+    rain_reading,
     selic_signal,
     visible_at,
 )
@@ -112,3 +117,57 @@ def test_sinal_ipca_compara_com_mes_anterior():
     signal = ipca_signal(IPCA, rows)
     assert signal.title == "IPCA de outubro de 2026 abaixo do mês anterior"
     assert ipca_signal(IPCA, rows[:1]) is None
+
+
+def _daily(start: date, days: int, value: str) -> dict[date, Decimal]:
+    from datetime import timedelta
+
+    return {start + timedelta(days=i): Decimal(value) for i in range(days)}
+
+
+def test_chuva_compara_janela_com_media_de_dez_anos():
+    end = date(2026, 11, 26)
+    recent = _daily(date(2026, 10, 1), 60, "1")
+    history = _daily(date(2016, 9, 1), 365 * 10 + 10, "2")
+    reading = rain_reading(recent, history, end)
+    assert reading is not None
+    assert (reading.total_mm, reading.normal_mm, reading.years) == (
+        Decimal("30.0"),
+        Decimal("60.0"),
+        10,
+    )
+    assert reading.anomaly_pct == Decimal("-50.0")
+
+
+def test_ano_incompleto_sai_da_media_e_poucos_anos_nao_viram_comparacao():
+    from datetime import timedelta
+
+    end = date(2026, 11, 26)
+    recent = _daily(date(2026, 10, 1), 60, "1")
+    history = _daily(date(2016, 9, 1), 365 * 10 + 10, "2")
+    # Um dia faltando descarta o ano inteiro, sem virar zero.
+    for years_back in range(1, 5):
+        history.pop(end.replace(year=end.year - years_back) - timedelta(days=3))
+    assert rain_reading(recent, history, end) is None
+    history = _daily(date(2016, 9, 1), 365 * 10 + 10, "2")
+    history.pop(date(2025, 11, 20))
+    reading = rain_reading(recent, history, end)
+    assert reading is not None and reading.years == 9
+    recent.pop(date(2026, 11, 10))
+    assert rain_reading(recent, history, end) is None
+
+
+def test_sinal_de_clima_so_aparece_fora_da_faixa_usual():
+    _, anomaly = climate_pair(REGIONS[0])
+    assert anomaly in CLIMATE_SERIES
+
+    def row(value: str) -> Row:
+        return Row(f"{anomaly.key}:2026-11-26", 1, date(2026, 11, 26), Decimal(value), at(26))
+
+    dry = climate_signal(anomaly, [row("-45.2")])
+    assert dry is not None and dry.rule == "climate_dry_spell_v1"
+    assert dry.title == "Chuva em Sorriso (MT) 45,2% abaixo da média de 10 anos"
+    assert dry.theme == "clima" and any("causa" in text for text in dry.limitations)
+    wet = climate_signal(anomaly, [row("60")])
+    assert wet is not None and wet.rule == "climate_wet_spell_v1"
+    assert climate_signal(anomaly, [row("-10")]) is None

@@ -49,30 +49,51 @@ const BUDGETS = {
   items: [{ category: { ...CATEGORIES[0] }, limit_cents: 150000, spent_cents: 180000, remaining_cents: -30000, status: 'over' }],
 };
 const SGS = { slug: 'bcb-sgs', name: 'Banco Central do Brasil — SGS', url: 'https://api.bcb.gov.br/dados/serie/', license: 'Dados abertos do Banco Central; citar a fonte' };
+const BRAPI = { slug: 'brapi', name: 'brapi.dev', url: 'https://brapi.dev/', license: 'Plano gratuito da brapi.dev; cotação com atraso' };
+const METEO = { slug: 'open-meteo', name: 'Open-Meteo', url: 'https://open-meteo.com/', license: 'CC BY 4.0; API gratuita para uso não comercial' };
+const SORRISO = { slug: 'sorriso-mt', name: 'Sorriso (MT)', production: 'soja e milho' };
 const point = (key: string, date: string, value: string, extra: Record<string, unknown> = {}) => ({
   signal_key: `${key}:${date}`, revision_id: 1, observation_date: date, value,
   published_at: '2026-11-27T17:07:00Z', published_at_estimated: false, ingested_at: '2026-11-27T17:07:00Z',
   source_url: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/20', ...extra,
 });
+const indicator = (key: string, title: string, unit: string, unit_label: string, theme: string, source: unknown, latest: ReturnType<typeof point>, previous: ReturnType<typeof point> | null, extra: Record<string, unknown> = {}) => ({
+  key, title, unit, unit_label, kind: 'macro_indicator', theme, periodicity: 'daily', region: null, source, latest, previous,
+  history: [...(previous ? [{ observation_date: previous.observation_date, value: previous.value }] : []), { observation_date: latest.observation_date, value: latest.value }],
+  ...extra,
+});
 const RADAR = {
   as_of: '2026-11-27T18:00:00Z', last_ingested_at: '2026-11-27T17:07:00Z',
   indicators: [
+    indicator('bcb:sgs:432', 'Selic meta', '%', '% ao ano', 'juros', SGS, point('bcb:sgs:432', '2026-11-27', '15'), point('bcb:sgs:432', '2026-11-26', '15.25')),
+    indicator('bcb:sgs:433', 'IPCA do mês', '%', '% no mês', 'inflacao', SGS,
+      point('bcb:sgs:433', '2026-10-01', '0.09', { published_at_estimated: true, published_at: '2026-11-12T15:00:00Z' }), null, { periodicity: 'monthly' }),
+    indicator('brapi:PETR4:change_pct', 'PETR4: variação do dia', '%', '% no dia', 'acoes', BRAPI,
+      point('brapi:PETR4:change_pct', '2026-11-27', '-1.2345'), point('brapi:PETR4:change_pct', '2026-11-26', '0.5'), { kind: 'price_move' }),
+    indicator('openmeteo:sorriso-mt:rain_30d', 'Chuva em 30 dias · Sorriso (MT)', 'mm', 'mm em 30 dias', 'clima', METEO,
+      point('openmeteo:sorriso-mt:rain_30d', '2026-11-26', '42.5'), null, { kind: 'climate_anomaly', region: SORRISO }),
+    indicator('openmeteo:sorriso-mt:rain_30d_anomaly', 'Chuva contra a média · Sorriso (MT)', '%', '% vs. média de 10 anos', 'clima', METEO,
+      point('openmeteo:sorriso-mt:rain_30d_anomaly', '2026-11-26', '-45.2'), null, { kind: 'climate_anomaly', region: SORRISO }),
+  ],
+  signals: [
     {
-      key: 'bcb:sgs:432', title: 'Selic meta', unit: '%', unit_label: '% ao ano', kind: 'macro_indicator', source: SGS,
-      latest: point('bcb:sgs:432', '2026-11-27', '15'), previous: point('bcb:sgs:432', '2026-11-26', '15.25'),
-      history: [{ observation_date: '2026-11-26', value: '15.25' }, { observation_date: '2026-11-27', value: '15' }],
+      key: 'bcb:sgs:432:mudanca:2026-11-27', title: 'Selic meta caiu de 15,25 % ao ano para 15 % ao ano', theme: 'juros',
+      summary: 'Mudança registrada na observação de 2026-11-27.', observation_date: '2026-11-27',
+      published_at: '2026-11-27T17:07:00Z', rule: 'selic_meta_change_v1', evidence_keys: ['bcb:sgs:432:2026-11-26', 'bcb:sgs:432:2026-11-27'],
+      limitations: ['Descreve o que já aconteceu; não antecipa a próxima decisão do Copom.'],
     },
     {
-      key: 'bcb:sgs:433', title: 'IPCA do mês', unit: '%', unit_label: '% no mês', kind: 'macro_indicator', source: SGS,
-      latest: point('bcb:sgs:433', '2026-10-01', '0.09', { published_at_estimated: true, published_at: '2026-11-12T15:00:00Z' }),
-      previous: null, history: [{ observation_date: '2026-10-01', value: '0.09' }],
+      key: 'openmeteo:sorriso-mt:rain_30d_anomaly:climate_dry_spell_v1:2026-11-26', title: 'Chuva em Sorriso (MT) 45,2% abaixo da média de 10 anos', theme: 'clima',
+      summary: 'Acumulado de 30 dias até 26/11/2026 em região de soja e milho.', observation_date: '2026-11-26',
+      published_at: '2026-11-27T17:07:00Z', rule: 'climate_dry_spell_v1', evidence_keys: ['openmeteo:sorriso-mt:rain_30d_anomaly:2026-11-26'],
+      limitations: ['Hipótese de acompanhamento: não prevê preços nem demonstra causa.'],
     },
   ],
-  signals: [{
-    key: 'bcb:sgs:432:selic_meta_change_v1', title: 'Selic meta caiu de 15,25% ao ano para 15% ao ano',
-    summary: 'Última mudança registrada da meta da Selic, observada em 27/11/2026.', observation_date: '2026-11-27',
-    published_at: '2026-11-27T17:07:00Z', rule: 'selic_meta_change_v1', evidence_keys: ['bcb:sgs:432:2026-11-27'],
-  }],
+  sources: [
+    { source: SGS, last_ingested_at: '2026-11-27T17:07:00Z', series_count: 2 },
+    { source: BRAPI, last_ingested_at: '2026-11-27T17:07:00Z', series_count: 1 },
+    { source: METEO, last_ingested_at: '2026-11-22T10:00:00Z', series_count: 2 },
+  ],
 };
 // Manchetes sintéticas só para o teste; a coleta real lê Agência Brasil, BCB e IBGE.
 const AB = { slug: 'agencia-brasil', name: 'Agência Brasil (EBC) — Economia', url: 'https://agenciabrasil.ebc.com.br/economia', license: 'Reprodução permitida com citação da Agência Brasil; aqui só título, trecho e link' };
@@ -118,7 +139,7 @@ async function mockApi(page: Page) {
   await page.route('**/api/v1/alpha/radar**', (route) => {
     const url = new URL(route.request().url());
     calls.push({ method: 'GET', url: url.pathname + url.search, body: null });
-    return json(route, url.searchParams.has('as_of') ? { ...RADAR, as_of: url.searchParams.get('as_of'), indicators: [], signals: [], last_ingested_at: null } : RADAR);
+    return json(route, url.searchParams.has('as_of') ? { ...RADAR, as_of: url.searchParams.get('as_of'), indicators: [], signals: [], sources: [], last_ingested_at: null } : RADAR);
   });
   await page.route('**/api/v1/alpha/news/weekly**', (route) => json(route, WEEKLY));
   await page.route('**/api/v1/finance/**', (route) => {
@@ -316,22 +337,53 @@ test('API fora do ar gera estado de erro com nova tentativa', async ({ page }) =
   await expect(page.getByRole('button', { name: 'Tentar de novo' }).first()).toBeVisible();
 });
 
-test('radar Alpha mostra fonte, publicação, coleta e reconstituição ilustrativa', async ({ page }) => {
+test('radar Alpha organiza pulso, temas, clima, sinais e fontes', async ({ page }) => {
   await mockApi(page);
   await page.goto('/#/app/alpha');
   await expect(page.getByRole('heading', { level: 1, name: 'Radar econômico' })).toBeVisible();
+  const pulse = page.getByLabel('Pulso econômico');
+  await expect(pulse).toContainText('15%');
+  await expect(pulse).toContainText('1 de 1');
   const selic = page.getByRole('article', { name: 'Selic meta' });
   await expect(selic.locator('.ax-card__value')).toHaveText('15% ao ano');
   await expect(selic).toContainText('antes 15,25');
   // Instante UTC exibido no horário de Brasília.
   await expect(selic).toContainText('27/11/2026, 14:07');
   const ipca = page.getByRole('article', { name: 'IPCA do mês' });
-  await expect(ipca.locator('.ax-card__value')).toHaveText('0,09% no mês');
   await expect(ipca).toContainText('outubro de 2026');
   await expect(ipca.getByText('reconstituição ilustrativa')).toBeVisible();
-  const why = page.getByRole('link', { name: 'Por quê?' });
-  await expect(why).toHaveAttribute('href', /#\/app\/valyra-ai\?q=/);
+  const region = page.getByRole('article', { name: 'Clima em Sorriso (MT)' });
+  await expect(region.locator('.ax-card__value')).toHaveText('42,5mm em 30 dias');
+  await expect(region).toContainText('45,2% abaixo da média de 10 anos');
+  await expect(page.getByRole('listitem', { name: 'PETR4: variação do dia' })).toContainText('-1,2345%');
+  const dry = page.locator('.ax-signal', { hasText: 'Chuva em Sorriso (MT) 45,2% abaixo' });
+  await expect(dry).toContainText('Dados observados');
+  await expect(dry).toContainText('Chuva contra a média · Sorriso (MT) · 26/11/2026: -45,2 % vs. média de 10 anos');
+  await expect(dry.getByLabel('Limitações')).toContainText('nem demonstra causa');
+  await expect(page.getByRole('link', { name: 'Por quê?' }).first()).toHaveAttribute('href', /#\/app\/valyra-ai\?q=/);
+  // Open-Meteo sem coleta há 5 dias aparece como desatualizada.
+  await expect(page.locator('.ax-sources li', { hasText: 'Open-Meteo' })).toContainText('desatualizada');
+  await expect(page.locator('.ax-sources li', { hasText: 'brapi.dev' })).toContainText('em dia');
   await expect(page.getByRole('note')).toContainText('não recomendação de investimento');
+});
+
+test('filtro por tema e detalhe do indicador no radar Alpha', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/#/app/alpha');
+  await page.getByRole('button', { name: /^Clima/ }).click();
+  await expect(page.getByRole('article', { name: 'Selic meta' })).toHaveCount(0);
+  await expect(page.getByRole('article', { name: 'Clima em Sorriso (MT)' })).toBeVisible();
+  await expect(page.locator('.ax-signal')).toHaveCount(1);
+  await page.getByRole('button', { name: /^Tudo/ }).click();
+  await page.getByRole('button', { name: 'Detalhes de Selic meta' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Selic meta' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('img')).toHaveAttribute('aria-label', /de 15,25 a 15 % ao ano/);
+  await expect(dialog.getByRole('row')).toHaveCount(3);
+  await expect(dialog).toContainText('Banco Central do Brasil — SGS');
+  await expect(dialog.getByRole('link', { name: 'Perguntar à Valyra' })).toHaveAttribute('href', /valyra-ai\?q=/);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
 });
 
 test('corte do radar vira as_of com fuso de Brasília e só mostra o publicado', async ({ page }) => {

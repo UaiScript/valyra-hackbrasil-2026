@@ -121,10 +121,12 @@ export type DecimalValue = {
 export type DerivedSignalOut = {
   evidence_keys: string[];
   key: string;
+  limitations: string[];
   /** date */ observation_date: string;
   /** date-time */ published_at: string;
   rule: string;
   summary: string;
+  theme: "juros" | "inflacao" | "acoes" | "clima";
   title: string;
 };
 
@@ -228,8 +230,11 @@ export type IndicatorOut = {
   key: string;
   kind: string;
   latest: PointOut;
+  periodicity: "daily" | "monthly";
   previous: PointOut | null;
+  region: RegionOut | null;
   source: SourceOut;
+  theme: "juros" | "inflacao" | "acoes" | "clima";
   title: string;
   unit: string;
   unit_label: string;
@@ -343,6 +348,13 @@ export type RadarOut = {
   indicators: IndicatorOut[];
   last_ingested_at: string | null;
   signals: DerivedSignalOut[];
+  sources: SourceStatusOut[];
+};
+
+export type RegionOut = {
+  name: string;
+  production: string;
+  slug: string;
 };
 
 export type SourceOut = {
@@ -350,6 +362,12 @@ export type SourceOut = {
   name: string;
   slug: string;
   url: string;
+};
+
+export type SourceStatusOut = {
+  last_ingested_at: string | null;
+  series_count: number;
+  source: SourceOut;
 };
 
 /** Resumo da Issue #43: saldo realizado de hoje e movimentações realizadas do mês. */

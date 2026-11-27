@@ -7,6 +7,9 @@ on:
     # De hora em hora no pregão (10h às 18h em São Paulo, UTC-3), dias úteis.
     # Quatro tickers da brapi x 9 execuções x 22 dias ficam perto de 800 requisições/mês (cota: 15 mil).
     - cron: "7 13-21 * * 1-5"
+    # Clima uma vez por dia (07h17 em São Paulo): a chuva acumulada muda devagar e a
+    # Open-Meteo gratuita pede uso moderado. Seis chamadas por execução.
+    - cron: "17 10 * * *"
   workflow_dispatch:
     inputs:
       backfill_days:
@@ -48,6 +51,7 @@ jobs:
           # Opcional: sem token, a brapi atende PETR4, VALE3, ITUB4 e MGLU3.
           BRAPI_TOKEN: ${{ secrets.BRAPI_TOKEN }}
           BACKFILL_DAYS: ${{ inputs.backfill_days }}
+          SCHEDULE: ${{ github.event.schedule }}
         run: |
           : "${NEON_DATABASE_URL:?configure o secret NEON_DATABASE_URL}"
           # Mesma conversão do deploy/start.sh: o SQLAlchemy precisa do driver psycopg explícito.
@@ -58,10 +62,15 @@ jobs:
           esac
           export DATABASE_URL
           # As migrações rodam no deploy do Render (start.sh); aqui só se coleta.
-          args=""
+          # Agendamento horário coleta mercado; o diário, clima; disparo manual, tudo.
+          case "$SCHEDULE" in
+            "17 10 * * *") args="--sources clima" ;;
+            "") args="" ;;
+            *) args="--sources bcb,brapi" ;;
+          esac
           if [ -n "$BACKFILL_DAYS" ]; then
             # Entrada manual: só dígitos chegam ao comando; o script valida a faixa (1 a 3650).
             case "$BACKFILL_DAYS" in *[!0-9]*) echo "backfill_days deve ser inteiro" >&2; exit 1 ;; esac
-            args="--backfill-days $BACKFILL_DAYS"
+            args="$args --backfill-days $BACKFILL_DAYS"
           fi
           uv run --locked --directory services/api python -m valyra.scripts.ingest_alpha $args

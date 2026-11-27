@@ -8,14 +8,15 @@ from pydantic import AwareDatetime
 from sqlalchemy.orm import Session
 
 from valyra.alpha import service
-from valyra.alpha.domain import format_decimal
 from valyra.alpha.schemas import (
     DerivedSignalOut,
     HistoryPointOut,
     IndicatorOut,
     PointOut,
     RadarOut,
+    RegionOut,
     SourceOut,
+    SourceStatusOut,
 )
 from valyra.core.db import get_session
 from valyra.core.errors import error_responses
@@ -30,12 +31,16 @@ def _point(point: service.Point) -> PointOut:
         signal_key=point.signal_key,
         revision_id=point.revision_id,
         observation_date=point.observation_date,
-        value=format_decimal(point.value),
+        value=service.format_value(point.value),
         published_at=point.published_at,
         published_at_estimated=point.published_at_estimated,
         ingested_at=point.ingested_at,
         source_url=point.source_url,
     )
+
+
+def _source(source) -> SourceOut:
+    return SourceOut(slug=source.slug, name=source.name, url=source.url, license=source.license)
 
 
 @router.get("/radar", name="alpha_get_radar", response_model=RadarOut)
@@ -60,17 +65,23 @@ def get_radar(
                 unit=view.series.unit,
                 unit_label=view.series.unit_label,
                 kind=view.series.kind,
-                source=SourceOut(
-                    slug=view.source.slug,
-                    name=view.source.name,
-                    url=view.source.url,
-                    license=view.source.license,
+                theme=view.series.theme,
+                periodicity=view.series.periodicity,
+                region=(
+                    RegionOut(
+                        slug=view.series.region.slug,
+                        name=view.series.region.name,
+                        production=view.series.region.production,
+                    )
+                    if view.series.region
+                    else None
                 ),
+                source=_source(view.source),
                 latest=_point(view.history[-1]),
                 previous=_point(view.history[-2]) if len(view.history) > 1 else None,
                 history=[
                     HistoryPointOut(
-                        observation_date=p.observation_date, value=format_decimal(p.value)
+                        observation_date=p.observation_date, value=service.format_value(p.value)
                     )
                     for p in view.history
                 ],
@@ -85,8 +96,18 @@ def get_radar(
                 observation_date=s.observation_date,
                 published_at=s.published_at,
                 rule=s.rule,
+                theme=s.theme,
                 evidence_keys=list(s.evidence_keys),
+                limitations=list(s.limitations),
             )
             for s in radar.signals
+        ],
+        sources=[
+            SourceStatusOut(
+                source=_source(status.source),
+                last_ingested_at=status.last_ingested_at,
+                series_count=status.series_count,
+            )
+            for status in radar.sources
         ],
     )
