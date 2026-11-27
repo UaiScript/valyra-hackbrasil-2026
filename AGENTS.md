@@ -31,18 +31,18 @@ Make aceita UV=/caminho/uv e ENV_FILE=/caminho/configuração. Usa .env existent
 
 ## Mapa de pastas
 
-- services/api/: [contexto de backend](services/api/AGENTS.md), core HTTP, Finance (ORM, domínio CSV, importação, consultas e cálculos HTTP), Alerts (pressão de caixa), IA (cliente, contratos, domínio, serviço e HTTP), Alembic e testes.
-- apps/web/: [landing em / e app Finance em #/app](apps/web/README.md), ligado à API; tipos gerados do OpenAPI em src/lib/api/.
+- services/api/: [contexto de backend](services/api/AGENTS.md), core HTTP, Finance (ORM, domínio CSV, importação, consultas e cálculos HTTP), Alerts (pressão de caixa), Alpha (radar SGS/brapi, coleta agendada), IA (cliente, contratos, domínio, serviço e HTTP), Alembic e testes.
+- apps/web/: [landing em / e app em #/app (Finance, radar Alpha, IA)](apps/web/README.md), ligado à API; tipos gerados do OpenAPI em src/lib/api/.
 - packages/ui/: estilos CSS compartilhados e [guia de uso](packages/ui/README.md).
 - packages/contracts/: OpenAPI gerado; infra/postgres/init/: criação idempotente do banco de testes.
 - docs/: arquitetura, glossário, ADRs e specs. .github/: CI, templates e revisão.
 - datasets/samples/: dados sintéticos de demonstração (CSV de transações), nunca dados reais.
-- pipelines e experiments são caminhos planejados, não funcionalidades implementadas.
+- pipelines e experiments são caminhos planejados; a coleta Alpha roda em .github/workflows/alpha-ingest.yml.
 
 ## Onde buscar contexto
 
 - Quando a tarefa envolver arquitetura/estado real → leia [docs/architecture.md](docs/architecture.md).
-- Quando envolver decisões → leia [ADR-0001](docs/adr/0001-monolito-modular.md), [ADR-0002](docs/adr/0002-provedor-llm.md), [ADR-0008](docs/adr/0008-review-por-agente.md), [ADR-0009](docs/adr/0009-dinheiro-em-centavos.md), [ADR-0010](docs/adr/0010-calculos-finance.md), [ADR-0011](docs/adr/0011-contrato-evidencias-ia.md) e [template](docs/adr/0000-template.md).
+- Quando envolver decisões → leia [ADR-0001](docs/adr/0001-monolito-modular.md), [ADR-0002](docs/adr/0002-provedor-llm.md), [ADR-0008](docs/adr/0008-review-por-agente.md), [ADR-0009](docs/adr/0009-dinheiro-em-centavos.md), [ADR-0010](docs/adr/0010-calculos-finance.md), [ADR-0011](docs/adr/0011-contrato-evidencias-ia.md), [ADR-0012](docs/adr/0012-fontes-alpha.md) e [template](docs/adr/0000-template.md).
 - Quando envolver termos → leia [docs/glossary.md](docs/glossary.md).
 - Quando envolver schema, CSV ou HTTP → leia [docs/modelagem-db.md](docs/modelagem-db.md), [docs/api-design.md](docs/api-design.md), [docs/revisao-modelagem.md](docs/revisao-modelagem.md).
 - Quando envolver fundação e propostas → leia [docs/spec-tecnica.md](docs/spec-tecnica.md).

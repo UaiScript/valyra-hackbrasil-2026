@@ -27,7 +27,12 @@ from valyra.ai.schemas import (
     HistoryMessage,
     LLMPayload,
 )
+from valyra.alpha.service import Radar
 from valyra.core.errors import AppError
+
+EMPTY_RADAR = Radar(
+    as_of=datetime(2026, 1, 1, tzinfo=UTC), indicators=[], signals=[], last_ingested_at=None
+)
 
 CUT = datetime.fromisoformat(AS_OF.replace("Z", "+00:00"))
 BUILT = datetime.fromisoformat(BUILT_AT.replace("Z", "+00:00"))
@@ -79,6 +84,8 @@ def finance(monkeypatch):
     batches = Mock(return_value=[])
     monkeypatch.setattr(service.finance_service, "list_completed_import_batches", batches)
     monkeypatch.setattr(service.finance_service, "is_anomalous", Mock(return_value=False))
+    # Radar vazio: sem coletas Alpha, o contexto declara a ausência como limitação.
+    monkeypatch.setattr(service.alpha_service, "get_radar", Mock(return_value=EMPTY_RADAR))
     return SimpleNamespace(
         account=account,
         get=get,

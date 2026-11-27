@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = Field(default=30, ge=1, le=120)
     llm_max_attempts: int = Field(default=2, ge=1, le=3)
     llm_max_output_tokens: int = Field(default=2048, ge=128, le=8192)
+    # Token gratuito da brapi (ADR-0012); vazio limita a coleta aos tickers liberados sem token.
+    brapi_token: SecretStr = SecretStr("")
 
     @field_validator("gemini_api_key", "openai_api_key", mode="before")
     @classmethod

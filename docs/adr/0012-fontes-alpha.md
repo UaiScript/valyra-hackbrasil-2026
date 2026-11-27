@@ -79,5 +79,11 @@ Proposta para o time aprovar:
 
 ## Status
 
-Proposta, 27/11/2026, a pedido de Willian. Aguarda aprovação do time antes de
-qualquer código do módulo `alpha` ou do pipeline.
+Aceita em 27/11/2026 por Willian, no thread do projeto, para o radar Alpha mínimo
+(SGS e brapi, com as regras temporais acima). Proposta registrada no mesmo dia.
+Ainda não verificados antes do uso em produção: `^BVSP` no plano gratuito da brapi e
+o código SGS do IPCA acumulado em 12 meses.
+
+Escopo implementado no primeiro incremento: Selic meta (432), CDI diário (12) e
+IPCA mensal (433) pelo SGS; variação diária de PETR4, VALE3, ITUB4 e MGLU3 pela
+brapi, guardada em `%` para não abrir o contrato de dinheiro Alpha.

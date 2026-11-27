@@ -21,6 +21,7 @@ EXPECTED_4XX = {
     "finance_delete_budget": {"404", "422"},
     "alerts_list": {"422"},
     "alerts_update": {"404", "422"},
+    "alpha_get_radar": {"422"},
 }
 
 
@@ -45,11 +46,11 @@ def test_error_response_descreve_envelope(app):
     assert body["properties"]["details"]["type"] == "object"
 
 
-def test_cada_operacao_finance_e_alerts_declara_seus_4xx_com_envelope(app):
+def test_cada_operacao_finance_alerts_e_alpha_declara_seus_4xx_com_envelope(app):
     finance = {
         op_id: operation
         for op_id, operation in _operations(app.openapi())
-        if op_id.startswith(("finance_", "alerts_"))
+        if op_id.startswith(("finance_", "alerts_", "alpha_"))
     }
     # Rota nova sem entrada na tabela quebra o teste até declarar seus erros.
     assert set(finance) == set(EXPECTED_4XX)

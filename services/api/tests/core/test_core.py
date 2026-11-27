@@ -81,6 +81,7 @@ def test_operation_ids_e_contrato_minimo(app):
         "finance_delete_budget",
         "alerts_list",
         "alerts_update",
+        "alpha_get_radar",
         "ai_explain",
     }
 

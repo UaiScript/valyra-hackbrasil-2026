@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from valyra.ai import llm_client
 from valyra.ai.domain import EvidenceContextError, build_explain_response
 from valyra.ai.schemas import (
+    DecimalValue,
     EvidenceContext,
     EvidenceItem,
     ExplainRequest,
@@ -26,6 +27,8 @@ from valyra.ai.schemas import (
     MoneyValue,
     TextValue,
 )
+from valyra.alpha import service as alpha_service
+from valyra.alpha.domain import format_decimal
 from valyra.core.errors import AppError
 from valyra.finance import service as finance_service
 
@@ -34,7 +37,12 @@ ContextProvider = Callable[[datetime], EvidenceContext]
 Clock = Callable[[], datetime]
 _BUSINESS_ZONE = ZoneInfo("America/Sao_Paulo")
 _TRANSACTION_LIMIT = 20
-_MISSING_CONTEXT = ("Contexto econômico Alpha ainda indisponível.",)
+_NO_ALPHA = "Contexto econômico Alpha sem coletas publicadas até o corte."
+_ALPHA_NOT_CAUSE = (
+    "Indicadores econômicos e gastos aparecem juntos no contexto; isso não demonstra causa."
+)
+# Último e penúltimo ponto de cada série bastam para "subiu ou caiu" sem o LLM calcular.
+_ALPHA_POINTS = 2
 _NO_CALCULATIONS = (
     "Sem lote de importação concluído: resumo, orçamento e projeção não foram calculados."
 )
@@ -146,7 +154,7 @@ def _finance_context(
     clock: Clock,
 ) -> EvidenceContext:
     evidences: list[EvidenceItem] = []
-    limitations = list(_MISSING_CONTEXT)
+    limitations: list[str] = []
     today = as_of.astimezone(_BUSINESS_ZONE).date()
     if _aware(account.recorded_at) > as_of:
         limitations.append(_AFTER_CUTOFF)
@@ -221,6 +229,7 @@ def _finance_context(
     if not included:
         limitations.append("Nenhuma movimentação elegível foi incluída neste contexto.")
     evidences.extend(_calculation_evidences(session, user_id, account, as_of, clock, limitations))
+    evidences.extend(_alpha_evidences(session, as_of, limitations))
     built_at = _aware(clock())
     if built_at < as_of:
         raise EvidenceContextError("Relógio retrocedeu durante a montagem do contexto")
@@ -250,6 +259,45 @@ def _previous_month(month: str) -> str:
     year, number = (int(part) for part in month.split("-"))
     year, number = (year - 1, 12) if number == 1 else (year, number - 1)
     return f"{year:04d}-{number:02d}"
+
+
+def _alpha_evidences(
+    session: Session, as_of: datetime, limitations: list[str]
+) -> list[EvidenceItem]:
+    """Indicadores Alpha publicados até o corte, com procedência completa (ADR-0011/0012)."""
+    radar = alpha_service.get_radar(session, as_of)
+    items: list[EvidenceItem] = []
+    for view in radar.indicators:
+        for point in view.history[-_ALPHA_POINTS:]:
+            items.append(
+                EvidenceItem(
+                    evidence_id=f"alpha_{point.signal_id.hex}",
+                    metric_key=view.series.metric_key,
+                    label=f"{view.series.title}, em {view.series.unit_label}",
+                    basis="observed",
+                    source={
+                        "kind": "alpha_signal",
+                        "source_id": view.source.id,
+                        "signal_id": point.signal_id,
+                        "signal_key": point.signal_key,
+                        "revision_id": point.revision_id,
+                        "source_url": point.source_url,
+                        "observation_date": point.observation_date,
+                        "published_at": point.published_at,
+                        "published_at_estimated": point.published_at_estimated,
+                        "ingested_at": point.ingested_at,
+                    },
+                    value=DecimalValue(
+                        value_decimal=format_decimal(point.value), unit=view.series.unit
+                    ),
+                    period={"start": point.observation_date, "end": point.observation_date},
+                )
+            )
+    if items:
+        limitations.append(_ALPHA_NOT_CAUSE)
+    else:
+        limitations.append(_NO_ALPHA)
+    return items
 
 
 def _calculation_evidences(

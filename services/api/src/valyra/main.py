@@ -1,10 +1,11 @@
-"""Composição HTTP: health, Finance, alertas (#47) e explicações IA com contexto do servidor."""
+"""Composição HTTP: health, Finance, alertas (#47), radar Alpha e explicações IA."""
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from valyra.ai.router import router as ai_router
 from valyra.alerts.router import router as alerts_router
+from valyra.alpha.router import router as alpha_router
 from valyra.core.config import get_settings
 from valyra.core.errors import register_error_handlers
 from valyra.core.health import router as health_router
@@ -25,5 +26,6 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(finance_router)
     app.include_router(alerts_router)
+    app.include_router(alpha_router)
     app.include_router(ai_router)
     return app

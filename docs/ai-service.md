@@ -78,7 +78,11 @@ Regras de corte:
 - Com `DEMO_TODAY` anterior ao corte, só dias da projeção posteriores à data do
   corte entram como `projected`, porque o contrato exige período futuro.
 
-Alpha ainda não tem integração e aparece sempre como limitação. Saldo zero
+Alpha entra pelo service público `alpha.service.get_radar(as_of)`: para cada série,
+os dois últimos pontos publicados até o corte viram evidências `alpha_signal`
+(`DecimalValue` com unidade `%`, procedência da fonte e `published_at`). Com
+evidências Alpha, uma limitação lembra que indicador e gasto juntos não
+demonstram causa; sem coletas até o corte, a ausência vira limitação. Saldo zero
 informado é evidência válida; ausência de dados não significa zero. Sem nenhuma
 evidência elegível, o serviço retorna uma mensagem determinística de
 insuficiência, com incerteza alta e limitações, sem chamar o provedor.
@@ -96,9 +100,8 @@ As dependências são funções internas, passadas por argumento:
 `context_provider` substitui a montagem padrão, sem contornar a autorização. Deve
 respeitar a conta, o corte recebido e um `built_at` já alcançado pelo relógio do
 servidor. Pode capturar dependências em uma função/closure; não é um parâmetro
-HTTP. Novos produtores deverão consultar os services públicos de resumo,
-projeções ou Alpha quando existirem, preservar a procedência e atualizar as
-limitações. Aceitar um contexto sintético Alpha não comprova integração real.
+HTTP. Novos produtores devem consultar os services públicos (Finance, Alpha),
+preservar a procedência e atualizar as limitações.
 
 Um exemplo sem banco, chave ou chamada externa:
 

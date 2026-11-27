@@ -13,6 +13,7 @@ import { Projection } from './pages/Projection';
 import { Alerts, ALERTS_CHANGED } from './pages/Alerts';
 import { Budgets } from './pages/Budgets';
 import { AskValyra } from './pages/AskValyra';
+import { Alpha } from './pages/Alpha';
 import { LogoMark } from '../components/LogoMark';
 import { MODULES, ModuleBadge } from './modules';
 import type { ModuleId } from './modules';
@@ -35,6 +36,10 @@ const NAV_GROUPS: { module: ModuleId; items: NavItem[] }[] = [
       { route: 'alerts', label: 'Alertas', icon: Bell },
       { route: 'import', label: 'Importar CSV', icon: Upload },
     ],
+  },
+  {
+    module: 'alpha',
+    items: [{ route: 'alpha', label: 'Radar econômico', icon: Compass }],
   },
   {
     module: 'ai',
@@ -122,12 +127,6 @@ export default function FinanceApp() {
               ))}
             </div>
           ))}
-          <div className="cx-nav__group cx-nav__group--alpha">
-            <span className="cx-nav__title"><ModuleBadge id="alpha" compact /></span>
-            <span className="cx-nav__soon" data-tip={`${MODULES.alpha.title} · em breve`} title="Módulo em pesquisa; ainda sem dados conectados">
-              <Compass size={19} aria-hidden="true" /><span className="cx-nav__label">{MODULES.alpha.subtitle} · em breve</span>
-            </span>
-          </div>
         </nav>
         <div className="cx-sidebar__foot">
           <a className="app-nav__back" href="#top" data-tip="Voltar à landing"><ArrowLeft size={18} aria-hidden="true" /><span className="cx-nav__label">Voltar à landing</span></a>
@@ -161,8 +160,13 @@ export default function FinanceApp() {
           {route === 'projection' && <Projection />}
           {route === 'alerts' && <Alerts />}
           {route === 'ai' && <AskValyra />}
+          {route === 'alpha' && <Alpha />}
           {route === 'import' && <ImportCsv />}
-          <p className="cx-footnote" role="note">Ambiente de demonstração: usuário demo e dados sintéticos, sem login. Todo número vem de um cálculo auditável da API.</p>
+          <p className="cx-footnote" role="note">
+            {route === 'alpha'
+              ? 'Dados públicos do Banco Central e da brapi.dev, com fonte e instante de coleta. Contexto econômico, não recomendação de investimento.'
+              : 'Ambiente de demonstração: usuário demo e dados sintéticos, sem login. Todo número vem de um cálculo auditável da API.'}
+          </p>
         </main>
       </div>
     </div>

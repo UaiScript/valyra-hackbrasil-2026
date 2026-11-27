@@ -6,6 +6,7 @@ from alembic import context
 from sqlalchemy import create_engine, pool
 
 from valyra.alerts import models as alerts_models  # noqa: F401 -- registra alerts na Base
+from valyra.alpha import models as alpha_models  # noqa: F401 -- registra sources e signals
 from valyra.core.config import get_settings
 from valyra.core.db import Base
 from valyra.finance import models  # noqa: F401 -- registra as cinco tabelas Finance na Base

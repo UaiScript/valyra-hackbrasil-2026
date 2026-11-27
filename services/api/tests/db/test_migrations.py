@@ -13,7 +13,7 @@ FINANCE_TABLES = {
     "categories",
     "transactions",
 }
-TABLES = FINANCE_TABLES | {"alerts", "budgets"}
+TABLES = FINANCE_TABLES | {"alerts", "budgets", "sources", "signals"}
 
 
 def test_single_migration_head():
@@ -34,6 +34,11 @@ def test_alerts_migration_follows_finance():
 def test_budgets_migration_follows_alerts():
     revision = ScriptDirectory.from_config(migration_config()).get_revision("0003_budgets")
     assert revision.down_revision == "0002_alerts"
+
+
+def test_alpha_migration_follows_budgets():
+    revision = ScriptDirectory.from_config(migration_config()).get_revision("0004_alpha")
+    assert revision.down_revision == "0003_budgets"
 
 
 @pytest.mark.postgres
@@ -76,6 +81,18 @@ def test_budgets_downgrade_keeps_alerts(empty_engine):
         command.upgrade(config, "head")
         command.downgrade(config, "0002_alerts")
         tables = FINANCE_TABLES | {"alerts", "alembic_version"}
+        assert set(inspect(connection).get_table_names()) == tables
+        command.upgrade(config, "head")
+        command.check(config)
+
+
+@pytest.mark.postgres
+def test_alpha_downgrade_keeps_budgets(empty_engine):
+    with empty_engine.begin() as connection:
+        config = migration_config(connection)
+        command.upgrade(config, "head")
+        command.downgrade(config, "0003_budgets")
+        tables = FINANCE_TABLES | {"alerts", "budgets", "alembic_version"}
         assert set(inspect(connection).get_table_names()) == tables
         command.upgrade(config, "head")
         command.check(config)

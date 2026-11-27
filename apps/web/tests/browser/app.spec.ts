@@ -48,6 +48,32 @@ const BUDGETS = {
   days_left: 24, daily_allowance_cents: 833,
   items: [{ category: { ...CATEGORIES[0] }, limit_cents: 150000, spent_cents: 180000, remaining_cents: -30000, status: 'over' }],
 };
+const SGS = { slug: 'bcb-sgs', name: 'Banco Central do Brasil — SGS', url: 'https://api.bcb.gov.br/dados/serie/', license: 'Dados abertos do Banco Central; citar a fonte' };
+const point = (key: string, date: string, value: string, extra: Record<string, unknown> = {}) => ({
+  signal_key: `${key}:${date}`, revision_id: 1, observation_date: date, value,
+  published_at: '2026-11-27T17:07:00Z', published_at_estimated: false, ingested_at: '2026-11-27T17:07:00Z',
+  source_url: 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/20', ...extra,
+});
+const RADAR = {
+  as_of: '2026-11-27T18:00:00Z', last_ingested_at: '2026-11-27T17:07:00Z',
+  indicators: [
+    {
+      key: 'bcb:sgs:432', title: 'Selic meta', unit: '%', unit_label: '% ao ano', kind: 'macro_indicator', source: SGS,
+      latest: point('bcb:sgs:432', '2026-11-27', '15'), previous: point('bcb:sgs:432', '2026-11-26', '15.25'),
+      history: [{ observation_date: '2026-11-26', value: '15.25' }, { observation_date: '2026-11-27', value: '15' }],
+    },
+    {
+      key: 'bcb:sgs:433', title: 'IPCA do mês', unit: '%', unit_label: '% no mês', kind: 'macro_indicator', source: SGS,
+      latest: point('bcb:sgs:433', '2026-10-01', '0.09', { published_at_estimated: true, published_at: '2026-11-12T15:00:00Z' }),
+      previous: null, history: [{ observation_date: '2026-10-01', value: '0.09' }],
+    },
+  ],
+  signals: [{
+    key: 'bcb:sgs:432:selic_meta_change_v1', title: 'Selic meta caiu de 15,25% ao ano para 15% ao ano',
+    summary: 'Última mudança registrada da meta da Selic, observada em 27/11/2026.', observation_date: '2026-11-27',
+    published_at: '2026-11-27T17:07:00Z', rule: 'selic_meta_change_v1', evidence_keys: ['bcb:sgs:432:2026-11-27'],
+  }],
+};
 const page1 = <T,>(items: T[]) => ({ items, total: items.length, limit: 50, offset: 0 });
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
@@ -60,6 +86,11 @@ async function mockApi(page: Page) {
     calls.push({ method: req.method(), url: url.pathname + url.search, body: req.postData() });
     if (req.method() === 'PATCH') return json(route, { ...ALERT, status: 'read', read_at: '2026-11-07T13:00:00Z' });
     return json(route, page1([ALERT]));
+  });
+  await page.route('**/api/v1/alpha/radar**', (route) => {
+    const url = new URL(route.request().url());
+    calls.push({ method: 'GET', url: url.pathname + url.search, body: null });
+    return json(route, url.searchParams.has('as_of') ? { ...RADAR, as_of: url.searchParams.get('as_of'), indicators: [], signals: [], last_ingested_at: null } : RADAR);
   });
   await page.route('**/api/v1/finance/**', (route) => {
     const req = route.request();
@@ -146,8 +177,11 @@ test('app usa os nomes dos módulos da landing no menu e no cabeçalho', async (
   await expect(page.locator('.cx-crumb')).toContainText('Valyra Finance');
   await expect(page.locator('.cx-crumb')).toContainText('Planejar o orçamento');
   const titles = page.locator('.cx-nav__title');
-  await expect(titles).toHaveText(['Valyra Finance', 'Valyra AI', 'Alternative Alpha']);
-  await expect(page.locator('.cx-nav__soon')).toContainText('Investigar o contexto econômico');
+  // Mesma ordem da landing: 01 Finance, 02 Alpha, 03 AI.
+  await expect(titles).toHaveText(['Valyra Finance', 'Alternative Alpha', 'Valyra AI']);
+  await page.goto('/#/app/alpha');
+  await expect(page.locator('.cx-crumb')).toContainText('Alternative Alpha');
+  await expect(page.locator('.cx-crumb')).toContainText('Investigar o contexto econômico');
   await page.goto('/#/app/valyra-ai');
   await expect(page.locator('.cx-crumb')).toContainText('Valyra AI');
   await expect(page.locator('.cx-crumb')).toContainText('Compreender evidências');
@@ -251,4 +285,32 @@ test('API fora do ar gera estado de erro com nova tentativa', async ({ page }) =
   await page.goto('/#/app');
   await expect(page.getByText('API indisponível')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Tentar de novo' }).first()).toBeVisible();
+});
+
+test('radar Alpha mostra fonte, publicação, coleta e reconstituição ilustrativa', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/#/app/alpha');
+  await expect(page.getByRole('heading', { level: 1, name: 'Radar econômico' })).toBeVisible();
+  const selic = page.getByRole('article', { name: 'Selic meta' });
+  await expect(selic.locator('.ax-card__value')).toHaveText('15% ao ano');
+  await expect(selic).toContainText('antes 15,25');
+  // Instante UTC exibido no horário de Brasília.
+  await expect(selic).toContainText('27/11/2026, 14:07');
+  const ipca = page.getByRole('article', { name: 'IPCA do mês' });
+  await expect(ipca.locator('.ax-card__value')).toHaveText('0,09% no mês');
+  await expect(ipca).toContainText('outubro de 2026');
+  await expect(ipca.getByText('reconstituição ilustrativa')).toBeVisible();
+  const why = page.getByRole('link', { name: 'Por quê?' });
+  await expect(why).toHaveAttribute('href', /#\/app\/valyra-ai\?q=/);
+  await expect(page.getByRole('note')).toContainText('não recomendação de investimento');
+});
+
+test('corte do radar vira as_of com fuso de Brasília e só mostra o publicado', async ({ page }) => {
+  const calls = await mockApi(page);
+  await page.goto('/#/app/alpha');
+  await page.getByLabel('Ver como estava em').fill('2026-11-01T09:30');
+  await expect.poll(() => calls.some((c) => c.url.includes('as_of=2026-11-01T09%3A30%3A00-03%3A00'))).toBe(true);
+  await expect(page.getByText('Ainda não há coletas publicadas até este corte.')).toBeVisible();
+  await page.getByRole('button', { name: 'Voltar para agora' }).click();
+  await expect(page.getByRole('article', { name: 'Selic meta' })).toBeVisible();
 });

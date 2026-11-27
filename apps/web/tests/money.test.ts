@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { centsToInput, formatCents, formatIsoDate, formatMonth, formatScore, formatShortDate, parseReaisToCents, shiftMonth } from '../src/app/money.ts';
+import { centsToInput, compareDecimal, formatCents, formatDecimal, formatInstant, formatIsoDate, formatMonth, formatScore, formatShortDate, parseReaisToCents, shiftMonth } from '../src/app/money.ts';
 
 test('formatCents usa centavos inteiros sem float', () => {
   assert.equal(formatCents(500000), 'R$ 5.000,00');
@@ -43,4 +43,26 @@ test('formatScore trunca em duas casas sem float', () => {
   assert.equal(formatScore('1.0000'), '1,00');
   assert.equal(formatScore('0.8125'), '0,81');
   assert.equal(formatScore('0'), '0,00');
+});
+
+test('formatDecimal troca ponto por vírgula sem passar por float', () => {
+  assert.equal(formatDecimal('15'), '15');
+  assert.equal(formatDecimal('0.055131'), '0,055131');
+  assert.equal(formatDecimal('-1.2345'), '-1,2345');
+  assert.equal(formatDecimal('1234.5'), '1.234,5');
+  assert.equal(formatDecimal('0.1000000000000000055511'), '0,1000000000000000055511');
+});
+
+test('formatInstant mostra o instante no horário de Brasília', () => {
+  assert.equal(formatInstant('2026-11-27T17:07:00Z'), '27/11/2026, 14:07');
+});
+
+test('compareDecimal compara texto decimal sem float', () => {
+  assert.equal(compareDecimal('15', '14.75'), 1);
+  assert.equal(compareDecimal('0.09', '0.48'), -1);
+  assert.equal(compareDecimal('-1.2', '-1.19'), -1);
+  assert.equal(compareDecimal('-0.5', '0.1'), -1);
+  assert.equal(compareDecimal('10', '9.999'), 1);
+  assert.equal(compareDecimal('15.00', '15'), 0);
+  assert.equal(compareDecimal('-0', '0'), 0);
 });
