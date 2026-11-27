@@ -51,7 +51,7 @@ O MVP não inclui integração bancária real, execução de operações ou reco
 
 ## Landing page
 
-A página de apresentação e a aplicação Finance ficam em [`apps/web/`](apps/web/README.md). A landing (`/`) usa exemplos visuais sintéticos e não depende da API; a aplicação (`#/app`) consome a API Finance: contas, transações, correção de categoria e importação de CSV.
+A página de apresentação e a aplicação Finance ficam em [`apps/web/`](apps/web/README.md). A landing (`/`) usa exemplos visuais sintéticos e não depende da API; a aplicação (`#/app`) consome a API Finance e Alerts: contas, resumo mensal, projeção de caixa, transações com recorrência e gasto atípico, correção de categoria, alertas e importação de CSV.
 
 Com Node.js 22.12 ou superior, execute `npm --prefix apps/web ci --ignore-scripts` e `npm --prefix apps/web run dev`. Com `make dev` rodando, abra <http://127.0.0.1:3000/#/app>. Validação, destino dos links e hospedagem estão no README de apps/web.
 

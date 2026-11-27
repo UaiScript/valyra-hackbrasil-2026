@@ -3,7 +3,7 @@ import type { FC } from 'react';
 import { api, describeError } from '../api/client';
 import type { CategoryOut, FinanceListTransactionsQuery, TransactionOut } from '../../lib/api/schema';
 import { formatIsoDate } from '../money';
-import { Amount, SOURCE_LABEL } from '../TransactionRow';
+import { Amount, SOURCE_LABEL, TransactionFlags } from '../TransactionRow';
 import { Async, Card, Empty, NoticeBar } from '../ui';
 import type { Notice } from '../ui';
 import { useApi } from '../useApi';
@@ -47,6 +47,11 @@ export const Transactions: FC = () => {
     setOffset(0);
     setFilters((f) => ({ ...f, [key]: value || undefined }));
   };
+  // Os filtros booleanos só são enviados quando ligados: ausente = sem filtro.
+  const toggle = (key: 'is_recurring' | 'is_anomaly') => {
+    setOffset(0);
+    setFilters((f) => ({ ...f, [key]: f[key] ? undefined : true }));
+  };
 
   async function correct(t: TransactionOut, categoryId: string) {
     try {
@@ -78,6 +83,10 @@ export const Transactions: FC = () => {
           </label>
           <label>De<input type="date" value={filters.date_from ?? ''} onChange={(e) => setFilter('date_from', e.target.value)} /></label>
           <label>Até<input type="date" value={filters.date_to ?? ''} onChange={(e) => setFilter('date_to', e.target.value)} /></label>
+          <div className="vx-chips" role="group" aria-label="Mostrar só">
+            <button type="button" className="vx-chip" aria-pressed={!!filters.is_recurring} onClick={() => toggle('is_recurring')}>Só recorrentes</button>
+            <button type="button" className="vx-chip" aria-pressed={!!filters.is_anomaly} onClick={() => toggle('is_anomaly')}>Só atípicos</button>
+          </div>
           <button type="button" className="button button--ghost button--sm" onClick={() => { setFilters({}); setOffset(0); }}>Limpar</button>
         </div>
       </Card>
@@ -93,7 +102,7 @@ export const Transactions: FC = () => {
                     {page.items.map((t) => (
                       <tr key={t.id}>
                         <td>{formatIsoDate(t.date)}</td>
-                        <td>{t.description}</td>
+                        <td><span className="vx-desc">{t.description}<TransactionFlags t={t} /></span></td>
                         <td>{categoryList.length ? <CategorySelect t={t} categories={categoryList} onChange={(id) => correct(t, id)} /> : t.category.name}</td>
                         <td><span className={`app-badge app-badge--${t.category_source}`}>{SOURCE_LABEL[t.category_source]}</span></td>
                         <td className="app-num"><Amount cents={t.amount_cents} /></td>

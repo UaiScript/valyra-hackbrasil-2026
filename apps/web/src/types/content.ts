@@ -66,6 +66,7 @@ export interface TranslationDictionary {
     simulator: string;
     performance: string;
     accessSystem: string;
+    openDemo: string;
     systemLive: string;
   };
   hero: {
@@ -135,6 +136,7 @@ export interface TranslationDictionary {
     title: string;
     description: string;
     button: string;
+    demoButton: string;
     dockerInfo: string;
     deploymentBadge: string;
   };

@@ -1,7 +1,7 @@
 import type { TranslationDictionary } from '../types/content';
 
 export const pt: TranslationDictionary = {
-  "demoNotice": "Projeto em desenvolvimento. Todos os gráficos e números desta página são exemplos sintéticos, sem conexão com mercados ou contas reais. Os links de acesso levam ao repositório oficial.",
+  "demoNotice": "Projeto em desenvolvimento. Todos os gráficos e números desta página são exemplos sintéticos, sem conexão com mercados ou contas reais. A demonstração do app também usa dados sintéticos, sem login.",
   "nav": {
     "capabilities": "Módulos",
     "cockpit": "Visão demonstrativa",
@@ -9,6 +9,7 @@ export const pt: TranslationDictionary = {
     "simulator": "Cenários",
     "performance": "Indicadores demo",
     "accessSystem": "Ver repositório",
+    "openDemo": "Abrir demonstração",
     "systemLive": "PROJETO EM DESENVOLVIMENTO"
   },
   "hero": {
@@ -208,8 +209,9 @@ export const pt: TranslationDictionary = {
   },
   "ctaBanner": {
     "title": "Acompanhe a construção do Valyra",
-    "description": "Conheça o código, a documentação e as próximas etapas no repositório oficial da UaiScript. O acesso à aplicação será disponibilizado quando estiver estabelecida.",
+    "description": "A demonstração do Valyra Finance já está aberta, com dados sintéticos e sem login: importe um extrato, veja o resumo do mês, a projeção de caixa e os alertas. Código e documentação ficam no repositório oficial da UaiScript.",
     "button": "Ver repositório oficial",
+    "demoButton": "Abrir demonstração",
     "dockerInfo": "Sem cadastro ou coleta de dados financeiros nesta página.",
     "deploymentBadge": "CÓDIGO E DOCUMENTAÇÃO NO GITHUB"
   },

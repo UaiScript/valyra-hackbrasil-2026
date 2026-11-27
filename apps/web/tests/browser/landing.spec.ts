@@ -36,6 +36,18 @@ test('every access link leads to the official repository, even with stale stored
   await expect(page).toHaveURL(repository);
 });
 
+test('demo buttons open the Finance app inside the same build', async ({ page }) => {
+  await page.route('**/health', r => r.fulfill({ contentType: 'application/json', body: '{"status":"ok","postgres":"ok"}' }));
+  await page.route('**/api/v1/**', r => r.fulfill({ contentType: 'application/json', body: '{"items":[],"total":0,"limit":50,"offset":0}' }));
+  await page.goto('/');
+  const demo = page.locator('[data-demo-cta]');
+  expect(await demo.count()).toBeGreaterThanOrEqual(3);
+  for (const link of await demo.all()) await expect(link).toHaveAttribute('href', '#/app');
+  await page.locator('header [data-demo-cta]').click();
+  await expect(page).toHaveURL(/#\/app$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Visão geral' })).toBeVisible();
+});
+
 test('language switch persists and updates document language', async ({ page }) => {
   await page.goto('/');
   await chooseLanguage(page, 'EN');
@@ -112,7 +124,8 @@ test('presents the product sections and mobile navigation', async ({ page }) => 
 test('layout stays within the viewport and internal links have real targets', async ({ page }, testInfo) => {
   await page.goto('/');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  const missingTargets = await page.locator('a[href^="#"]').evaluateAll(links =>
+  // "#/app" é rota do app (hash routing), não âncora da página; é coberta no teste dos botões de demonstração.
+  const missingTargets = await page.locator('a[href^="#"]:not([href^="#/"])').evaluateAll(links =>
     links.map(a => a.getAttribute('href')!.slice(1)).filter(id => !document.getElementById(id)));
   expect(missingTargets).toEqual([]);
   await page.keyboard.press('Tab');

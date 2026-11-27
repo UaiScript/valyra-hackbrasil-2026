@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { FC, FormEvent } from 'react';
 import { ApiError, api } from '../api/client';
-import type { ImportBatchOut } from '../../lib/api/schema';
+import { BellRing } from 'lucide-react';
+import type { ImportBatchCreatedOut, ImportBatchOut } from '../../lib/api/schema';
 import { ROUTES } from '../router';
 import { Async, Card, Empty, ErrorState } from '../ui';
 import { useApi } from '../useApi';
@@ -16,8 +17,17 @@ const REASON_LABEL: Record<string, string> = {
   wrong_column_count: 'Número de colunas incorreto',
 };
 
-const BatchResult: FC<{ batch: ImportBatchOut }> = ({ batch }) => (
+const BatchResult: FC<{ batch: ImportBatchOut | ImportBatchCreatedOut }> = ({ batch }) => (
   <div className="app-stack">
+    {'alerts_created' in batch && batch.alerts_created > 0 && (
+      <a className="app-inline-alert" href={ROUTES.alerts}>
+        <BellRing size={18} aria-hidden="true" />
+        <span>
+          {batch.alerts_created === 1 ? 'A importação gerou 1 alerta de pressão de caixa.' : `A importação gerou ${batch.alerts_created} alertas de pressão de caixa.`}
+          {' '}<strong>Ver alertas</strong>
+        </span>
+      </a>
+    )}
     <dl className="app-stats">
       <div><dt>Linhas lidas</dt><dd>{batch.rows_total}</dd></div>
       <div><dt>Importadas</dt><dd>{batch.rows_imported}</dd></div>
@@ -47,7 +57,7 @@ export const ImportCsv: FC = () => {
   const [accountId, setAccountId] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
-  const [result, setResult] = useState<ImportBatchOut | null>(null);
+  const [result, setResult] = useState<ImportBatchCreatedOut | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [localError, setLocalError] = useState<string | null>(null);
 

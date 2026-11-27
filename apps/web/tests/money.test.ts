@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { centsToInput, formatCents, formatIsoDate, parseReaisToCents } from '../src/app/money.ts';
+import { centsToInput, formatCents, formatIsoDate, formatMonth, formatScore, formatShortDate, parseReaisToCents, shiftMonth } from '../src/app/money.ts';
 
 test('formatCents usa centavos inteiros sem float', () => {
   assert.equal(formatCents(500000), 'R$ 5.000,00');
@@ -30,4 +30,17 @@ test('centsToInput e formatIsoDate', () => {
   assert.equal(centsToInput(-8990), '-89,90');
   assert.equal(parseReaisToCents(centsToInput(123456789)), 123456789);
   assert.equal(formatIsoDate('2026-11-07'), '07/11/2026');
+});
+
+test('formatMonth, shiftMonth e formatShortDate não dependem de Date', () => {
+  assert.equal(formatMonth('2026-10'), 'outubro de 2026');
+  assert.equal(shiftMonth('2026-01', -1), '2025-12');
+  assert.equal(shiftMonth('2026-11', 2), '2027-01');
+  assert.equal(formatShortDate('2026-11-09'), '9 nov');
+});
+
+test('formatScore trunca em duas casas sem float', () => {
+  assert.equal(formatScore('1.0000'), '1,00');
+  assert.equal(formatScore('0.8125'), '0,81');
+  assert.equal(formatScore('0'), '0,00');
 });
