@@ -1,6 +1,8 @@
 """Adaptadores LLM da ADR-0002; validação de evidências pertence ao domínio IA.
 
 Primário:  Gemini (GEMINI_MODEL, padrão gemini-3.8-flash) — habilitado com GEMINI_API_KEY.
+Reserva:   Groq (GROQ_MODEL, padrão openai/gpt-oss-120b) — habilitado com GROQ_API_KEY;
+           plano gratuito, protocolo da OpenAI (ADR-0014).
 Fallback:  GPT-4o-mini       — habilitado com OPENAI_API_KEY; controle de gasto
                                pelo hard spend limit do projeto no painel da OpenAI.
 
@@ -13,8 +15,9 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from time import sleep
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from pydantic import ValidationError
@@ -186,22 +189,69 @@ def _call_gemini(prompt: str, settings: Settings) -> LLMPayload:
     return _parse_response(response.text or "")
 
 
-def _call_openai(prompt: str, settings: Settings) -> LLMPayload:
+@dataclass(frozen=True)
+class _CompatibleProvider:
+    """Provedor que fala o protocolo Chat Completions da OpenAI."""
+
+    name: Literal["groq", "openai"]
+    label: str
+    api_key: str
+    model: str
+    base_url: str | None
+    # Strict mode exige suporte do modelo ao subconjunto completo do JSON Schema; no Groq o
+    # modo best-effort aceita mais modelos e a resposta é validada pelo Pydantic do mesmo jeito.
+    strict_schema: bool
+
+
+def _openai_provider(settings: Settings) -> _CompatibleProvider:
+    return _CompatibleProvider(
+        name="openai",
+        label="OpenAI",
+        api_key=settings.openai_api_key.get_secret_value(),
+        model=_OPENAI_MODEL,
+        base_url=None,
+        strict_schema=True,
+    )
+
+
+def _groq_provider(settings: Settings) -> _CompatibleProvider:
+    return _CompatibleProvider(
+        name="groq",
+        label="Groq",
+        api_key=settings.groq_api_key.get_secret_value(),
+        model=settings.groq_model,
+        base_url=settings.groq_base_url,
+        strict_schema=False,
+    )
+
+
+def _call_openai_compatible(
+    prompt: str, settings: Settings, provider: _CompatibleProvider
+) -> LLMPayload:
     import openai as openai_sdk
 
+    client_options: dict[str, Any] = {
+        "api_key": provider.api_key,
+        "timeout": settings.llm_timeout_seconds,
+        "max_retries": 0,  # A aplicação controla tentativas para não multiplicá-las no SDK.
+    }
+    if provider.base_url:
+        client_options["base_url"] = provider.base_url
+    extra: dict[str, Any] = {}
+    if provider.model.startswith("openai/gpt-oss"):
+        # Modelos gpt-oss raciocinam antes de responder e esses tokens contam no teto de saída;
+        # o nível baixo deixa espaço para o JSON, como no Gemini.
+        extra["reasoning_effort"] = "low"
+    label = provider.label
     try:
-        with openai_sdk.OpenAI(
-            api_key=settings.openai_api_key.get_secret_value(),
-            timeout=settings.llm_timeout_seconds,
-            max_retries=0,  # A aplicação controla tentativas para não multiplicá-las no SDK.
-        ) as client:
+        with openai_sdk.OpenAI(**client_options) as client:
             completion = client.chat.completions.create(
-                model=_OPENAI_MODEL,
+                model=provider.model,
                 response_format={
                     "type": "json_schema",
                     "json_schema": {
                         "name": "valyra_answer",
-                        "strict": True,
+                        "strict": provider.strict_schema,
                         "schema": _RESPONSE_SCHEMA,
                     },
                 },
@@ -211,10 +261,11 @@ def _call_openai(prompt: str, settings: Settings) -> LLMPayload:
                 ],
                 temperature=0.2,
                 max_completion_tokens=settings.llm_max_output_tokens,
+                **extra,
             )
     except openai_sdk.APIConnectionError:
         # APITimeoutError também é APIConnectionError no SDK.
-        raise _TransientProviderError("Falha de transporte OpenAI") from None
+        raise _TransientProviderError(f"Falha de transporte {label}") from None
     except openai_sdk.APIStatusError as exc:
         # Uma nova tentativa não resolve falta de crédito nem limite financeiro atingido.
         if exc.status_code == 429 and exc.code in {
@@ -225,16 +276,28 @@ def _call_openai(prompt: str, settings: Settings) -> LLMPayload:
             "project_spend_limit_exceeded",
         }:
             raise LLMUnavailableError(
-                "OpenAI sem crédito ou com limite financeiro atingido"
+                f"{label} sem crédito ou com limite financeiro atingido"
             ) from None
+        if exc.status_code == 413:
+            # O plano gratuito do Groq limita tokens por minuto; repetir o mesmo prompt
+            # não cabe no limite, mas o próximo provedor ainda pode atender.
+            raise LLMUnavailableError(f"{label}: prompt acima do limite do plano") from None
         if exc.status_code in _TRANSIENT_STATUS or exc.status_code >= 500:
-            raise _TransientProviderError("OpenAI temporariamente indisponível") from None
-        raise LLMConfigurationError("OpenAI recusou a configuração da chamada") from None
+            raise _TransientProviderError(f"{label} temporariamente indisponível") from None
+        raise LLMConfigurationError(f"{label} recusou a configuração da chamada") from None
 
     choice = completion.choices[0] if completion.choices else None
     if not choice or choice.finish_reason != "stop" or choice.message.refusal:
-        raise LLMParseError("OpenAI não retornou uma resposta completa")
+        raise LLMParseError(f"{label} não retornou uma resposta completa")
     return _parse_response(choice.message.content or "")
+
+
+def _call_openai(prompt: str, settings: Settings) -> LLMPayload:
+    return _call_openai_compatible(prompt, settings, _openai_provider(settings))
+
+
+def _call_groq(prompt: str, settings: Settings) -> LLMPayload:
+    return _call_openai_compatible(prompt, settings, _groq_provider(settings))
 
 
 def _run_provider(call: Callable[[], LLMPayload], attempts: int, provider: str) -> LLMPayload:
@@ -249,33 +312,73 @@ def _run_provider(call: Callable[[], LLMPayload], attempts: int, provider: str) 
     raise LLMUnavailableError(f"Tentativas esgotadas para {provider}")
 
 
-def call_llm(request: LLMRequest) -> LLMResponse:
-    """Executa Gemini; cai para GPT-4o-mini se OPENAI_API_KEY estiver configurada.
+@dataclass(frozen=True)
+class _ChainStep:
+    name: Literal["gemini", "groq", "openai"]
+    model: str
+    enabled: bool
+    # Provedor pago não recebe a chamada depois de um erro de configuração: o mesmo pedido
+    # provavelmente seria recusado de novo e cobrado. Reserva gratuita pode tentar.
+    paid: bool
+    call: Callable[[], LLMPayload]
 
-    Controle de gasto do fallback é responsabilidade do hard spend limit configurado
-    no projeto da OpenAI — não há contador interno na aplicação.
-    LLMParseError e LLMConfigurationError não acionam o fallback.
+
+def call_llm(request: LLMRequest) -> LLMResponse:
+    """Executa Gemini; cai para Groq e depois GPT-4o-mini conforme as chaves configuradas.
+
+    Indisponibilidade (cota, rede, 5xx) passa ao próximo provedor habilitado.
+    Erro de configuração do Gemini (chave inválida, acesso negado, modelo desativado)
+    passa apenas à reserva gratuita do Groq. LLMParseError não aciona nenhuma reserva.
+    Controle de gasto da OpenAI é responsabilidade do hard spend limit do projeto.
     """
     settings = get_settings()
     prompt = _build_user_prompt(request)
+    chain = (
+        _ChainStep(
+            "gemini",
+            settings.gemini_model,
+            settings.gemini_enabled,
+            False,
+            lambda: _call_gemini(prompt, settings),
+        ),
+        _ChainStep(
+            "groq",
+            settings.groq_model,
+            settings.groq_fallback_enabled,
+            False,
+            lambda: _call_groq(prompt, settings),
+        ),
+        _ChainStep(
+            "openai",
+            _OPENAI_MODEL,
+            settings.openai_fallback_enabled,
+            True,
+            lambda: _call_openai(prompt, settings),
+        ),
+    )
 
-    if settings.gemini_enabled:
+    configuration_error: LLMConfigurationError | None = None
+    unavailable_error: LLMUnavailableError | None = None
+    for step in chain:
+        if not step.enabled or (configuration_error is not None and step.paid):
+            continue
         try:
-            payload = _run_provider(
-                lambda: _call_gemini(prompt, settings), settings.llm_max_attempts, "gemini"
-            )
-            return LLMResponse(
-                provider="gemini", model=settings.gemini_model, **payload.model_dump()
-            )
-        except LLMUnavailableError:
-            logger.warning("Gemini indisponível; tentando fallback OpenAI")
+            payload = _run_provider(step.call, settings.llm_max_attempts, step.name)
+        except LLMUnavailableError as exc:
+            logger.warning("Provedor %s indisponível; tentando o próximo", step.name)
+            unavailable_error = exc
+            continue
+        except LLMConfigurationError as exc:
+            logger.warning("Provedor %s recusou a configuração; tentando reserva", step.name)
+            configuration_error = configuration_error or exc
+            continue
+        return LLMResponse(provider=step.name, model=step.model, **payload.model_dump())
 
-    if settings.openai_fallback_enabled:
-        payload = _run_provider(
-            lambda: _call_openai(prompt, settings), settings.llm_max_attempts, "openai"
-        )
-        return LLMResponse(provider="openai", model=_OPENAI_MODEL, **payload.model_dump())
-
+    # Erro de configuração prevalece: indica algo a corrigir no ambiente, não só esperar.
+    if configuration_error is not None:
+        raise configuration_error
+    if unavailable_error is not None:
+        raise unavailable_error
     raise LLMUnavailableError(
-        "Nenhum provedor disponível: configure GEMINI_API_KEY ou OPENAI_API_KEY"
+        "Nenhum provedor disponível: configure GEMINI_API_KEY, GROQ_API_KEY ou OPENAI_API_KEY"
     )

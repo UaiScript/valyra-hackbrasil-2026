@@ -1,7 +1,7 @@
 # Cliente IA — fundação
 
-O cliente implementa Gemini como primário e OpenAI como fallback
-([ADR-0002](adr/0002-provedor-llm.md)). A
+O cliente implementa Gemini como primário, Groq como reserva gratuita e OpenAI como
+fallback pago ([ADR-0002](adr/0002-provedor-llm.md), [ADR-0014](adr/0014-reserva-groq.md)). A
 [ADR-0011](adr/0011-contrato-evidencias-ia.md), aprovada em 17/11/2026, define os
 contratos tipados e a resolução de citações implementados neste incremento.
 O [serviço IA](ai-service.md) já consulta Finance, executa o cliente e valida a
@@ -18,6 +18,14 @@ Execute `make sync` na raiz. Configure `GEMINI_API_KEY` em seu `.env` local.
 O `.env.example` deixa as chaves vazias para a API e o CI funcionarem sem provedor.
 Com `OPENAI_API_KEY`, há fallback em caso de indisponibilidade/cota do Gemini;
 sem chave Gemini, OpenAI pode atender diretamente. Nunca versione as chaves.
+
+Com `GROQ_API_KEY` (gratuita em https://console.groq.com/keys), o Groq entra antes da
+OpenAI: atende quando o Gemini está indisponível, sem cota ou recusa a chave/modelo.
+A OpenAI, paga, continua sem receber chamadas depois de erro de configuração do Gemini.
+O modelo vem de `GROQ_MODEL` (padrão `openai/gpt-oss-120b`, com saída por JSON Schema
+em modo best-effort e raciocínio baixo); `GROQ_BASE_URL` só muda em testes ou proxies.
+O plano gratuito limita tokens por minuto: prompt grande demais recebe HTTP 413 e
+segue para o próximo provedor sem repetir.
 
 O modelo Gemini vem de `GEMINI_MODEL` (padrão `gemini-3.8-flash`). O Google
 desativa versões antigas; em novembro de 2026 havia relatos no fórum do Google

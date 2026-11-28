@@ -32,6 +32,9 @@ def settings(monkeypatch):
         "GEMINI_API_KEY",
         "GEMINI_MODEL",
         "OPENAI_API_KEY",
+        "GROQ_API_KEY",
+        "GROQ_MODEL",
+        "GROQ_BASE_URL",
         "LLM_TIMEOUT_SECONDS",
         "LLM_MAX_ATTEMPTS",
         "LLM_MAX_OUTPUT_TOKENS",
@@ -84,9 +87,10 @@ def openai_sdk_http(monkeypatch):
 
         def factory(**kwargs):
             state.options.append(kwargs)
+            # Sem base_url explícita é a OpenAI; o Groq informa a própria base.
+            options = {"base_url": "https://openai.test/v1", **kwargs}
             client = real_client(
-                **kwargs,
-                base_url="https://openai.test/v1",
+                **options,
                 http_client=httpx.Client(transport=httpx.MockTransport(capture)),
             )
             state.clients.append(client)
@@ -465,3 +469,143 @@ def test_prompt_tipado_grande_falha_antes_da_rede(settings, monkeypatch):
     with pytest.raises(ValueError, match="64000"):
         llm.call_llm(request)
     factory.assert_not_called()
+
+
+def _groq_key(settings):
+    settings.groq_api_key = Settings(
+        database_url="unused", groq_api_key="test-groq", _env_file=None
+    ).groq_api_key
+
+
+def _gemini_error(status):
+    return lambda _: httpx.Response(status, json={"error": {"code": status, "message": "falha"}})
+
+
+def _hosts(state):
+    return [request.url.host for request in state.requests]
+
+
+@pytest.mark.parametrize("gemini_status", [429, 503])
+def test_groq_reserva_quando_gemini_indisponivel(
+    settings, sdk, openai_sdk_http, payload, gemini_status
+):
+    _groq_key(settings)
+    settings.openai_api_key = Settings(
+        database_url="unused", openai_api_key="test-openai", _env_file=None
+    ).openai_api_key
+    gemini = sdk(_gemini_error(gemini_status))
+    state = openai_sdk_http(lambda _: openai_response(payload))
+    result = llm.call_llm(make_request(question="Explique"))
+    assert result.provider == "groq"
+    assert result.model == "openai/gpt-oss-120b"
+    assert len(gemini.requests) == settings.llm_max_attempts
+    # OpenAI paga não é chamada quando a reserva gratuita atende.
+    assert _hosts(state) == ["api.groq.com"]
+    assert state.requests[0].url.path == "/openai/v1/chat/completions"
+    assert state.requests[0].headers["authorization"] == "Bearer test-groq"
+    body = json.loads(state.requests[0].content)
+    assert body["model"] == "openai/gpt-oss-120b"
+    assert body["response_format"]["json_schema"]["strict"] is False
+    assert body["response_format"]["json_schema"]["schema"] == llm._RESPONSE_SCHEMA
+    assert body["reasoning_effort"] == "low"
+    assert body["max_completion_tokens"] == settings.llm_max_output_tokens
+    assert state.options[0]["max_retries"] == 0
+    assert state.clients[0].is_closed()
+
+
+@pytest.mark.parametrize("gemini_status", [400, 403])
+def test_groq_reserva_quando_gemini_recusa_chave(
+    settings, sdk, openai_sdk_http, payload, gemini_status
+):
+    _groq_key(settings)
+    gemini = sdk(_gemini_error(gemini_status))
+    state = openai_sdk_http(lambda _: openai_response(payload))
+    assert llm.call_llm(make_request(question="Explique")).provider == "groq"
+    assert len(gemini.requests) == 1
+    assert _hosts(state) == ["api.groq.com"]
+
+
+def test_groq_sem_gemini_atende_direto(settings, monkeypatch, openai_sdk_http, payload):
+    settings.gemini_api_key = Settings(
+        database_url="unused", gemini_api_key="", _env_file=None
+    ).gemini_api_key
+    _groq_key(settings)
+    monkeypatch.setattr(genai, "Client", Mock(side_effect=AssertionError("Sem chave Gemini")))
+    state = openai_sdk_http(lambda _: openai_response(payload))
+    assert llm.call_llm(make_request(question="Explique")).provider == "groq"
+    assert _hosts(state) == ["api.groq.com"]
+
+
+def test_groq_modelo_configuravel_sem_raciocinio(settings, sdk, openai_sdk_http, payload):
+    _groq_key(settings)
+    settings.groq_model = "llama-3.3-70b-versatile"
+    sdk(_gemini_error(429))
+    state = openai_sdk_http(lambda _: openai_response(payload))
+    result = llm.call_llm(make_request(question="Explique"))
+    assert result.model == "llama-3.3-70b-versatile"
+    body = json.loads(state.requests[0].content)
+    assert body["model"] == "llama-3.3-70b-versatile"
+    assert "reasoning_effort" not in body
+
+
+@pytest.mark.parametrize("groq_status", [429, 413])
+def test_openai_depois_do_groq_indisponivel(settings, sdk, openai_sdk_http, payload, groq_status):
+    _groq_key(settings)
+    settings.openai_api_key = Settings(
+        database_url="unused", openai_api_key="test-openai", _env_file=None
+    ).openai_api_key
+    sdk(_gemini_error(429))
+
+    def handler(request):
+        if request.url.host == "api.groq.com":
+            return httpx.Response(
+                groq_status, json={"error": {"message": "SEGREDO", "code": "rate_limit_exceeded"}}
+            )
+        return openai_response(payload)
+
+    state = openai_sdk_http(handler)
+    result = llm.call_llm(make_request(question="Explique"))
+    assert result.provider == "openai"
+    # 413 (prompt acima do limite por minuto) não repete; 429 segue o teto de tentativas.
+    groq_calls = 1 if groq_status == 413 else settings.llm_max_attempts
+    assert _hosts(state) == ["api.groq.com"] * groq_calls + ["openai.test"]
+    assert all(client.is_closed() for client in state.clients)
+
+
+def test_todos_indisponiveis_gera_indisponivel(settings, sdk, openai_sdk_http):
+    _groq_key(settings)
+    sdk(_gemini_error(503))
+    state = openai_sdk_http(
+        lambda _: httpx.Response(503, json={"error": {"message": "falha", "code": "x"}})
+    )
+    with pytest.raises(llm.LLMUnavailableError):
+        llm.call_llm(make_request(question="Explique"))
+    assert _hosts(state) == ["api.groq.com"] * settings.llm_max_attempts
+
+
+def test_configuracao_gemini_prevalece_se_groq_indisponivel(settings, sdk, openai_sdk_http):
+    _groq_key(settings)
+    sdk(_gemini_error(403))
+    openai_sdk_http(lambda _: httpx.Response(503, json={"error": {"message": "x", "code": "x"}}))
+    with pytest.raises(llm.LLMConfigurationError, match="Gemini"):
+        llm.call_llm(make_request(question="Explique"))
+
+
+def test_parse_error_nao_aciona_groq(settings, sdk, monkeypatch, payload):
+    import openai as openai_sdk
+
+    _groq_key(settings)
+    factory = Mock(side_effect=AssertionError("Não deve acionar reserva em parse error"))
+    monkeypatch.setattr(openai_sdk, "OpenAI", factory)
+    sdk(lambda _: gemini_response(payload, finish="MAX_TOKENS"))
+    with pytest.raises(llm.LLMParseError):
+        llm.call_llm(make_request(question="Explique"))
+    factory.assert_not_called()
+
+
+def test_chave_groq_mascarada_e_aparada():
+    config = Settings(database_url="unused", groq_api_key=" test-groq ", _env_file=None)
+    assert config.groq_api_key.get_secret_value() == "test-groq"
+    assert config.groq_fallback_enabled
+    assert "test-groq" not in repr(config)
+    assert not Settings(database_url="unused", _env_file=None).groq_fallback_enabled
