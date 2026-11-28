@@ -3,6 +3,8 @@
 Primário:  Gemini (GEMINI_MODEL, padrão gemini-3.8-flash) — habilitado com GEMINI_API_KEY.
 Reserva:   Groq (GROQ_MODEL, padrão openai/gpt-oss-120b) — habilitado com GROQ_API_KEY;
            plano gratuito, protocolo da OpenAI (ADR-0014).
+Emergência: OpenRouter (OPENROUTER_MODEL, padrão openrouter/free) — habilitado com
+           OPENROUTER_API_KEY; modelos gratuitos, protocolo da OpenAI (ADR-0015).
 Fallback:  GPT-4o-mini       — habilitado com OPENAI_API_KEY; controle de gasto
                                pelo hard spend limit do projeto no painel da OpenAI.
 
@@ -193,7 +195,7 @@ def _call_gemini(prompt: str, settings: Settings) -> LLMPayload:
 class _CompatibleProvider:
     """Provedor que fala o protocolo Chat Completions da OpenAI."""
 
-    name: Literal["groq", "openai"]
+    name: Literal["groq", "openrouter", "openai"]
     label: str
     api_key: str
     model: str
@@ -201,6 +203,8 @@ class _CompatibleProvider:
     # Strict mode exige suporte do modelo ao subconjunto completo do JSON Schema; no Groq o
     # modo best-effort aceita mais modelos e a resposta é validada pelo Pydantic do mesmo jeito.
     strict_schema: bool
+    # Corpo adicional específico do provedor, enviado sem alterar o protocolo comum.
+    extra_body: dict[str, Any] | None = None
 
 
 def _openai_provider(settings: Settings) -> _CompatibleProvider:
@@ -225,6 +229,20 @@ def _groq_provider(settings: Settings) -> _CompatibleProvider:
     )
 
 
+def _openrouter_provider(settings: Settings) -> _CompatibleProvider:
+    return _CompatibleProvider(
+        name="openrouter",
+        label="OpenRouter",
+        api_key=settings.openrouter_api_key.get_secret_value(),
+        model=settings.openrouter_model,
+        base_url=settings.openrouter_base_url,
+        # Modelos gratuitos variam no suporte ao strict mode; a validação Pydantic decide.
+        strict_schema=False,
+        # Sem isso o OpenRouter pode rotear para um provedor que ignora response_format.
+        extra_body={"provider": {"require_parameters": True}},
+    )
+
+
 def _call_openai_compatible(
     prompt: str, settings: Settings, provider: _CompatibleProvider
 ) -> LLMPayload:
@@ -242,6 +260,8 @@ def _call_openai_compatible(
         # Modelos gpt-oss raciocinam antes de responder e esses tokens contam no teto de saída;
         # o nível baixo deixa espaço para o JSON, como no Gemini.
         extra["reasoning_effort"] = "low"
+    if provider.extra_body:
+        extra["extra_body"] = provider.extra_body
     label = provider.label
     try:
         with openai_sdk.OpenAI(**client_options) as client:
@@ -278,6 +298,9 @@ def _call_openai_compatible(
             raise LLMUnavailableError(
                 f"{label} sem crédito ou com limite financeiro atingido"
             ) from None
+        if exc.status_code == 402:
+            # OpenRouter responde 402 quando o saldo da conta não cobre a chamada.
+            raise LLMUnavailableError(f"{label} sem crédito disponível") from None
         if exc.status_code == 413:
             # O plano gratuito do Groq limita tokens por minuto; repetir o mesmo prompt
             # não cabe no limite, mas o próximo provedor ainda pode atender.
@@ -300,6 +323,10 @@ def _call_groq(prompt: str, settings: Settings) -> LLMPayload:
     return _call_openai_compatible(prompt, settings, _groq_provider(settings))
 
 
+def _call_openrouter(prompt: str, settings: Settings) -> LLMPayload:
+    return _call_openai_compatible(prompt, settings, _openrouter_provider(settings))
+
+
 def _run_provider(call: Callable[[], LLMPayload], attempts: int, provider: str) -> LLMPayload:
     for attempt in range(attempts):
         try:
@@ -314,7 +341,7 @@ def _run_provider(call: Callable[[], LLMPayload], attempts: int, provider: str) 
 
 @dataclass(frozen=True)
 class _ChainStep:
-    name: Literal["gemini", "groq", "openai"]
+    name: Literal["gemini", "groq", "openrouter", "openai"]
     model: str
     enabled: bool
     # Provedor pago não recebe a chamada depois de erro de configuração do primário: o mesmo
@@ -328,13 +355,13 @@ class _ChainStep:
 
 
 def call_llm(request: LLMRequest) -> LLMResponse:
-    """Executa Gemini; cai para Groq e depois GPT-4o-mini conforme as chaves configuradas.
+    """Executa Gemini; cai para Groq, OpenRouter e GPT-4o-mini conforme as chaves configuradas.
 
     Indisponibilidade (cota, rede, 5xx) passa ao próximo provedor habilitado.
     Erro de configuração do Gemini (chave inválida, acesso negado, modelo desativado)
-    passa apenas à reserva gratuita do Groq; erro de configuração do próprio Groq (chave
-    dele) não bloqueia a OpenAI. LLMParseError do Gemini não aciona reserva; do Groq,
-    em modo best-effort, passa à OpenAI.
+    passa apenas às reservas gratuitas (Groq e OpenRouter com modelo gratuito); erro de
+    configuração de uma reserva (chave dela) não bloqueia as seguintes. LLMParseError do
+    Gemini não aciona reserva; das reservas, em modo best-effort, passa ao próximo.
     Controle de gasto da OpenAI é responsabilidade do hard spend limit do projeto.
     """
     settings = get_settings()
@@ -354,6 +381,14 @@ def call_llm(request: LLMRequest) -> LLMResponse:
             settings.groq_fallback_enabled,
             False,
             lambda: _call_groq(prompt, settings),
+            parse_falls_through=True,
+        ),
+        _ChainStep(
+            "openrouter",
+            settings.openrouter_model,
+            settings.openrouter_fallback_enabled,
+            not settings.openrouter_model_is_free,
+            lambda: _call_openrouter(prompt, settings),
             parse_falls_through=True,
         ),
         _ChainStep(
@@ -399,5 +434,6 @@ def call_llm(request: LLMRequest) -> LLMResponse:
     if unavailable_error is not None:
         raise unavailable_error
     raise LLMUnavailableError(
-        "Nenhum provedor disponível: configure GEMINI_API_KEY, GROQ_API_KEY ou OPENAI_API_KEY"
+        "Nenhum provedor disponível: configure GEMINI_API_KEY, GROQ_API_KEY, "
+        "OPENROUTER_API_KEY ou OPENAI_API_KEY"
     )

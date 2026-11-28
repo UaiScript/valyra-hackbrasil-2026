@@ -45,7 +45,8 @@ que o limite de tokens por minuto recebe HTTP 413.
 
 - **DeepSeek:** bom em português e barato, mas pago; repetiria o problema de crédito.
 - **OpenRouter:** porta para vários modelos, com modelos gratuitos de disponibilidade
-  variável; útil como último recurso, mas adiciona um intermediário.
+  variável; útil como último recurso, mas adiciona um intermediário. Em 28/11/2026 a
+  [ADR-0015](0015-reserva-openrouter.md) o acrescentou depois do Groq.
 - **Só ativar a OpenAI:** exige crédito e limite de gasto antes da apresentação.
 - **Strict mode no Groq:** restringe a troca de modelo por variável; a validação local
   já recusa saída fora do schema.

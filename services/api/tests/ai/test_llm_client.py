@@ -35,6 +35,9 @@ def settings(monkeypatch):
         "GROQ_API_KEY",
         "GROQ_MODEL",
         "GROQ_BASE_URL",
+        "OPENROUTER_API_KEY",
+        "OPENROUTER_MODEL",
+        "OPENROUTER_BASE_URL",
         "LLM_TIMEOUT_SECONDS",
         "LLM_MAX_ATTEMPTS",
         "LLM_MAX_OUTPUT_TOKENS",
@@ -651,3 +654,153 @@ def test_resposta_invalida_do_groq_sem_openai(settings, sdk, openai_sdk_http, pa
     openai_sdk_http(lambda _: openai_response(payload, finish="length"))
     with pytest.raises(llm.LLMParseError):
         llm.call_llm(make_request(question="Explique"))
+
+
+def _openrouter_key(settings):
+    settings.openrouter_api_key = Settings(
+        database_url="unused", openrouter_api_key="test-openrouter", _env_file=None
+    ).openrouter_api_key
+
+
+def _openai_key(settings):
+    settings.openai_api_key = Settings(
+        database_url="unused", openai_api_key="test-openai", _env_file=None
+    ).openai_api_key
+
+
+def _fail_on(host, status, code="rate_limit_exceeded"):
+    def handler(request):
+        if request.url.host == host:
+            return httpx.Response(status, json={"error": {"message": "SEGREDO", "code": code}})
+        return None
+
+    return handler
+
+
+def test_openrouter_depois_do_groq_indisponivel(settings, sdk, openai_sdk_http, payload):
+    _groq_key(settings)
+    _openrouter_key(settings)
+    _openai_key(settings)
+    sdk(_gemini_error(429))
+    groq_fails = _fail_on("api.groq.com", 429)
+    state = openai_sdk_http(lambda request: groq_fails(request) or openai_response(payload))
+    result = llm.call_llm(make_request(question="Explique"))
+    assert result.provider == "openrouter"
+    assert result.model == "openrouter/free"
+    # OpenAI paga não é chamada quando a reserva de emergência gratuita atende.
+    assert _hosts(state) == ["api.groq.com"] * settings.llm_max_attempts + ["openrouter.ai"]
+    request = state.requests[-1]
+    assert request.url.path == "/api/v1/chat/completions"
+    assert request.headers["authorization"] == "Bearer test-openrouter"
+    body = json.loads(request.content)
+    assert body["model"] == "openrouter/free"
+    assert body["provider"] == {"require_parameters": True}
+    assert body["response_format"]["json_schema"]["strict"] is False
+    assert body["response_format"]["json_schema"]["schema"] == llm._RESPONSE_SCHEMA
+    assert "reasoning_effort" not in body
+    assert all(client.is_closed() for client in state.clients)
+
+
+def test_openrouter_sem_groq_atende_depois_do_gemini(settings, sdk, openai_sdk_http, payload):
+    _openrouter_key(settings)
+    sdk(_gemini_error(503))
+    state = openai_sdk_http(lambda _: openai_response(payload))
+    assert llm.call_llm(make_request(question="Explique")).provider == "openrouter"
+    assert _hosts(state) == ["openrouter.ai"]
+
+
+@pytest.mark.parametrize("status", [402, 429])
+def test_openai_depois_do_openrouter_indisponivel(settings, sdk, openai_sdk_http, payload, status):
+    _openrouter_key(settings)
+    _openai_key(settings)
+    sdk(_gemini_error(429))
+    fails = _fail_on("openrouter.ai", status)
+    state = openai_sdk_http(lambda request: fails(request) or openai_response(payload))
+    assert llm.call_llm(make_request(question="Explique")).provider == "openai"
+    # 402 (sem saldo) não repete; 429 segue o teto de tentativas.
+    calls = 1 if status == 402 else settings.llm_max_attempts
+    assert _hosts(state) == ["openrouter.ai"] * calls + ["openai.test"]
+
+
+def test_gemini_recusa_chave_aciona_openrouter_gratuito(settings, sdk, openai_sdk_http, payload):
+    _openrouter_key(settings)
+    _openai_key(settings)
+    sdk(_gemini_error(403))
+    state = openai_sdk_http(lambda _: openai_response(payload))
+    assert llm.call_llm(make_request(question="Explique")).provider == "openrouter"
+    assert _hosts(state) == ["openrouter.ai"]
+
+
+def test_openrouter_modelo_pago_nao_recebe_erro_de_configuracao(
+    settings, sdk, openai_sdk_http, payload
+):
+    _openrouter_key(settings)
+    settings.openrouter_model = "anthropic/modelo-pago"
+    sdk(_gemini_error(403))
+    state = openai_sdk_http(lambda _: openai_response(payload))
+    with pytest.raises(llm.LLMConfigurationError, match="Gemini"):
+        llm.call_llm(make_request(question="Explique"))
+    assert _hosts(state) == []
+
+
+def test_openrouter_modelo_gratuito_configuravel(settings, sdk, openai_sdk_http, payload):
+    _openrouter_key(settings)
+    settings.openrouter_model = "google/gemma-4-26b-a4b-it:free"
+    sdk(_gemini_error(403))
+    state = openai_sdk_http(lambda _: openai_response(payload))
+    result = llm.call_llm(make_request(question="Explique"))
+    assert result.model == "google/gemma-4-26b-a4b-it:free"
+    assert json.loads(state.requests[0].content)["model"] == "google/gemma-4-26b-a4b-it:free"
+
+
+def test_resposta_invalida_do_openrouter_passa_a_openai(settings, sdk, openai_sdk_http, payload):
+    _openrouter_key(settings)
+    _openai_key(settings)
+    sdk(_gemini_error(429))
+
+    def handler(request):
+        if request.url.host == "openrouter.ai":
+            return openai_response(payload, finish="length")
+        return openai_response(payload)
+
+    state = openai_sdk_http(handler)
+    assert llm.call_llm(make_request(question="Explique")).provider == "openai"
+    assert _hosts(state) == ["openrouter.ai", "openai.test"]
+
+
+def test_chave_openrouter_mascarada_e_aparada():
+    config = Settings(database_url="unused", openrouter_api_key=" test-or ", _env_file=None)
+    assert config.openrouter_api_key.get_secret_value() == "test-or"
+    assert config.openrouter_fallback_enabled
+    assert config.openrouter_model_is_free
+    assert "test-or" not in repr(config)
+    assert not Settings(database_url="unused", _env_file=None).openrouter_fallback_enabled
+
+
+@pytest.mark.parametrize("status", [401, 503])
+def test_openrouter_erro_proprio_nao_bloqueia_openai(
+    settings, sdk, openai_sdk_http, payload, status
+):
+    _openrouter_key(settings)
+    _openai_key(settings)
+    sdk(_gemini_error(429))
+    fails = _fail_on("openrouter.ai", status, code="x")
+    state = openai_sdk_http(lambda request: fails(request) or openai_response(payload))
+    assert llm.call_llm(make_request(question="Explique")).provider == "openai"
+    # 401 é configuração da chave do OpenRouter, sem repetir; 5xx segue o teto de tentativas.
+    calls = 1 if status == 401 else settings.llm_max_attempts
+    assert _hosts(state) == ["openrouter.ai"] * calls + ["openai.test"]
+
+
+@pytest.mark.parametrize(
+    ("model", "free"),
+    [
+        ("openrouter/free", True),
+        ("google/gemma-4-26b-a4b-it:free", True),
+        ("vendor/modelo:freebie", False),
+        ("openrouter/auto", False),
+    ],
+)
+def test_openrouter_so_modelo_gratuito_conta_como_sem_custo(model, free):
+    config = Settings(database_url="unused", openrouter_model=model, _env_file=None)
+    assert config.openrouter_model_is_free is free
