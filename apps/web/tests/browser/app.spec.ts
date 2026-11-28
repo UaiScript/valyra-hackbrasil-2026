@@ -545,31 +545,33 @@ test('perfil da demo adapta menu, atalhos, faixa, radar e perguntas da IA', asyn
   await page.goto('/#/app');
   const picker = page.getByRole('region', { name: 'Para quem a Valyra vai trabalhar hoje?' });
   await expect(picker.getByRole('button')).toHaveCount(3);
-  await picker.getByRole('button', { name: /Cooperado do agro/ }).click();
+  // Cada perfil é um cliente fictício com histórico próprio: a API recebe o perfil no cabeçalho.
+  const finance = page.waitForRequest((r) => r.url().includes('/api/v1/finance/') && r.headers()['x-valyra-profile'] === 'investidor');
+  await picker.getByRole('button', { name: /Investidor/ }).click();
+  await finance;
   await expect(picker).toHaveCount(0);
-  const forYou = page.getByRole('region', { name: 'Para você: perfil Cooperado do agro' });
-  await expect(forYou.getByRole('link', { name: /Chuva nas regiões produtoras/ })).toHaveAttribute('href', '#/app/alpha');
-  await expect(page.locator('.cx-ticker').getByRole('button', { name: 'Clima' })).toHaveAttribute('aria-pressed', 'true');
+  const forYou = page.getByRole('region', { name: 'Para você: perfil Investidor' });
+  await expect(forYou.getByRole('link', { name: /Bolsa, juros e inflação/ })).toHaveAttribute('href', '#/app/alpha');
+  await expect(page.locator('.cx-ticker').getByRole('button', { name: 'Bolsa' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.cx-nav__focus')).toHaveCount(1);
   await page.goto('/#/app/alpha');
-  await expect(page.getByRole('button', { name: /^Clima/ })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('article', { name: 'Selic meta' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Ações/ })).toHaveAttribute('aria-pressed', 'true');
   // Trocar de perfil com o radar aberto reabre no tema do novo perfil.
   await page.getByRole('button', { name: /Perfil da demonstração/ }).click();
   await page.getByRole('group', { name: 'Perfis da demonstração' }).getByRole('button', { name: /Começando a investir/ }).click();
-  await expect(page.getByRole('button', { name: /^Ações/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: /^Juros/ })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: /Perfil da demonstração/ }).click();
-  await page.getByRole('group', { name: 'Perfis da demonstração' }).getByRole('button', { name: /Cooperado do agro/ }).click();
+  await page.getByRole('group', { name: 'Perfis da demonstração' }).getByRole('button', { name: /Investidor/ }).click();
   await page.goto('/#/app/alpha/semana');
-  await expect(page.locator('.nx-grid > *').first()).toContainText('Agro e cadeia da soja');
+  await expect(page.locator('.nx-grid > *').first()).toContainText('Ações que você acompanha');
   await page.goto('/#/app/valyra-ai');
-  await expect(page.locator('.cx-suggestion').first()).toHaveText('Como está a chuva nas regiões produtoras do radar?');
+  await expect(page.locator('.cx-suggestion').first()).toHaveText('O que o radar mostra sobre ações, juros e inflação nesta semana?');
   // Troca pelo menu do cabeçalho: menu e faixa seguem o novo perfil.
   await page.getByRole('button', { name: /Perfil da demonstração/ }).click();
-  await page.getByRole('group', { name: 'Perfis da demonstração' }).getByRole('button', { name: /Começando a investir/ }).click();
-  await expect(page.locator('.cx-nav__title').first()).toHaveText(/Alternative Alpha/);
+  await page.getByRole('group', { name: 'Perfis da demonstração' }).getByRole('button', { name: /Orçamento apertado/ }).click();
+  await expect(page.locator('.cx-nav__title').first()).toHaveText(/Valyra Finance/);
   await page.goto('/#/app');
-  await expect(page.locator('.cx-ticker').getByRole('button', { name: 'Bolsa' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.cx-ticker').getByRole('button', { name: 'Manchetes' })).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('faixa recolhe, para de buscar dados e lembra a escolha', async ({ page }) => {

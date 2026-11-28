@@ -13,6 +13,18 @@ O histórico dá ao Valyra três meses para reconhecer as recorrências e o padr
 
 As contas de energia e água ficam na mesma categoria que internet e celular, com valores próximos; assim nenhuma conta comum aparece como atípica. Estes dois arquivos são o conjunto oficial da apresentação. O `transactions_demo.csv` continua disponível para desenvolvimento e testes, mas não deve ser misturado com eles na mesma conta.
 
+## Perfis com histórico pronto
+
+Os três perfis do seletor da Central (Orçamento apertado, Começando a investir e Investidor) são clientes fictícios que já usam a Valyra há alguns meses. Cada um tem conta, orçamento e um extrato sintético próprio de três meses fechados mais o mês atual, criados por `valyra.scripts.seed_demo_profiles` no start da API e importados pela mesma importação CSV da tela Importar. Recorrências, gastos atípicos, projeção e alertas são calculados pelo Finance.
+
+| Perfil | O que aparece |
+| --- | --- |
+| Orçamento apertado | Mês no vermelho, orçamento quase no teto (cerca de R$ 5 por dia), três gastos atípicos e alerta de saldo negativo antes do próximo salário. |
+| Começando a investir | Sobra no mês, aplicação mensal no CDB, primeira compra de ações e um jantar fora do padrão. |
+| Investidor | Aportes mensais em fundo e Tesouro, proventos de FIIs recorrentes, dividendos e uma compra grande de ações. |
+
+O app envia o perfil no cabeçalho `X-Valyra-Profile`; sem perfil escolhido vale o usuário demo padrão, que segue o roteiro de importação abaixo. As datas partem de "hoje" (`DEMO_TODAY`) no momento do primeiro seed, e uma conta que já tem extrato não recebe outro, então alterações feitas durante a demo sobrevivem a um redeploy. Para voltar ao estado inicial só dos perfis, rode `python -m valyra.scripts.seed_demo_profiles --reset` com `DATABASE_URL` apontando para o banco da demo no Neon (e o mesmo `DEMO_TODAY`); o usuário demo padrão não é tocado.
+
 ## Preparação (uma vez, antes do dia)
 
 1. **Banco limpo.** Se a conta demo já tiver transações de testes anteriores, volte ao estado inicial como descrito em [deploy.md](deploy.md#cuidados), de preferência criando um branch novo no Neon. Antes de apagar qualquer tabela, confirme no painel que é o banco da demo e que ele é descartável. Dados antigos entram nos mesmos cálculos e mudam os números do roteiro.

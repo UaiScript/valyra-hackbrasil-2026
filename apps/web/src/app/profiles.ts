@@ -3,11 +3,15 @@
  *
  * Os perfis são só dados. Trocar uma persona é editar este arquivo, sem mexer em telas:
  * a Central, o menu, o ticker, o radar Alpha, o relatório da semana e o Pergunte ao Valyra
- * leem daqui o que destacar. Os números continuam vindo da API e são os mesmos para todos
- * os perfis (mesmo usuário demo, mesmos dados sintéticos); muda a experiência, não o dado.
+ * leem daqui o que destacar.
+ *
+ * Cada perfil também é um cliente fictício com extrato próprio na API: o id é enviado no
+ * cabeçalho X-Valyra-Profile e precisa existir em services/api/src/valyra/core/demo_profiles.py,
+ * com o histórico em valyra/scripts/seed_demo_profiles.py. Id desconhecido usa o usuário
+ * demo padrão (sem histórico pronto).
  *
  * Os três perfis abaixo são provisórios, pensados para a trilha 5 e para o modelo de
- * receita proposto (B2C freemium + B2B2C com bancos e cooperativas). A persona final
+ * receita proposto (B2C freemium + B2B2C com bancos e corretoras). A persona final
  * ainda será definida pelo time.
  */
 
@@ -78,8 +82,8 @@ export const PROFILES: Profile[] = [
     initial: 'I',
     modules: ['alpha', 'finance', 'ai'],
     ticker: 'bolsa',
-    alphaFocus: 'acoes',
-    newsThemes: ['acoes', 'juros'],
+    alphaFocus: 'juros',
+    newsThemes: ['juros', 'renda', 'acoes'],
     shortcuts: [
       { module: 'alpha', route: 'alpha', title: 'Radar de juros e ações', hint: 'Selic, CDI, IPCA e a variação do dia, com fonte e data' },
       { module: 'finance', route: 'summary', title: 'Quanto sobrou no mês', hint: 'Entradas, saídas e resultado para guardar' },
@@ -88,22 +92,22 @@ export const PROFILES: Profile[] = [
     questions: ['O que o radar mostra sobre juros e ações nesta semana?', 'O que mudou nos meus gastos em relação ao mês passado?'],
   },
   {
-    id: 'cooperado-agro',
-    name: 'Cooperado do agro',
-    persona: 'Pequeno produtor de grãos, cliente de cooperativa de crédito',
-    need: 'Atravessar a entressafra com caixa e acompanhar o clima do campo',
-    plan: 'Via cooperativa parceira (B2B2C)',
+    id: 'investidor',
+    name: 'Investidor',
+    persona: 'Carteira de ações, FIIs e fundos; aporta todo mês',
+    need: 'Acompanhar juros, bolsa e proventos e ver o efeito dos aportes no caixa',
+    plan: 'Via corretora ou banco parceiro (B2B2C)',
     initial: 'A',
-    modules: ['finance', 'alpha', 'ai'],
-    ticker: 'clima',
-    alphaFocus: 'clima',
-    newsThemes: ['agro', 'juros'],
+    modules: ['alpha', 'ai', 'finance'],
+    ticker: 'bolsa',
+    alphaFocus: 'acoes',
+    newsThemes: ['acoes', 'juros', 'inflacao'],
     shortcuts: [
-      { module: 'finance', route: 'projection', title: 'Caixa dos próximos meses', hint: 'Saldo previsto com contas fixas e média de gastos' },
-      { module: 'alpha', route: 'alpha', title: 'Chuva nas regiões produtoras', hint: 'Acumulado de 30 dias contra a média de 10 anos' },
-      { module: 'ai', question: 'Como está a chuva nas regiões produtoras do radar?', title: 'Como está o clima?', hint: 'Leitura dos sinais de clima, sem prever preço' },
+      { module: 'alpha', route: 'alpha', title: 'Bolsa, juros e inflação', hint: 'Ações, Selic, CDI e IPCA com fonte e data de coleta' },
+      { module: 'finance', route: 'projection', title: 'Caixa depois dos aportes', hint: 'Saldo previsto com aportes, proventos e contas fixas' },
+      { module: 'ai', question: 'O que o radar mostra sobre ações, juros e inflação nesta semana?', title: 'O que mudou no mercado?', hint: 'Explicação com os sinais do radar citados' },
     ],
-    questions: ['Como está a chuva nas regiões produtoras do radar?', 'Por que meu saldo previsto fica negativo nos próximos dias?'],
+    questions: ['O que o radar mostra sobre ações, juros e inflação nesta semana?', 'Quanto entrou de proventos e quanto aportei neste mês?'],
   },
 ];
 

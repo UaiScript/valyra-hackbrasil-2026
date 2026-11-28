@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type { FC, ReactNode } from 'react';
+import { setApiProfile } from './api/client';
 import { NEUTRAL_PROFILE, findProfile, isTickerMode } from './profiles';
 import type { Profile, TickerMode } from './profiles';
 
@@ -38,7 +39,12 @@ type ProfileState = {
 const ProfileContext = createContext<ProfileState | null>(null);
 
 export const ProfileProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const [profileId, setProfileId] = useState(() => read(PROFILE_KEY));
+  const [profileId, setProfileId] = useState(() => {
+    const id = findProfile(read(PROFILE_KEY))?.id ?? null;
+    // Antes do primeiro render: as telas já pedem os dados do cliente certo.
+    setApiProfile(id);
+    return id;
+  });
   const [override, setOverride] = useState<TickerMode | null>(() => {
     const v = read(TICKER_KEY);
     return isTickerMode(v) ? v : null;
@@ -48,6 +54,8 @@ export const ProfileProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const profile = saved ?? NEUTRAL_PROFILE;
 
   const setProfile = useCallback((id: string) => {
+    // Cada perfil é um cliente com histórico próprio na API; o app remonta com os dados dele.
+    setApiProfile(findProfile(id)?.id ?? null);
     setProfileId(id);
     write(PROFILE_KEY, id);
     // Trocar de perfil volta o ticker ao padrão do perfil: é o que a demo quer mostrar.
