@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { NEUTRAL_PROFILE, PROFILES, TICKER_MODES, byPriority, findProfile, isTickerMode } from '../src/app/profiles.ts';
+import { readFileSync } from 'node:fs';
+import { NEUTRAL_PROFILE, PROFILES, byPriority, findProfile, isTickerMode } from '../src/app/profiles.ts';
 
 // Os perfis são dados editáveis: este teste pega erro de digitação antes da demo.
 test('cada perfil tem id único, três módulos distintos e um atalho por módulo', () => {
@@ -12,8 +13,11 @@ test('cada perfil tem id único, três módulos distintos e um atalho por módul
   }
 });
 
-test('os perfis da demo mostram os três modos da faixa', () => {
-  assert.deepEqual(PROFILES.map((p) => p.ticker).sort(), [...TICKER_MODES].sort());
+// Perfil sem cliente na API abriria a conta vazia do usuário demo padrão, sem histórico.
+test('cada perfil tem um cliente fictício com histórico na API', () => {
+  const backend = readFileSync(new URL('../../../services/api/src/valyra/core/demo_profiles.py', import.meta.url), 'utf8');
+  const keys = [...backend.matchAll(/^\s+"([a-z-]+)": UUID\(/gm)].map((m) => m[1]).sort();
+  assert.deepEqual(PROFILES.map((p) => p.id).sort(), keys);
 });
 
 test('perfil salvo que não existe mais volta para a experiência neutra', () => {

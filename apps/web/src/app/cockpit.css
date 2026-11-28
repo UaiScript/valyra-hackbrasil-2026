@@ -118,7 +118,9 @@ body:has(.cx) { background: #0a0c13; }
   border: 1px solid var(--cx-glass-line);
   border-radius: 26px;
   background: rgb(11 14 24 / 0.82);
- 
+  /* Acima do conteúdo: o rótulo flutuante do trilho ficava por baixo dos painéis da
+     Central e o texto parecia transparente sobre eles. */
+  z-index: var(--z-overlay);
 }
 .cx-brand,
 .cx .cx-brand:hover { display: flex; align-items: center; gap: 12px; color: var(--cx-text); text-decoration: none; }
