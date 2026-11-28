@@ -37,10 +37,14 @@ Pela documentação consultada em 28/11/2026:
 5. Com modelo gratuito (`openrouter/free` ou id terminado em `:free`), o OpenRouter conta
    como reserva sem custo: recebe a chamada mesmo depois de erro de configuração do
    Gemini. Com qualquer outro modelo, é tratado como pago e segue a trava da ADR-0002.
+   O hard spend limit da OpenAI não cobre o OpenRouter: quem configurar um modelo pago
+   deve definir o limite de crédito da própria chave no painel do OpenRouter.
 6. Erro de configuração ou resposta fora do schema do OpenRouter passa à OpenAI, se
    configurada, como no Groq.
 7. Só dados sintéticos da demonstração vão ao OpenRouter. Antes de enviar dados reais,
-   revisar a política de dados de cada modelo gratuito.
+   revisar a política de dados de cada modelo gratuito. O filtro
+   `provider.data_collection: "deny"` não é usado porque excluiria a maior parte dos
+   provedores gratuitos e deixaria o roteador sem modelo.
 
 ## Alternativas consideradas
 

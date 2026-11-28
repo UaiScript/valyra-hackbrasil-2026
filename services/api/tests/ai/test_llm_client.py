@@ -775,3 +775,32 @@ def test_chave_openrouter_mascarada_e_aparada():
     assert config.openrouter_model_is_free
     assert "test-or" not in repr(config)
     assert not Settings(database_url="unused", _env_file=None).openrouter_fallback_enabled
+
+
+@pytest.mark.parametrize("status", [401, 503])
+def test_openrouter_erro_proprio_nao_bloqueia_openai(
+    settings, sdk, openai_sdk_http, payload, status
+):
+    _openrouter_key(settings)
+    _openai_key(settings)
+    sdk(_gemini_error(429))
+    fails = _fail_on("openrouter.ai", status, code="x")
+    state = openai_sdk_http(lambda request: fails(request) or openai_response(payload))
+    assert llm.call_llm(make_request(question="Explique")).provider == "openai"
+    # 401 é configuração da chave do OpenRouter, sem repetir; 5xx segue o teto de tentativas.
+    calls = 1 if status == 401 else settings.llm_max_attempts
+    assert _hosts(state) == ["openrouter.ai"] * calls + ["openai.test"]
+
+
+@pytest.mark.parametrize(
+    ("model", "free"),
+    [
+        ("openrouter/free", True),
+        ("google/gemma-4-26b-a4b-it:free", True),
+        ("vendor/modelo:freebie", False),
+        ("openrouter/auto", False),
+    ],
+)
+def test_openrouter_so_modelo_gratuito_conta_como_sem_custo(model, free):
+    config = Settings(database_url="unused", openrouter_model=model, _env_file=None)
+    assert config.openrouter_model_is_free is free

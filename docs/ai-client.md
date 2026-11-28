@@ -33,7 +33,9 @@ Com `OPENROUTER_API_KEY` (em https://openrouter.ai/settings/keys), o OpenRouter 
 depois do Groq e antes da OpenAI. `OPENROUTER_MODEL` (padrão `openrouter/free`) escolhe
 um modelo gratuito que aceite saída estruturada; um id terminado em `:free` fixa o
 modelo. Só modelos gratuitos recebem a chamada depois de erro de configuração do Gemini;
-outro modelo é tratado como pago. Sem créditos comprados, o plano gratuito permite 50
+outro modelo é tratado como pago e precisa de limite de crédito na própria chave do
+OpenRouter, porque o limite da OpenAI não o cobre. Modelos gratuitos podem registrar
+prompts: envie só dados sintéticos. Sem créditos comprados, o plano gratuito permite 50
 chamadas por dia; HTTP 402 (sem saldo) segue para o próximo provedor sem repetir.
 
 O modelo Gemini vem de `GEMINI_MODEL` (padrão `gemini-3.8-flash`). O Google
