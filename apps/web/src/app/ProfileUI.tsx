@@ -44,7 +44,7 @@ const Picker: FC<{ onDone?: () => void }> = ({ onDone }) => {
         <div>
           <span className="cx-eyebrow"><UserRoundCog size={14} aria-hidden="true" />Demonstração</span>
           <h2 id="cx-profiles-title">Para quem a Valyra vai trabalhar hoje?</h2>
-          <p className="app-muted">Escolha um perfil: a Central, o menu, a faixa do topo, o radar e as perguntas à IA se ajustam. Os dados sintéticos são os mesmos; muda o que vem primeiro.</p>
+          <p className="app-muted">Escolha um cliente: cada perfil já usa a Valyra há alguns meses, com extrato, orçamento e alertas próprios. A Central, o menu, a faixa do topo, o radar e as perguntas à IA se ajustam a ele. Dados sintéticos.</p>
         </div>
         {chosen && onDone && <button type="button" className="button button--ghost button--sm" onClick={onDone}>Fechar</button>}
       </header>

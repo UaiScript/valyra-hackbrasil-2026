@@ -114,7 +114,13 @@ function useNewAlertCount(route: AppRoute): number {
 }
 
 export default function FinanceApp() {
-  return <ProfileProvider><Shell /></ProfileProvider>;
+  return <ProfileProvider><ProfileShell /></ProfileProvider>;
+}
+
+/** Trocar de perfil é trocar de cliente: remontar descarta estado e dados do anterior. */
+function ProfileShell() {
+  const { profile } = useProfile();
+  return <Shell key={profile.id} />;
 }
 
 function Shell() {
@@ -201,7 +207,9 @@ function Shell() {
               ? 'Dados públicos do Banco Central, da brapi.dev e da Open-Meteo, com fonte e instante de coleta. Contexto econômico, não recomendação de investimento.'
               : route === 'news'
               ? 'Manchetes da Agência Brasil, do Banco Central e do IBGE, com fonte e data e link para a matéria original. Contexto, não recomendação de investimento.'
-              : 'Ambiente de demonstração: usuário demo e dados sintéticos, sem login. Todo número vem de um cálculo auditável da API.'}
+              : chosen
+                ? `Ambiente de demonstração: cliente fictício do perfil ${profile.name}, com extrato sintético, sem login. Todo número vem de um cálculo auditável da API.`
+                : 'Ambiente de demonstração: usuário demo e dados sintéticos, sem login. Todo número vem de um cálculo auditável da API.'}
           </p>
         </main>
       </div>

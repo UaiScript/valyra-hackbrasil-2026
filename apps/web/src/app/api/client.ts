@@ -54,13 +54,30 @@ function buildUrl(path: string, query?: Query): string {
   return `${BASE_URL}${path}${qs ? `?${qs}` : ''}`;
 }
 
+/*
+ * Perfil da demonstração: cada perfil é um cliente fictício com histórico próprio na API
+ * (core/demo_profiles.py). Sem perfil, a API usa o usuário demo padrão, o da importação ao vivo.
+ */
+const PROFILE_HEADER = 'X-Valyra-Profile';
+let demoProfile: string | null = null;
+
+/** Troca o cliente da demo; o cache é limpo para nenhuma tela mostrar dado do perfil anterior. */
+export function setApiProfile(profileId: string | null) {
+  if (profileId === demoProfile) return;
+  demoProfile = profileId;
+  clearApiCache();
+}
+
 async function send<T>(method: string, url: string, init: { json?: unknown; body?: BodyInit; signal?: AbortSignal }): Promise<T> {
   let response: Response;
+  const headers: Record<string, string> = {};
+  if (init.json !== undefined) headers['Content-Type'] = 'application/json';
+  if (demoProfile && !url.endsWith('/health')) headers[PROFILE_HEADER] = demoProfile;
   try {
     response = await fetch(url, {
       method,
       signal: init.signal,
-      headers: init.json !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      headers,
       body: init.json !== undefined ? JSON.stringify(init.json) : init.body,
     });
   } catch (error) {
@@ -120,15 +137,17 @@ async function request<T>(method: string, path: string, init: { query?: Query; j
   }
   // O indicador da API precisa de uma checagem real a cada vez: só compartilha o que está em voo.
   const cacheable = path !== '/health';
-  const hit = cacheable ? fresh.get(url) : undefined;
+  // A chave inclui o perfil: a mesma URL devolve dados de clientes diferentes.
+  const key = `${demoProfile ?? ''} ${url}`;
+  const hit = cacheable ? fresh.get(key) : undefined;
   if (hit && Date.now() - hit.at < FRESH_MS) return hit.data as T;
-  let shared = inflight.get(url) as Promise<T> | undefined;
+  let shared = inflight.get(key) as Promise<T> | undefined;
   if (!shared) {
     shared = send<T>('GET', url, {});
-    inflight.set(url, shared);
+    inflight.set(key, shared);
     shared.then(
-      (data) => { if (inflight.get(url) === shared) { inflight.delete(url); if (cacheable) fresh.set(url, { at: Date.now(), data }); } },
-      () => { if (inflight.get(url) === shared) inflight.delete(url); },
+      (data) => { if (inflight.get(key) === shared) { inflight.delete(key); if (cacheable) fresh.set(key, { at: Date.now(), data }); } },
+      () => { if (inflight.get(key) === shared) inflight.delete(key); },
     );
   }
   return withAbort(shared, init.signal);

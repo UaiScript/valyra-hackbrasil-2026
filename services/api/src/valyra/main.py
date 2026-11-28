@@ -8,6 +8,7 @@ from valyra.alerts.router import router as alerts_router
 from valyra.alpha.news_router import router as alpha_news_router
 from valyra.alpha.router import router as alpha_router
 from valyra.core.config import get_settings
+from valyra.core.demo_profiles import PROFILE_HEADER
 from valyra.core.errors import register_error_handlers
 from valyra.core.health import router as health_router
 from valyra.core.openapi import operation_id
@@ -21,7 +22,8 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=[settings.cors_origin],
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type"],
+        # O cabeçalho do perfil da demo dispara preflight; sem liberá-lo o navegador bloqueia.
+        allow_headers=["Content-Type", PROFILE_HEADER],
     )
     register_error_handlers(app)
     app.include_router(health_router)
