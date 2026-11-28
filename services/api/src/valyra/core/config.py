@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     # Configurável porque o Groq troca o catálogo de modelos abertos com frequência.
     groq_model: str = Field(default="openai/gpt-oss-120b", min_length=1)
     groq_base_url: str = Field(default="https://api.groq.com/openai/v1", min_length=1)
+    # Reserva de emergência depois do Groq (ADR-0015). O roteador openrouter/free escolhe
+    # um modelo gratuito que aceite saída estruturada, sobrevivendo à troca do catálogo.
+    openrouter_api_key: SecretStr = SecretStr("")
+    openrouter_model: str = Field(default="openrouter/free", min_length=1)
+    openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1", min_length=1)
     # Configurável porque o Google desativa versões do Gemini sem novo deploy de código:
     # trocar a variável no Render basta para seguir um modelo novo.
     gemini_model: str = Field(default="gemini-3.8-flash", min_length=1)
@@ -42,7 +47,9 @@ class Settings(BaseSettings):
     # Token gratuito da brapi (ADR-0012); vazio limita a coleta aos tickers liberados sem token.
     brapi_token: SecretStr = SecretStr("")
 
-    @field_validator("gemini_api_key", "openai_api_key", "groq_api_key", mode="before")
+    @field_validator(
+        "gemini_api_key", "openai_api_key", "groq_api_key", "openrouter_api_key", mode="before"
+    )
     @classmethod
     def _trim_key(cls, value: str | SecretStr) -> str:
         raw = value.get_secret_value() if isinstance(value, SecretStr) else value
@@ -56,6 +63,17 @@ class Settings(BaseSettings):
     @property
     def groq_fallback_enabled(self) -> bool:
         return bool(self.groq_api_key.get_secret_value())
+
+    @property
+    def openrouter_fallback_enabled(self) -> bool:
+        return bool(self.openrouter_api_key.get_secret_value())
+
+    @property
+    def openrouter_model_is_free(self) -> bool:
+        # Só modelos gratuitos contam como reserva sem custo; outro modelo é tratado como
+        # pago e respeita a mesma trava da OpenAI depois de erro de configuração do Gemini.
+        model = self.openrouter_model
+        return model == "openrouter/free" or model.endswith(":free")
 
     @property
     def openai_fallback_enabled(self) -> bool:

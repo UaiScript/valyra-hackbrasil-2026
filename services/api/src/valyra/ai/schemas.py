@@ -352,7 +352,7 @@ class LLMPayload(ContractModel):
 class LLMResponse(LLMPayload):
     """Metadados internos atribuídos pela aplicação; não é a resposta HTTP."""
 
-    provider: Literal["gemini", "groq", "openai"]
+    provider: Literal["gemini", "groq", "openrouter", "openai"]
     model: NonBlank
 
 
