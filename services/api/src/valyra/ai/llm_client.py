@@ -76,6 +76,9 @@ Sem evidências, explique apenas a insuficiência de informação, sem números 
 Dados Micro e Macro simultâneos não demonstram causa e efeito. Mesmo com valores e fontes
 corretos, não diga que clima, safra ou um sinal macro causou o gasto/saldo de uma pessoa.
 Não atribua probabilidade a scores heurísticos, nem faça recomendações de investimento.
+Oscilação estimada mede amplitude de risco, nunca probabilidade de alta ou queda.
+Ao citar modelos ou ações, use nomes por extenso ("modelo de mercado", "modelo com clima",
+"ação acompanhada"), nunca tickers da bolsa ou códigos alfanuméricos com dígitos.
 """
 
 

@@ -317,8 +317,22 @@ def _finance_context(
         as_of=as_of,
         built_at=built_at,
         evidences=evidences,
-        limitations=list(dict.fromkeys(limitations)),
+        limitations=_cap_limitations(limitations),
     )
+
+
+def _cap_limitations(entries: Sequence[str]) -> list[str]:
+    """Deduplica e mantém até 20 itens (teto do contrato), concatenando excedentes sem perda."""
+    merged: list[str] = []
+    for message in dict.fromkeys(entries):
+        if len(merged) < 20:
+            merged.append(message)
+            continue
+        for i in range(len(merged) - 1, -1, -1):
+            if len(merged[i]) + len(message) + 1 <= 2000:
+                merged[i] = f"{merged[i]} {message}"
+                break
+    return merged
 
 
 def _transaction_label(transaction: object, category: object) -> str:
@@ -346,6 +360,75 @@ def _alpha_evidences(
     """Indicadores Alpha publicados até o corte, com procedência completa (ADR-0011/0012)."""
     radar = alpha_service.get_radar(session, as_of)
     items: list[EvidenceItem] = []
+    model = radar.soy_volatility
+    if model.status == "insufficient_data":
+        if radar.indicators:
+            limitations.append(
+                "Estudo de oscilação da cadeia da soja sem histórico alinhado "
+                "suficiente até o corte."
+            )
+    elif radar.model_record_ids:
+        limitations.append(
+            "Estudo de oscilação da cadeia da soja: janela curta experimental; mede amplitude "
+            "de risco, não probabilidade de alta/queda nem recomendação."
+        )
+        if any("não superou" in item for item in model.limitations):
+            limitations.append(
+                "O modelo com clima não superou o modelo de mercado no erro "
+                "walk-forward desta janela."
+            )
+        # A síntese não pode fazer uma reconstituição parecer um backtest ao vivo.
+        for warning in model.limitations:
+            if "Publicações estimadas" in warning:
+                limitations.append(warning)
+        cutoff_day = as_of.astimezone(_BUSINESS_ZONE).date()
+        span = {"start": model.first_observation_date, "end": model.last_observation_date}
+        for key, value, unit, basis in (
+            ("m1_5d", model.m1_forecast_pct, "%", "projected"),
+            ("m0_5d", model.m0_forecast_pct, "%", "projected"),
+            ("mae_m1", model.mae_m1_pp, "pp", "observed"),
+            ("mae_m0", model.mae_m0_pp, "pp", "observed"),
+        ):
+            if (
+                basis == "projected"
+                and model.last_observation_date + timedelta(days=7) <= cutoff_day
+            ):
+                limitations.append("Estimativa da soja defasada: horizonte projetado já passou.")
+                continue
+            items.append(
+                EvidenceItem(
+                    evidence_id=f"soy_{key}",
+                    metric_key=f"alpha.volatility.slce3.{key}",
+                    label={
+                        "m1_5d": "Oscilação estimada pelo modelo com clima",
+                        "m0_5d": "Oscilação estimada pelo modelo de mercado",
+                        "mae_m1": "Erro walk-forward do modelo com clima",
+                        "mae_m0": "Erro walk-forward do modelo de mercado",
+                    }[key],
+                    basis=basis,
+                    source={
+                        "kind": "calculation",
+                        "module": "alpha",
+                        "method_key": "alpha.soy_volatility_ridge",
+                        "method_version": "adr-0014-v1",
+                        "computed_at": as_of,
+                        "input_scope": {
+                            "account_id": None,
+                            "period": span,
+                            "record_ids": radar.model_record_ids,
+                        },
+                    },
+                    value=DecimalValue(value_decimal=value, unit=unit),
+                    period=(
+                        {
+                            "start": cutoff_day + timedelta(days=1),
+                            "end": cutoff_day + timedelta(days=7),
+                        }
+                        if basis == "projected"
+                        else span
+                    ),
+                )
+            )
     # Último ponto de todas as séries antes dos anteriores: se faltar espaço, sai o histórico.
     ranked = [
         (view, point)
@@ -384,7 +467,7 @@ def _alpha_evidences(
         items = items[: max(room, 0)]
     if items:
         limitations.append(_ALPHA_NOT_CAUSE)
-        if any(item.source.published_at_estimated for item in items):
+        if any(getattr(item.source, "published_at_estimated", False) for item in items):
             limitations.append(_ALPHA_ESTIMATED)
     else:
         limitations.append(_NO_ALPHA)

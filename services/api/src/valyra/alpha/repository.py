@@ -62,3 +62,19 @@ def list_visible(
         .limit(limit)
     )
     return [(signal, source) for signal, source in rows]
+
+
+def list_model_revisions(
+    session: Session, prefix: str, as_of: datetime, limit: int
+) -> list[Signal]:
+    """Revisões dos últimos pontos: correções tardias não reescrevem features passadas."""
+    keys = [row.signal_key for row, _ in list_visible(session, prefix, as_of, limit)]
+    if not keys:
+        return []
+    return list(
+        session.scalars(
+            select(Signal)
+            .where(Signal.signal_key.in_(keys), Signal.published_at <= as_of)
+            .order_by(Signal.observation_date, Signal.published_at, Signal.revision_id)
+        )
+    )

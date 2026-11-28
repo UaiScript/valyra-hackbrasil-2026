@@ -159,3 +159,20 @@ ou `make test` com `TEST_DATABASE_URL` dedicado para incluir a integração.
 A validação lexical não comprova causalidade ou associação semântica entre frase
 e métrica. Os limites e exemplos de avaliação permanecem em
 [ai-validation.md](ai-validation.md).
+
+### Estudo de oscilação da soja (ADR-0014)
+
+O radar fornece `soy_volatility_ridge_v1`: M0 usa mercado e M1 acrescenta o módulo
+absoluto da anomalia hídrica de Sorriso-MT, para a oscilação de cinco pregões de
+SLCE3. O domínio usa Decimal, Ridge com intercepto livre e lambda=1, avaliação
+walk-forward com treino expansivo e purge gap de cinco pregões. Retornos e revisões
+posteriores ao instante de cada feature não reescrevem seu passado. A carga
+histórica traz publicações estimadas e não constitui um backtest ao vivo.
+
+Com dados suficientes, IA recebe `alpha.volatility.slce3.m1_5d` e `m0_5d` em `%`,
+mais `mae_m1` e `mae_m0` em `pp`, como cálculos Alpha com UUIDs reais dos sinais de
+entrada. As projeções têm período futuro no corte do servidor e são omitidas
+quando a referência estiver defasada além do horizonte. MAEs continuam observados.
+Sem histórico suficiente há limitação explícita, sem estimativa zero. O modelo não
+usa manchetes como regressoras e não estima direção ou probabilidade de retorno.
+M1 com MAE igual ou pior que M0 é reportado com limitação, sem esconder o resultado.

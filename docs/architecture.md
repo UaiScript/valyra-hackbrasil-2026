@@ -58,3 +58,24 @@ A landing não depende da API; a aplicação em #/app é carregada sob demanda e
 - [Registro da migração/seed](revisao-modelagem.md).
 
 Hospedagem, configuração do limite externo para fallback LLM, licença de cotações e precisão monetária Alpha e persistência de falhas de importação continuam pendências registradas. Não inferir aprovação de todo o desenho a partir das ADRs específicas.
+
+## Estudo preditivo da cadeia da soja
+
+A [ADR-0014](adr/0014-modelo-oscilacao-soja.md) implementa
+`soy_volatility_ridge_v1` em `alpha/domain.py`, sem dependências numéricas externas:
+oscilação realizada de cinco pregões de SLCE3, baseline M0 de mercado e M1 com
+estresse hídrico de Sorriso-MT. O radar carrega até noventa observações das duas
+séries, preservando revisões para as features históricas, e mantém trinta pontos
+nos gráficos. HTTP expõe `soy_volatility`; o painel compara estimativas,
+contribuições, pesos e erros walk-forward com purge gap. Não estima direção do preço.
+
+A ingestão com `--backfill-days 90` busca três meses de fechamentos ajustados na
+brapi e reconstrói até noventa dias de clima com duas chamadas por região. Sem
+`BRAPI_TOKEN`, SLCE3 é ignorada sem warning; o estudo degrada para
+`insufficient_data`. O token fica no ambiente da coleta, nunca em URLs persistidas.
+O cálculo na API usa somente sinais persistidos, sem rede nem nova migração.
+Configurar chave e executar a carga externa continua responsabilidade operacional;
+os testes usam dados sintéticos e HTTP simulado.
+
+Referências dos adaptadores: [brapi ações](https://brapi.dev/docs/acoes) e
+[Open-Meteo](https://open-meteo.com/en/docs).

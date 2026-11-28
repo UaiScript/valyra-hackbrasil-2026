@@ -29,6 +29,35 @@ export function localToIso(local: string): string | undefined {
 type Theme = IndicatorOut['theme'];
 type Filter = Theme | 'todos';
 
+const SoyStudy: FC<{ r: RadarOut }> = ({ r }) => {
+  const model = r.soy_volatility;
+  return <Card title="Oscilação Estimada · Cadeia da Soja (SLCE3 × Clima MT)">
+    {!model || model.status === 'insufficient_data' ? <div role="status">
+      <p>{model?.reason ?? 'Aguardando carga histórica de SLCE3 e clima de Sorriso-MT.'}</p>
+      <p className="app-muted">São necessários histórico de mercado, clima alinhado e janelas completas de treino e avaliação.</p>
+      {model && <p>Pregões: {model.stock_points} · Clima: {model.climate_points} · Treino: {model.train_windows} · Avaliação: {model.eval_windows}</p>}
+    </div> : <div className="app-stack soy-study">
+      <p><b>M1 mercado + clima: {formatDecimal(model.m1_forecast_pct!)} %</b> · M0 mercado: {formatDecimal(model.m0_forecast_pct!)} %</p>
+      <p>Horizonte de {model.horizon_days} pregões a partir da referência · Regime <strong className={`cx-basis soy-study__regime--${model.regime}`}>{model.regime}</strong> · Referência {formatIsoDate(model.last_observation_date!)}</p>
+      <div className="soy-study__factors">
+        {([
+          ['Base', model.intercept_pct], ['Inércia do mercado', model.market_persistence_pct],
+          ['Choque diário', model.daily_shock_pct], ['Anomalia hídrica · Sorriso-MT', model.climate_component_pct],
+          ['Ajuste de truncamento/arredondamento', model.truncation_adjustment_pct],
+        ] as const).map(([label, value]) => <div key={label}>
+          <span>{label}</span><strong>{formatDecimal(value ?? '0')} %</strong>
+          <div className="soy-study__track"><span style={{ width: `${Math.min(100, Math.abs(Number(value ?? '0')) / Math.max(1, ...[model.intercept_pct, model.market_persistence_pct, model.daily_shock_pct, model.climate_component_pct].map(v => Math.abs(Number(v ?? '0')))) * 100)}%` }} /></div>
+        </div>)}
+      </div>
+      <details><summary>Pesos auditáveis do M1</summary><ul>{Object.entries(model.weights ?? {}).map(([key, value]) => <li key={key}>{key}: {formatDecimal(String(value))}</li>)}</ul></details>
+      <p>Walk-forward · {model.eval_windows} janelas · Treino {model.train_windows} janelas</p>
+      <p>MAE M1: {formatDecimal(model.mae_m1_pp!)} pp · MAE M0: {formatDecimal(model.mae_m0_pp!)} pp</p>
+      <a className="app-link" href={askHref('Explique o estudo de oscilação da cadeia da soja com o clima de Sorriso: compare o modelo com clima e o modelo de mercado e seus erros walk-forward, sem prever direção do preço.')}>Explicar com Valyra AI</a>
+    </div>}
+    <ul className="app-muted">{(model?.limitations ?? ['Oscilação não é probabilidade de alta/queda nem recomendação.']).map(l => <li key={l}>{l}</li>)}</ul>
+  </Card>;
+};
+
 const THEMES: { id: Filter; label: string; Icon: typeof Landmark }[] = [
   { id: 'todos', label: 'Tudo', Icon: RadarIcon },
   { id: 'juros', label: 'Juros', Icon: Landmark },
@@ -387,6 +416,7 @@ const Board: FC<{ r: RadarOut }> = ({ r }) => {
 
       <div className="ax-layout">
         <div className="ax-main">
+          {(filter === "todos" || filter === "acoes" || filter === "clima") && <SoyStudy r={r} />}
           {r.indicators.length === 0 && <Empty>Nenhum indicador coletado até {formatInstant(r.as_of)}. A coleta roda de hora em hora no pregão e o clima, uma vez por dia.</Empty>}
           {macro.length > 0 && (
             <Card title="Juros e inflação · Banco Central">
@@ -436,7 +466,7 @@ export const Alpha: FC = () => {
           <span className="ax-intro__eyebrow"><RadarIcon size={14} aria-hidden="true" />Radar econômico</span>
           <h2>O contexto da economia, com origem e data</h2>
           <p className="app-muted">
-            Juros e inflação do Banco Central, o movimento de quatro ações da B3 e a chuva em regiões produtoras de alimentos.
+            Juros e inflação do Banco Central, o movimento das ações acompanhadas na B3 e a chuva em regiões produtoras de alimentos.
             É contexto para entender o cenário: não é recomendação de investimento e não explica, sozinho, os seus gastos.
           </p>
         </div>

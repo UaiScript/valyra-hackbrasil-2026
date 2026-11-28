@@ -165,3 +165,71 @@ def test_clima_gera_chuva_anomalia_sinal_e_status_da_fonte(client, db_session, t
     assert dry[0]["limitations"] and dry[0]["evidence_keys"]
     [status] = radar["sources"]
     assert status["source"]["slug"] == "open-meteo" and status["series_count"] == 6
+
+
+def test_radar_modelo_carrega_90_pontos_mas_grafico_mantem_30(
+    client, db_session, reference_rows, app, monkeypatch
+):
+    from tests.alpha.test_soy_volatility import histories
+    from valyra.alpha.domain import CLIMATE_SERIES, STOCK_SERIES
+    from valyra.alpha.service import record_observation
+
+    stocks, rain, cut = histories()
+    stock = next(s for s in STOCK_SERIES if s.ticker == "SLCE3")
+    climate = next(s for s in CLIMATE_SERIES if s.key == "openmeteo:sorriso-mt:rain_30d_anomaly")
+    for series, points in ((stock, stocks), (climate, rain)):
+        for point in points:
+            record_observation(
+                db_session,
+                series,
+                point.observation_date,
+                point.value,
+                ingested_at=point.published_at,
+                source_url="https://example.org/public",
+            )
+    db_session.commit()
+    response = client.get("/api/v1/alpha/radar", params={"as_of": cut.isoformat()})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    model = body["soy_volatility"]
+    assert model["status"] == "ready"
+    assert model["stock_points"] == 85 and model["eval_windows"] >= 5
+    assert isinstance(model["m1_forecast_pct"], str)
+    assert all(len(item["history"]) == 30 for item in body["indicators"])
+
+    from valyra.ai import llm_client
+    from valyra.ai import service as ai_service
+    from valyra.ai.schemas import LLMPayload
+    from valyra.core.deps import get_current_user_id
+
+    actual = ai_service.explain_for_account
+    app.dependency_overrides[get_current_user_id] = lambda: reference_rows["user"].id
+    monkeypatch.setattr(
+        ai_service,
+        "explain_for_account",
+        lambda session, uid, body: actual(session, uid, body, clock=lambda: cut),
+    )
+
+    def reply(sent):
+        item = next(e for e in sent.context_data.evidences if e.evidence_id == "soy_m1_5d")
+        assert item.source.input_scope.record_ids
+        return LLMPayload(
+            answer=f"Oscilação estimada: {item.display_value}.",
+            evidence_ids=[item.evidence_id],
+            uncertainty="alta",
+            limitations=[],
+        )
+
+    monkeypatch.setattr(llm_client, "call_llm", reply)
+    explained = client.post(
+        "/api/v1/ai/explain",
+        json={
+            "question": "Explique o estudo de SLCE3",
+            "account_id": str(reference_rows["account"].id),
+        },
+    )
+    assert explained.status_code == 200, explained.text
+    item = explained.json()["evidences"][0]
+    assert item["source"]["module"] == "alpha"
+    assert item["source"]["input_scope"]["record_ids"]
+    assert item["value"]["value_decimal"] == model["m1_forecast_pct"]

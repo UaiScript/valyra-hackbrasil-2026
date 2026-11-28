@@ -10,10 +10,14 @@ from sqlalchemy.orm import Session
 from valyra.alpha import repository
 from valyra.alpha.domain import (
     ALL_SERIES,
+    MODEL_CLIMATE_KEY,
+    MODEL_STOCK_KEY,
     SGS_SERIES,
     DerivedSignal,
     Series,
+    SoyVolatility,
     climate_signal,
+    estimate_soy_volatility,
     estimated_publication,
     format_decimal,
     ipca_signal,
@@ -42,6 +46,7 @@ SOURCES = {
 }
 # Histórico curto basta para o radar e mantém a leitura barata no plano gratuito do banco.
 HISTORY_POINTS = 30
+MODEL_HISTORY_POINTS = 90
 
 
 def _source(session: Session, slug: str) -> Source:
@@ -143,6 +148,8 @@ class Radar:
     signals: list[DerivedSignal]
     last_ingested_at: datetime | None
     sources: list[SourceStatus] = field(default_factory=list)
+    soy_volatility: SoyVolatility = field(default_factory=SoyVolatility)
+    model_record_ids: list[UUID] = field(default_factory=list)
 
 
 def get_radar(session: Session, as_of: datetime) -> Radar:
@@ -189,13 +196,27 @@ def get_radar(session: Session, as_of: datetime) -> Radar:
             derived = None
         if derived is not None:
             signals.append(derived)
+    model_rows = {
+        key: repository.list_model_revisions(session, key, as_of, MODEL_HISTORY_POINTS)
+        for key in (MODEL_STOCK_KEY, MODEL_CLIMATE_KEY)
+    }
     signals.sort(key=lambda s: s.observation_date, reverse=True)
+    model = estimate_soy_volatility(
+        model_rows.get(MODEL_STOCK_KEY, []), model_rows.get(MODEL_CLIMATE_KEY, []), as_of
+    )
     return Radar(
         as_of=as_of,
         indicators=indicators,
         signals=signals,
         last_ingested_at=last,
         sources=_source_statuses(indicators, as_of),
+        soy_volatility=model,
+        model_record_ids=[
+            s.id
+            for rows in model_rows.values()
+            for s in rows
+            if s.signal_key in model.evidence_keys
+        ],
     )
 
 

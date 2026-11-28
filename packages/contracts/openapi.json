@@ -1758,6 +1758,9 @@
             },
             "title": "Sources",
             "type": "array"
+          },
+          "soy_volatility": {
+            "$ref": "#/components/schemas/SoyVolatilityOut"
           }
         },
         "required": [
@@ -1765,7 +1768,8 @@
           "last_ingested_at",
           "indicators",
           "signals",
-          "sources"
+          "sources",
+          "soy_volatility"
         ],
         "title": "RadarOut",
         "type": "object"
@@ -1849,6 +1853,253 @@
           "series_count"
         ],
         "title": "SourceStatusOut",
+        "type": "object"
+      },
+      "SoyVolatilityOut": {
+        "properties": {
+          "asset": {
+            "default": "SLCE3",
+            "title": "Asset",
+            "type": "string"
+          },
+          "climate_component_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Climate Component Pct"
+          },
+          "climate_points": {
+            "default": 0,
+            "title": "Climate Points",
+            "type": "integer"
+          },
+          "daily_shock_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Shock Pct"
+          },
+          "eval_windows": {
+            "default": 0,
+            "title": "Eval Windows",
+            "type": "integer"
+          },
+          "evidence_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Keys",
+            "type": "array"
+          },
+          "first_observation_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Observation Date"
+          },
+          "horizon_days": {
+            "default": 5,
+            "title": "Horizon Days",
+            "type": "integer"
+          },
+          "intercept_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intercept Pct"
+          },
+          "last_observation_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Observation Date"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "m0_forecast_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "M0 Forecast Pct"
+          },
+          "m1_forecast_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "M1 Forecast Pct"
+          },
+          "mae_m0_pp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mae M0 Pp"
+          },
+          "mae_m1_pp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mae M1 Pp"
+          },
+          "market_persistence_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Persistence Pct"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "recent_rv_5d_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recent Rv 5D Pct"
+          },
+          "regime": {
+            "anyOf": [
+              {
+                "enum": [
+                  "normal",
+                  "elevada"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regime"
+          },
+          "region": {
+            "default": "sorriso-mt",
+            "title": "Region",
+            "type": "string"
+          },
+          "rule": {
+            "default": "soy_volatility_ridge_v1",
+            "title": "Rule",
+            "type": "string"
+          },
+          "sorriso_rain_anomaly_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sorriso Rain Anomaly Pct"
+          },
+          "status": {
+            "default": "insufficient_data",
+            "enum": [
+              "ready",
+              "insufficient_data"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_points": {
+            "default": 0,
+            "title": "Stock Points",
+            "type": "integer"
+          },
+          "train_windows": {
+            "default": 0,
+            "title": "Train Windows",
+            "type": "integer"
+          },
+          "truncation_adjustment_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Truncation Adjustment Pct"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Weights",
+            "type": "object"
+          }
+        },
+        "title": "SoyVolatilityOut",
         "type": "object"
       },
       "SummaryOut": {

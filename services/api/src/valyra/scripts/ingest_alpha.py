@@ -5,8 +5,8 @@ Uso: python -m valyra.scripts.ingest_alpha [--sources bcb,brapi,clima] [--backfi
 Sem `--backfill-days`, lê os últimos 20 pontos de cada série (limite do SGS) e grava
 como publicação o instante da coleta. Com ele, carrega o histórico usando publicação
 reconstituída e marcada como estimada. Cada série é gravada na própria transação: uma
-fonte fora do ar não descarta o que as outras trouxeram. O clima não tem carga histórica:
-cada coleta grava a chuva dos últimos 30 dias e a comparação com os 10 anos anteriores.
+fonte fora do ar não descarta o que as outras trouxeram. Clima reconstrói até 90 dias
+e brapi consulta três meses de fechamentos ajustados na carga histórica.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 from functools import partial
 
 import httpx
@@ -100,10 +100,15 @@ def fetch_sgs(
     return found
 
 
-def fetch_brapi(client: httpx.Client, series: Series, *, token: str) -> list[Observation]:
+def fetch_brapi(
+    client: httpx.Client, series: Series, *, token: str, backfill_days: int | None = None
+) -> list[Observation]:
     assert series.ticker is not None
     url = BRAPI_URL.format(ticker=series.ticker)
-    response = client.get(url, params={"token": token} if token else None)
+    params = {"token": token.strip()} if token.strip() else {}
+    if backfill_days is not None:
+        params.update(range="3mo", interval="1d")
+    response = client.get(url, params=params or None)
     response.raise_for_status()
     # parse_float=Decimal: a variação nunca passa por float.
     body = response.json(parse_float=Decimal)
@@ -111,6 +116,48 @@ def fetch_brapi(client: httpx.Client, series: Series, *, token: str) -> list[Obs
     if not isinstance(results, list) or not results or not isinstance(results[0], dict):
         raise SgsFormatError("resposta da brapi sem resultados")
     quote = results[0]
+    if backfill_days is not None:
+        data = quote.get("data")
+        history = quote.get("historicalDataPrice")
+        if history is None and isinstance(data, dict):
+            history = data.get("historicalDataPrice")
+        if not isinstance(history, list):
+            raise SgsFormatError("histórico da brapi ausente")
+        closes = {}
+        for row in history:
+            if not isinstance(row, dict):
+                raise SgsFormatError("registro histórico inválido")
+            epoch = row.get("date")
+            if not isinstance(epoch, int) or isinstance(epoch, bool):
+                raise SgsFormatError("data histórica da brapi inválida")
+            day = (
+                (datetime(1970, 1, 1, tzinfo=UTC) + timedelta(seconds=epoch))
+                .astimezone(BUSINESS_ZONE)
+                .date()
+            )
+            close = None
+            for field in ("adjustedClose", "close"):
+                raw = row.get(field)
+                if isinstance(raw, (int, Decimal)) and not isinstance(raw, bool):
+                    value = Decimal(raw)
+                    if value.is_finite() and value > 0:
+                        close = value
+                        break
+            if close is None:
+                raise SgsFormatError("fechamento histórico inválido")
+            closes[day] = close
+        points = sorted(closes.items())
+        return [
+            Observation(
+                series,
+                day,
+                ((value - before) / before * 100).quantize(
+                    Decimal("0.0001"), rounding=ROUND_HALF_EVEN
+                ),
+                url,
+            )
+            for (_, before), (day, value) in zip(points, points[1:], strict=False)
+        ]
     raw_time = str(quote.get("regularMarketTime", ""))
     try:
         moment = datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
@@ -150,36 +197,51 @@ def _coordinates(region: Region) -> dict[str, str]:
     }
 
 
-def fetch_climate(client: httpx.Client, region: Region, *, today: date) -> list[Observation]:
-    """Chuva de 30 dias até ontem e anomalia contra a mesma janela nos 10 anos anteriores."""
+def fetch_climate(
+    client: httpx.Client, region: Region, *, today: date, backfill_days: int | None = None
+) -> list[Observation]:
+    """Duas chamadas por região; o arquivo completa os dias mais antigos da janela."""
     end = today - timedelta(days=1)
-    # O arquivo histórico (ERA5) chega com dias de atraso; a janela recente vem do
-    # endpoint de previsão, que também devolve dias passados.
+    count = min(backfill_days, 90) if backfill_days is not None else 1
     recent = client.get(
         FORECAST_URL,
-        params=_coordinates(region) | {"past_days": RAIN_WINDOW_DAYS + 1, "forecast_days": 1},
+        params=_coordinates(region)
+        | {
+            "past_days": 92 if backfill_days is not None else RAIN_WINDOW_DAYS + 1,
+            "forecast_days": 1,
+        },
     )
     recent.raise_for_status()
-    start = end.replace(year=end.year - NORMAL_YEARS) - timedelta(days=RAIN_WINDOW_DAYS + 1)
+    try:
+        old = today.replace(year=today.year - NORMAL_YEARS)
+    except ValueError:
+        old = today.replace(year=today.year - NORMAL_YEARS, day=28)
+    start = old - timedelta(days=150)
     archive = client.get(
         ARCHIVE_URL,
         params=_coordinates(region)
-        | {"start_date": start.isoformat(), "end_date": end.replace(year=end.year - 1).isoformat()},
+        | {
+            "start_date": start.isoformat(),
+            "end_date": (today - timedelta(days=2)).isoformat(),
+        },
     )
     archive.raise_for_status()
-    reading = rain_reading(
-        _daily_rain(recent.json(parse_float=Decimal)),
-        _daily_rain(archive.json(parse_float=Decimal)),
-        end,
-    )
-    if reading is None:
-        raise SgsFormatError("janela de chuva incompleta")
+    history = _daily_rain(archive.json(parse_float=Decimal))
+    daily = history | _daily_rain(recent.json(parse_float=Decimal))
     rain_series, anomaly_series = climate_pair(region)
-    url = str(recent.request.url)
-    found = [Observation(rain_series, end, reading.total_mm, url)]
-    if reading.anomaly_pct is not None:
-        archive_url = str(archive.request.url)
-        found.append(Observation(anomaly_series, end, reading.anomaly_pct, archive_url))
+    found = []
+    for offset in reversed(range(count)):
+        day = end - timedelta(days=offset)
+        reading = rain_reading(daily, history, day)
+        if reading is None:
+            continue
+        found.append(Observation(rain_series, day, reading.total_mm, str(recent.request.url)))
+        if reading.anomaly_pct is not None:
+            found.append(
+                Observation(anomaly_series, day, reading.anomaly_pct, str(archive.request.url))
+            )
+    if not found:
+        raise SgsFormatError("janela de chuva incompleta")
     return found
 
 
@@ -207,11 +269,23 @@ def ingest(
             )
     if "brapi" in sources:
         for series in STOCK_SERIES:
-            tasks.append(((series,), partial(fetch_brapi, client, series, token=token)))
+            if series.requires_token and not token.strip():
+                continue
+            tasks.append(
+                (
+                    (series,),
+                    partial(fetch_brapi, client, series, token=token, backfill_days=backfill_days),
+                )
+            )
     if "clima" in sources:
         for region in REGIONS:
             tasks.append(
-                (climate_pair(region), partial(fetch_climate, client, region, today=today))
+                (
+                    climate_pair(region),
+                    partial(
+                        fetch_climate, client, region, today=today, backfill_days=backfill_days
+                    ),
+                )
             )
     for group, fetch in tasks:
         try:
@@ -233,7 +307,13 @@ def ingest(
                         item.value,
                         ingested_at=ingested_at,
                         source_url=item.source_url,
-                        backfill=backfill_days is not None and item.series.theme != "clima",
+                        backfill=(
+                            backfill_days is not None
+                            and (
+                                item.series.theme != "clima"
+                                or item.observation_date < today - timedelta(days=1)
+                            )
+                        ),
                     )
                 session.commit()
             except BaseException:

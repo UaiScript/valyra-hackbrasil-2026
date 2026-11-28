@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SourceOut(BaseModel):
@@ -73,6 +73,36 @@ class SourceStatusOut(BaseModel):
     series_count: int
 
 
+class SoyVolatilityOut(BaseModel):
+    status: Literal["ready", "insufficient_data"] = "insufficient_data"
+    reason: str | None = None
+    rule: str = "soy_volatility_ridge_v1"
+    asset: str = "SLCE3"
+    region: str = "sorriso-mt"
+    horizon_days: int = 5
+    stock_points: int = 0
+    climate_points: int = 0
+    train_windows: int = 0
+    eval_windows: int = 0
+    first_observation_date: date | None = None
+    last_observation_date: date | None = None
+    m0_forecast_pct: str | None = None
+    m1_forecast_pct: str | None = None
+    intercept_pct: str | None = None
+    market_persistence_pct: str | None = None
+    daily_shock_pct: str | None = None
+    climate_component_pct: str | None = None
+    truncation_adjustment_pct: str | None = None
+    recent_rv_5d_pct: str | None = None
+    sorriso_rain_anomaly_pct: str | None = None
+    mae_m0_pp: str | None = None
+    mae_m1_pp: str | None = None
+    regime: Literal["normal", "elevada"] | None = None
+    weights: dict[str, str] = Field(default_factory=dict)
+    evidence_keys: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+
+
 class RadarOut(BaseModel):
     """Radar econômico no corte `as_of`: só revisões publicadas até esse instante."""
 
@@ -81,3 +111,5 @@ class RadarOut(BaseModel):
     indicators: list[IndicatorOut]
     signals: list[DerivedSignalOut]
     sources: list[SourceStatusOut]
+
+    soy_volatility: SoyVolatilityOut

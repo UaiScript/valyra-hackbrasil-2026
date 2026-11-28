@@ -677,3 +677,32 @@ test('menu lateral expande com os nomes e lembra a escolha', async ({ page, isMo
   await expect(page.getByRole('button', { name: 'Recolher menu' })).toHaveAttribute('aria-pressed', 'true');
   await expect(label).toBeInViewport();
 });
+
+test('radar da soja apresenta insuficiência e estudo pronto com baseline e limitações', async ({ page }) => {
+  await mockApi(page);
+  let ready = false;
+  await page.route('**/api/v1/alpha/radar**', route => json(route, { ...RADAR,
+    soy_volatility: ready ? {
+      status: 'ready', rule: 'soy_volatility_ridge_v1', asset: 'SLCE3', region: 'sorriso-mt',
+      horizon_days: 5, last_observation_date: '2026-11-26', train_windows: 40, eval_windows: 20,
+      m0_forecast_pct: '3.1000', m1_forecast_pct: '3.4000', regime: 'elevada',
+      intercept_pct: '1.0000', market_persistence_pct: '1.0000', daily_shock_pct: '0.4000',
+      climate_component_pct: '1.0000', truncation_adjustment_pct: '0.0000',
+      weights: { intercept: '1.0000', market_persistence: '0.5000', daily_shock: '0.2000', climate: '2.0000' },
+      mae_m0_pp: '0.5000', mae_m1_pp: '0.6000',
+      limitations: ['M1 não superou o baseline M0 no MAE walk-forward desta janela.'],
+    } : { status: 'insufficient_data', reason: 'Falta histórico de SLCE3 ou clima de Sorriso-MT.',
+          stock_points: 0, climate_points: 0, train_windows: 0, eval_windows: 0, limitations: [] },
+  }));
+  await page.goto('/#/app/alpha');
+  await page.getByRole('button', { name: /^Tudo/ }).click();
+  await expect(page.getByText('Falta histórico de SLCE3 ou clima de Sorriso-MT.')).toBeVisible();
+  ready = true;
+  await page.reload();
+  await page.getByRole('button', { name: /^Tudo/ }).click();
+  await expect(page.getByText('M1 mercado + clima:', { exact: false })).toBeVisible();
+  await expect(page.getByText('MAE M1:', { exact: false })).toContainText('0,6000 pp');
+  await expect(page.getByText('M1 não superou o baseline M0', { exact: false })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Explicar com Valyra AI' })).toHaveAttribute('href', /valyra-ai\?q=/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

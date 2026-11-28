@@ -317,3 +317,51 @@ def test_openapi_expoe_contrato_publico_e_envelope_real(app):
         assert operation["responses"][status]["content"]["application/json"]["schema"] == {
             "$ref": "#/components/schemas/ErrorResponse"
         }
+
+
+def test_http_expoe_calculos_soja_com_procedencia_e_periodo_futuro(stack, monkeypatch):
+    from dataclasses import replace
+
+    from valyra.alpha.domain import SoyVolatility
+
+    now = datetime.now(UTC)
+    model = SoyVolatility(
+        status="ready",
+        first_observation_date=date(2026, 8, 1),
+        last_observation_date=now.date(),
+        m0_forecast_pct="2.0000",
+        m1_forecast_pct="3.0000",
+        mae_m0_pp="1.0000",
+        mae_m1_pp="0.5000",
+        limitations=tuple(f"Limitação detalhada da tela {i}." for i in range(12))
+        + (
+            "M1 não superou o baseline M0 no MAE walk-forward desta janela.",
+            "Publicações estimadas: avaliação histórica reconstituída, não backtest ao vivo.",
+        ),
+    )
+    signal_id = UUID("00000000-0000-0000-0000-000000000701")
+    radar = replace(EMPTY_RADAR, soy_volatility=model, model_record_ids=[signal_id])
+    monkeypatch.setattr(service.alpha_service, "get_radar", lambda *_: radar)
+
+    def reply(sent):
+        items = {e.evidence_id: e for e in sent.context_data.evidences}
+        assert {"soy_m1_5d", "soy_m0_5d", "soy_mae_m1", "soy_mae_m0"} <= items.keys()
+        assert len(sent.context_data.limitations) <= 20
+        assert any("Publicações estimadas" in t for t in sent.context_data.limitations)
+        assert any("não superou o modelo de mercado" in t for t in sent.context_data.limitations)
+        item = items["soy_m1_5d"]
+        assert item.source.module == "alpha"
+        assert item.source.input_scope.account_id is None
+        assert item.source.input_scope.record_ids == [signal_id]
+        assert item.period.start > sent.context_data.as_of.astimezone(service._BUSINESS_ZONE).date()
+        return LLMPayload(
+            answer=f"Oscilação estimada: {item.display_value}.",
+            evidence_ids=[item.evidence_id],
+            uncertainty="alta",
+            limitations=[],
+        )
+
+    stack.llm.side_effect = reply
+    response = stack.http.post(URL, json=BODY)
+    assert response.status_code == 200, response.text
+    assert response.json()["evidences"][0]["value"]["value_decimal"] == "3.0000"

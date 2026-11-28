@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation, localcontext
 from typing import Literal, Protocol
 from zoneinfo import ZoneInfo
 
@@ -35,6 +35,7 @@ class Series:
     sgs_code: int | None = None
     ticker: str | None = None
     region: Region | None = None
+    requires_token: bool = False
 
 
 SGS_SERIES: tuple[Series, ...] = (
@@ -89,8 +90,9 @@ STOCK_SERIES: tuple[Series, ...] = tuple(
         kind="price_move",
         theme="acoes",
         ticker=ticker,
+        requires_token=ticker == "SLCE3",
     )
-    for ticker in BRAPI_TICKERS
+    for ticker in (*BRAPI_TICKERS, "SLCE3")
 )
 
 
@@ -467,4 +469,246 @@ def climate_signal(series: Series, history: Sequence[Revision]) -> DerivedSignal
             "Dado modelado por coordenada (Open-Meteo), não medição de estação oficial.",
             "Hipótese de acompanhamento: não prevê preços nem demonstra causa.",
         ),
+    )
+
+
+MODEL_STOCK_KEY = "brapi:SLCE3:change_pct"
+MODEL_CLIMATE_KEY = "openmeteo:sorriso-mt:rain_30d_anomaly"
+MIN_TRAIN = 15
+MIN_EVAL = 5
+MODEL_WINDOW = 5
+MODEL_HORIZON = 5
+_MODEL_QUANTUM = Decimal("0.0001")
+
+
+@dataclass(frozen=True)
+class SoyVolatility:
+    status: Literal["ready", "insufficient_data"] = "insufficient_data"
+    reason: str | None = None
+    rule: str = "soy_volatility_ridge_v1"
+    asset: str = "SLCE3"
+    region: str = "sorriso-mt"
+    horizon_days: int = 5
+    stock_points: int = 0
+    climate_points: int = 0
+    train_windows: int = 0
+    eval_windows: int = 0
+    first_observation_date: date | None = None
+    last_observation_date: date | None = None
+    m0_forecast_pct: str | None = None
+    m1_forecast_pct: str | None = None
+    intercept_pct: str | None = None
+    market_persistence_pct: str | None = None
+    daily_shock_pct: str | None = None
+    climate_component_pct: str | None = None
+    truncation_adjustment_pct: str | None = None
+    recent_rv_5d_pct: str | None = None
+    sorriso_rain_anomaly_pct: str | None = None
+    mae_m0_pp: str | None = None
+    mae_m1_pp: str | None = None
+    regime: Literal["normal", "elevada"] | None = None
+    weights: dict[str, str] = field(default_factory=dict)
+    evidence_keys: tuple[str, ...] = ()
+    limitations: tuple[str, ...] = ()
+
+
+def _ridge(samples: list[tuple[list[Decimal], Decimal]], width: int) -> list[Decimal]:
+    # Intercepto livre; as outras diagonais recebem lambda=1. Pivoteamento
+    # determinístico evita depender de BLAS ou da ordem de execução da máquina.
+    matrix = [
+        [
+            sum((x[i] * x[j] for x, _ in samples), Decimal(0))
+            + (Decimal(1) if i == j and i else Decimal(0))
+            for j in range(width)
+        ]
+        + [sum((x[i] * y for x, y in samples), Decimal(0))]
+        for i in range(width)
+    ]
+    for col in range(width):
+        pivot = max(range(col, width), key=lambda r: abs(matrix[r][col]))
+        matrix[col], matrix[pivot] = matrix[pivot], matrix[col]
+        scale = matrix[col][col]
+        if not scale:
+            raise ValueError("Sistema Ridge singular")
+        matrix[col] = [v / scale for v in matrix[col]]
+        for row in range(width):
+            if row != col:
+                factor = matrix[row][col]
+                matrix[row] = [
+                    a - factor * b for a, b in zip(matrix[row], matrix[col], strict=True)
+                ]
+    return [row[-1] for row in matrix]
+
+
+def _prediction(weights: list[Decimal], x: list[Decimal]) -> Decimal:
+    return max(Decimal(0), sum((w * v for w, v in zip(weights, x, strict=True)), Decimal(0)))
+
+
+def _model_text(value: Decimal) -> str:
+    return format(value.quantize(_MODEL_QUANTUM, rounding=ROUND_HALF_EVEN), "f")
+
+
+def estimate_soy_volatility(
+    stock_history: Sequence[Revision], climate_history: Sequence[Revision], as_of: datetime
+) -> SoyVolatility:
+    """Estudo reconstituído com expanding window e embargo de cinco pregões.
+
+    Revisões são escolhidas no instante de cada feature, não só no corte final;
+    uma correção publicada depois não reescreve as features de um teste passado.
+    """
+    with localcontext() as ctx:
+        ctx.prec = 40
+        return _estimate_soy(stock_history, climate_history, as_of)
+
+
+def _estimate_soy(stock_history, climate_history, as_of) -> SoyVolatility:
+    cutoff_day = as_of.astimezone(BUSINESS_ZONE).date()
+    stocks = sorted(
+        (
+            r
+            for r in visible_at(stock_history, as_of).values()
+            if r.value is not None and r.observation_date <= cutoff_day
+        ),
+        key=lambda r: r.observation_date,
+    )
+    climate = list(visible_at(climate_history, as_of).values())
+    base = dict(
+        stock_points=len(stocks),
+        climate_points=len(climate),
+        first_observation_date=stocks[0].observation_date if stocks else None,
+        last_observation_date=stocks[-1].observation_date if stocks else None,
+    )
+    limits = [
+        "Janela curta; estudo experimental, sem garantia de desempenho futuro.",
+        "Pesos e contribuições são associações estatísticas, não demonstração de causa.",
+        "Oscilação mede amplitude de risco, não probabilidade de alta/queda nem recomendação.",
+        "Clima modelado em Sorriso não representa todas as operações da empresa.",
+        "Janelas de avaliação se sobrepõem; os erros não são amostras independentes.",
+    ]
+    if any(getattr(r, "published_at_estimated", False) for r in [*stocks, *climate]):
+        limits.append(
+            "Publicações estimadas: avaliação histórica reconstituída, não backtest ao vivo."
+        )
+    if not stocks or not climate:
+        return SoyVolatility(
+            **base,
+            reason="Falta histórico de SLCE3 ou clima de Sorriso-MT.",
+            limitations=tuple(limits),
+        )
+    if stocks[-1].observation_date + timedelta(days=7) <= cutoff_day:
+        limits.append("Horizonte original já passou: estimativa histórica, não atual.")
+    features = {}
+    feature_cuts = {}
+    used = set()
+    for t in range(MODEL_WINDOW - 1, len(stocks)):
+        day = stocks[t].observation_date
+        # Mesmo calendário conservador da carga histórica: dia seguinte ao meio-dia.
+        # Uma primeira coleta tardia também não desloca o passado para incluir o futuro.
+        cut = min(
+            as_of,
+            datetime.combine(day + timedelta(days=1), time(12), BUSINESS_ZONE).astimezone(UTC),
+        )
+        if t == len(stocks) - 1:
+            cut = as_of
+        feature_cuts[t] = cut
+        past = visible_at(stock_history, cut)
+        window = [past.get(r.signal_key) for r in stocks[t - 4 : t + 1]]
+        rain = [
+            r
+            for r in visible_at(climate_history, cut).values()
+            if r.value is not None and r.observation_date <= day
+        ]
+        if any(r is None or r.value is None for r in window) or not rain:
+            continue
+        water = max(rain, key=lambda r: (r.observation_date, r.published_at, r.revision_id))
+        x = [
+            Decimal(1),
+            sum((r.value**2 for r in window), Decimal(0)).sqrt(),
+            abs(window[-1].value),
+            abs(water.value) / 100,
+        ]
+        features[t] = (x, water)
+        used.update(r.signal_key for r in window)
+        used.add(water.signal_key)
+    targets = {
+        t: sum((r.value**2 for r in stocks[t + 1 : t + 6]), Decimal(0)).sqrt()
+        for t in features
+        if t + MODEL_HORIZON < len(stocks)
+    }
+    errors = [[], []]
+    for tau, target in targets.items():
+        # Nenhum alvo que termina depois de tau participa do ajuste desse passo.
+        known = visible_at(stock_history, feature_cuts[tau])
+        train = [
+            t
+            for t in targets
+            if t <= tau - MODEL_HORIZON
+            and feature_cuts[t] <= feature_cuts[tau]
+            and all(r.signal_key in known for r in stocks[t + 1 : t + 6])
+        ]
+        labels = {
+            t: sum(
+                (known[r.signal_key].value ** 2 for r in stocks[t + 1 : t + 6]), Decimal(0)
+            ).sqrt()
+            for t in train
+        }
+        if len(train) < MIN_TRAIN:
+            continue
+        for model, width in enumerate((3, 4)):
+            w = _ridge([(features[t][0][:width], labels[t]) for t in train], width)
+            errors[model].append(abs(target - _prediction(w, features[tau][0][:width])))
+    base.update(train_windows=len(targets), eval_windows=len(errors[0]))
+    if (
+        len(targets) < MIN_TRAIN + MIN_EVAL
+        or len(errors[0]) < MIN_EVAL
+        or len(stocks) - 1 not in features
+    ):
+        return SoyVolatility(
+            **base,
+            reason=(
+                "Histórico alinhado insuficiente: requer treino e avaliação "
+                "walk-forward com purge gap."
+            ),
+            limitations=tuple(limits),
+        )
+    x, water = features[len(stocks) - 1]
+    w0 = _ridge([(features[t][0][:3], y) for t, y in targets.items()], 3)
+    w1 = _ridge([(features[t][0], y) for t, y in targets.items()], 4)
+    contributions = [w * v for w, v in zip(w1, x, strict=True)]
+    forecast = _prediction(w1, x)
+    mae0, mae1 = (sum(e, Decimal(0)) / len(e) for e in errors)
+    if Decimal(_model_text(mae1)) >= Decimal(_model_text(mae0)):
+        limits.append("M1 não superou o baseline M0 no MAE walk-forward desta janela.")
+    ordered = sorted(targets.values())
+    position = Decimal(len(ordered) - 1) * Decimal("0.75")
+    low = int(position)
+    threshold = ordered[low] + (ordered[min(low + 1, len(ordered) - 1)] - ordered[low]) * (
+        position - low
+    )
+    # Mantém a soma pública das contribuições compatível com o truncamento e arredondamento.
+    parts = [v.quantize(_MODEL_QUANTUM, rounding=ROUND_HALF_EVEN) for v in contributions]
+    adjustment = forecast.quantize(_MODEL_QUANTUM, rounding=ROUND_HALF_EVEN) - sum(parts)
+    return SoyVolatility(
+        **base,
+        status="ready",
+        m0_forecast_pct=_model_text(_prediction(w0, x[:3])),
+        m1_forecast_pct=_model_text(forecast),
+        intercept_pct=_model_text(parts[0]),
+        market_persistence_pct=_model_text(parts[1]),
+        daily_shock_pct=_model_text(parts[2]),
+        climate_component_pct=_model_text(parts[3]),
+        truncation_adjustment_pct=_model_text(adjustment),
+        recent_rv_5d_pct=_model_text(x[1]),
+        sorriso_rain_anomaly_pct=_model_text(water.value),
+        mae_m0_pp=_model_text(mae0),
+        mae_m1_pp=_model_text(mae1),
+        regime="elevada" if forecast >= threshold else "normal",
+        weights={
+            key: _model_text(value)
+            for key, value in zip(
+                ("intercept", "market_persistence", "daily_shock", "climate"), w1, strict=True
+            )
+        },
+        evidence_keys=tuple(sorted(used | {r.signal_key for r in stocks})),
+        limitations=tuple(limits),
     )

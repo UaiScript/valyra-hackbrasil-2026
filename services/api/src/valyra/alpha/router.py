@@ -1,5 +1,6 @@
 """Rotas HTTP do Alpha: só leitura; quem grava sinais é a coleta agendada (ADR-0012)."""
 
+from dataclasses import asdict
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -57,6 +58,7 @@ def get_radar(
     radar = service.get_radar(session, cut)
     return RadarOut(
         as_of=radar.as_of,
+        soy_volatility=asdict(radar.soy_volatility),
         last_ingested_at=radar.last_ingested_at,
         indicators=[
             IndicatorOut(

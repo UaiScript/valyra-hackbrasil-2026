@@ -353,6 +353,7 @@ export type RadarOut = {
   last_ingested_at: string | null;
   signals: DerivedSignalOut[];
   sources: SourceStatusOut[];
+  soy_volatility: SoyVolatilityOut;
 };
 
 export type RegionOut = {
@@ -372,6 +373,36 @@ export type SourceStatusOut = {
   last_ingested_at: string | null;
   series_count: number;
   source: SourceOut;
+};
+
+export type SoyVolatilityOut = {
+  asset?: string;
+  climate_component_pct?: string | null;
+  climate_points?: number;
+  daily_shock_pct?: string | null;
+  eval_windows?: number;
+  evidence_keys?: string[];
+  first_observation_date?: string | null;
+  horizon_days?: number;
+  intercept_pct?: string | null;
+  last_observation_date?: string | null;
+  limitations?: string[];
+  m0_forecast_pct?: string | null;
+  m1_forecast_pct?: string | null;
+  mae_m0_pp?: string | null;
+  mae_m1_pp?: string | null;
+  market_persistence_pct?: string | null;
+  reason?: string | null;
+  recent_rv_5d_pct?: string | null;
+  regime?: "normal" | "elevada" | null;
+  region?: string;
+  rule?: string;
+  sorriso_rain_anomaly_pct?: string | null;
+  status?: "ready" | "insufficient_data";
+  stock_points?: number;
+  train_windows?: number;
+  truncation_adjustment_pct?: string | null;
+  weights?: Record<string, unknown>;
 };
 
 /** Resumo da Issue #43: saldo realizado de hoje e movimentações realizadas do mês. */
