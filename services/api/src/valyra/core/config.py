@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # Chaves ficam mascaradas no repr para não vazarem em diagnóstico de configuração.
     gemini_api_key: SecretStr = SecretStr("")
     openai_api_key: SecretStr = SecretStr("")
+    # Reserva gratuita do Gemini (ADR-0014): o Groq fala o protocolo da OpenAI.
+    groq_api_key: SecretStr = SecretStr("")
+    # Configurável porque o Groq troca o catálogo de modelos abertos com frequência.
+    groq_model: str = Field(default="openai/gpt-oss-120b", min_length=1)
+    groq_base_url: str = Field(default="https://api.groq.com/openai/v1", min_length=1)
     # Configurável porque o Google desativa versões do Gemini sem novo deploy de código:
     # trocar a variável no Render basta para seguir um modelo novo.
     gemini_model: str = Field(default="gemini-3.8-flash", min_length=1)
@@ -37,7 +42,7 @@ class Settings(BaseSettings):
     # Token gratuito da brapi (ADR-0012); vazio limita a coleta aos tickers liberados sem token.
     brapi_token: SecretStr = SecretStr("")
 
-    @field_validator("gemini_api_key", "openai_api_key", mode="before")
+    @field_validator("gemini_api_key", "openai_api_key", "groq_api_key", mode="before")
     @classmethod
     def _trim_key(cls, value: str | SecretStr) -> str:
         raw = value.get_secret_value() if isinstance(value, SecretStr) else value
@@ -47,6 +52,10 @@ class Settings(BaseSettings):
     def gemini_enabled(self) -> bool:
         key = self.gemini_api_key.get_secret_value()
         return bool(key) and key != "sua-chave-aqui"
+
+    @property
+    def groq_fallback_enabled(self) -> bool:
+        return bool(self.groq_api_key.get_secret_value())
 
     @property
     def openai_fallback_enabled(self) -> bool:

@@ -77,6 +77,8 @@ incluem prompts, respostas brutas nem mensagens de erro vindas do SDK.
 - **Fallback permanentemente bloqueado:** descartado; o objetivo do fallback é
   exatamente cobrir indisponibilidade ou esgotamento de cota do Gemini.
 - **Outro provedor ou execução local:** adiados para manter o escopo do hackathon.
+  Em 28/11/2026 a [ADR-0014](0014-reserva-groq.md) acrescentou o Groq como reserva
+  gratuita entre Gemini e OpenAI.
 
 ## Consequências
 

@@ -114,8 +114,9 @@ pendente enquanto o ambiente não tiver provedor configurado; os testes automát
 não a substituem. Use somente a conta/dados sintéticos da demonstração.
 
 1. Configure `.env` local conforme `.env.example`, com `GEMINI_API_KEY` e, se
-   desejar fallback, `OPENAI_API_KEY`. Configure o limite de gasto externo antes
-   de habilitar OpenAI, conforme ADR-0002. Não compartilhe as chaves.
+   desejar reserva gratuita, `GROQ_API_KEY`; para fallback pago, `OPENAI_API_KEY`.
+   Configure o limite de gasto externo antes de habilitar OpenAI, conforme ADR-0002.
+   Não compartilhe as chaves.
 2. Prepare o banco e a conta sintética, sem reset de dados:
 
    ```bash
