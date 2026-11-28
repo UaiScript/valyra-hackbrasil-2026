@@ -62,3 +62,15 @@ def test_historico_coletado_substitui_a_reserva_e_respeita_o_corte(client, db_se
 
 def test_perfil_desconhecido_e_recusado(client):
     assert client.get(URL, params={"profile": "cooperado"}).status_code == 422
+
+
+def test_cache_guarda_so_o_corte_atual(db_session):
+    from valyra.alpha import forecast_service
+
+    now = datetime(2026, 11, 28, 12, tzinfo=UTC)
+    forecast_service.get_forecasts(db_session, None, now, now=now)
+    for minute in range(3):
+        past = datetime(2026, 1, 1, 12, minute, tzinfo=UTC)
+        forecast_service.get_forecasts(db_session, None, past, now=now)
+    # Cortes históricos não entram no cache: só a chave do perfil no corte atual.
+    assert list(forecast_service._cache) == [None]

@@ -31,7 +31,6 @@ from valyra.ai.schemas import (
 )
 from valyra.alpha import forecast_service, news_service
 from valyra.alpha import service as alpha_service
-from valyra.alpha.forecast import METHOD_VERSION as _FORECAST_VERSION
 from valyra.core.demo_profiles import DEMO_PROFILE_USERS
 from valyra.core.errors import AppError
 from valyra.finance import service as finance_service
@@ -455,10 +454,12 @@ def _news_evidences(
 
 _PROFILE_BY_USER = {user: profile for profile, user in DEMO_PROFILE_USERS.items()}
 _FORECAST_RULE = (
-    "Previsões Alpha calculadas em código (forecast_v1), não pelo modelo de linguagem: "
+    "Previsões Alpha calculadas em código (método forecast_v1, visão pela regra "
+    "forecast_view_v1), não pelo modelo de linguagem: "
     "cenário central e faixa de 80% de 1.000 cenários simulados, e a chance é a fração "
     "desses cenários. São leitura estatística, não recomendação de investimento."
 )
+_FORECAST_TRIMMED = "Parte das previsões ficou fora do contexto pelo limite de evidências."
 _FORECAST_RESERVE = (
     "Previsões com séries de reserva sintéticas ficaram fora do contexto: só entram "
     "previsões feitas com dados coletados."
@@ -478,12 +479,15 @@ def _forecast_evidences(
         return []
     # Sem nova leitura do relógio: o corte é o "agora" do contexto e o cálculo não passa dele.
     now = as_of
-    result = forecast_service.get_forecasts(session, _PROFILE_BY_USER.get(user_id), as_of, now=now)
+    # Sem cache: o cálculo usa exatamente o corte deste contexto.
+    result = forecast_service.get_forecasts(
+        session, _PROFILE_BY_USER.get(user_id), as_of, now=now, use_cache=False
+    )
     known = {item.evidence_id for item in present}
     cutoff_day = as_of.astimezone(_BUSINESS_ZONE).date()
     start = cutoff_day + timedelta(days=1)
     items: list[EvidenceItem] = []
-    skipped = False
+    skipped = omitted = False
     for forecast, inputs in result.items:
         if any(i.origin != "coleta" or i.last_signal_id is None for i in inputs):
             skipped = True
@@ -497,7 +501,7 @@ def _forecast_evidences(
             "kind": "calculation",
             "module": "alpha",
             "method_key": f"alpha.forecast.{spec.method}",
-            "method_version": _FORECAST_VERSION,
+            "method_version": forecast_service.FORECAST_METHOD_VERSION,
             "computed_at": min(_aware(result.computed_at), now),
             "input_scope": {
                 "period": {
@@ -513,8 +517,10 @@ def _forecast_evidences(
             ],
         }
 
-        def add(suffix: str, label: str, value, spec=spec, source=source, end=end) -> None:
-            items.append(
+        group: list[EvidenceItem] = []
+
+        def add(suffix, label, value, spec=spec, source=source, end=end, group=group) -> None:
+            group.append(
                 EvidenceItem(
                     evidence_id=f"forecast_{spec.kind}_{suffix}",
                     metric_key=f"alpha.forecast.{spec.kind}.{suffix}",
@@ -540,9 +546,16 @@ def _forecast_evidences(
         add("view", f"Leitura da Valyra para {spec.title.lower()}", TextValue(
             value_text=forecast.view.headline
         ))  # fmt: skip
+        # Previsão entra inteira (centro, faixa, chance e visão) ou fica fora com aviso:
+        # o centro sem a faixa perderia o suporte estatístico.
+        if len(items) + len(group) <= room:
+            items.extend(group)
+        else:
+            omitted = True
     if skipped:
         limitations.append(_FORECAST_RESERVE)
-    items = items[:room]
+    if omitted:
+        limitations.append(_FORECAST_TRIMMED)
     if items:
         limitations.append(_FORECAST_RULE)
     return items

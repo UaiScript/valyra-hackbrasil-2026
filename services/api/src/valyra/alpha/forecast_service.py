@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from valyra.alpha import forecast, repository
 from valyra.alpha.domain import BUSINESS_ZONE, FORECAST_SGS_SERIES, SGS_SERIES, STOCK_SERIES
+from valyra.alpha.forecast import METHOD_VERSION
 from valyra.alpha.forecast_reserve import reserve_series
 from valyra.alpha.models import Source
 
@@ -38,6 +39,8 @@ _RESERVE_SOURCE = {
     "license": "Dados sintéticos de demonstração; não são dados reais",
 }
 CACHE_SECONDS = 600
+# Versão do método, para outros módulos (IA) citarem sem importar o domínio.
+FORECAST_METHOD_VERSION = METHOD_VERSION
 
 
 @dataclass(frozen=True)
@@ -167,7 +170,8 @@ def _reserve_input(
     )
 
 
-_cache: dict[tuple[str | None, datetime | None], tuple[float, ProfileForecasts]] = {}
+# Uma entrada por perfil (três mais o padrão): o tamanho é fixo e cada uma expira sozinha.
+_cache: dict[str | None, tuple[float, ProfileForecasts]] = {}
 _lock = threading.Lock()
 
 
@@ -186,13 +190,15 @@ def get_forecasts(
 ) -> ProfileForecasts:
     """Previsões do perfil com o que era conhecido no corte; nada publicado depois entra.
 
-    O cache só vale para o corte "agora" (sem as_of explícito, quem chama passa as_of = now).
+    O cache só vale para o corte "agora" e guarda o `as_of` efetivo do cálculo, que a rota
+    devolve. Quem precisa do corte exato (a IA) passa `use_cache=False`.
     """
-    live = as_of >= now
-    key = (profile, None if live else as_of)
-    if use_cache:
+    # Só o corte "agora" vai para o cache: um as_of histórico arbitrário criaria uma entrada
+    # por valor e a memória cresceria sem limite.
+    live = use_cache and as_of >= now
+    if live:
         with _lock:
-            hit = _cache.get(key)
+            hit = _cache.get(profile)
         if hit and hit[0] > time.monotonic():
             return hit[1]
     specs = forecast.specs_for(profile)
@@ -214,7 +220,7 @@ def get_forecasts(
         spec_inputs = [inputs[k] for k in spec.inputs]
         items.append((forecast.compute(spec, base, profile), spec_inputs))
     result = ProfileForecasts(profile=profile, as_of=as_of, computed_at=now, items=items)
-    if use_cache:
+    if live:
         with _lock:
-            _cache[key] = (time.monotonic() + CACHE_SECONDS, result)
+            _cache[profile] = (time.monotonic() + CACHE_SECONDS, result)
     return result

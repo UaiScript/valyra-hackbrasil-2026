@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
 import type { Page, Route } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+
+// Resposta real da API local (perfil investidor, séries de reserva), gravada para o teste.
+const FORECASTS = JSON.parse(readFileSync(new URL('./fixtures/forecasts-investidor.json', import.meta.url), 'utf8'));
 
 // A API é simulada por page.route: o teste roda no CI sem PostgreSQL nem FastAPI.
 // Os formatos seguem packages/contracts/openapi.json.
@@ -155,6 +159,11 @@ async function mockApi(page: Page) {
     return json(route, url.searchParams.has('as_of') ? { ...RADAR, as_of: url.searchParams.get('as_of'), indicators: [], signals: [], sources: [], last_ingested_at: null } : RADAR);
   });
   await page.route('**/api/v1/alpha/news/weekly**', (route) => json(route, WEEKLY));
+  await page.route('**/api/v1/alpha/forecasts**', (route) => {
+    const url = new URL(route.request().url());
+    calls.push({ method: 'GET', url: url.pathname + url.search, body: null });
+    return json(route, FORECASTS);
+  });
   await page.route('https://imagens.ebc.com.br/**', (route) => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: PHOTO_SVG }));
   await page.route('**/api/v1/finance/**', (route) => {
     const req = route.request();
@@ -551,7 +560,7 @@ test('perfil da demo adapta menu, atalhos, faixa, radar e perguntas da IA', asyn
   await finance;
   await expect(picker).toHaveCount(0);
   const forYou = page.getByRole('region', { name: 'Para você: perfil Investidor' });
-  await expect(forYou.getByRole('link', { name: /Bolsa, juros e inflação/ })).toHaveAttribute('href', '#/app/alpha');
+  await expect(forYou.getByRole('link', { name: /Bolsa, dólar e juros à frente/ })).toHaveAttribute('href', '#/app/alpha/previsoes');
   await expect(page.locator('.cx-ticker').getByRole('button', { name: 'Bolsa' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.cx-nav__focus')).toHaveCount(1);
   await page.goto('/#/app/alpha');
@@ -565,13 +574,29 @@ test('perfil da demo adapta menu, atalhos, faixa, radar e perguntas da IA', asyn
   await page.goto('/#/app/alpha/semana');
   await expect(page.locator('.nx-grid > *').first()).toContainText('Ações que você acompanha');
   await page.goto('/#/app/valyra-ai');
-  await expect(page.locator('.cx-suggestion').first()).toHaveText('O que o radar mostra sobre ações, juros e inflação nesta semana?');
+  await expect(page.locator('.cx-suggestion').first()).toHaveText('Quanto a bolsa e o dólar podem oscilar no próximo mês, segundo as previsões?');
   // Troca pelo menu do cabeçalho: menu e faixa seguem o novo perfil.
   await page.getByRole('button', { name: /Perfil da demonstração/ }).click();
   await page.getByRole('group', { name: 'Perfis da demonstração' }).getByRole('button', { name: /Orçamento apertado/ }).click();
   await expect(page.locator('.cx-nav__title').first()).toHaveText(/Valyra Finance/);
   await page.goto('/#/app');
   await expect(page.locator('.cx-ticker').getByRole('button', { name: 'Manchetes' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('previsões mostram dados, estatística e a visão da Valyra separada', async ({ page }) => {
+  const calls = await mockApi(page);
+  await page.addInitScript(() => localStorage.setItem('valyra:demo-profile', 'investidor'));
+  await page.goto('/#/app/alpha/previsoes');
+  await expect(page.locator('.fx-card')).toHaveCount(4);
+  expect(calls.some((c) => c.url.startsWith('/api/v1/alpha/forecasts?profile=investidor'))).toBe(true);
+  const first = page.locator('.fx-card').first();
+  await expect(first.getByRole('heading', { name: 'Cesta de ações acompanhadas' })).toBeVisible();
+  await expect(first.getByText('Chance de fechar o período em alta', { exact: true })).toBeVisible();
+  await expect(first.getByRole('complementary', { name: 'Visão da Valyra' })).toContainText('não recomendação');
+  await expect(first.getByRole('link', { name: 'Explicar com a Valyra AI' })).toHaveAttribute('href', /#\/app\/valyra-ai\?q=/);
+  // Dados de reserva ficam sempre identificados na tela.
+  await expect(page.getByRole('note').filter({ hasText: 'reserva sintéticas' })).toBeVisible();
+  await expect(first.getByRole('row', { name: /PETR4/ })).toBeVisible();
 });
 
 test('faixa recolhe, para de buscar dados e lembra a escolha', async ({ page }) => {
