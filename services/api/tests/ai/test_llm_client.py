@@ -30,6 +30,7 @@ def payload():
 def settings(monkeypatch):
     for key in (
         "GEMINI_API_KEY",
+        "GEMINI_MODEL",
         "OPENAI_API_KEY",
         "LLM_TIMEOUT_SECONDS",
         "LLM_MAX_ATTEMPTS",
@@ -177,19 +178,38 @@ def test_sucesso_com_sdk_real_limites_e_fechamento(settings, sdk, payload):
     state = sdk(lambda _: gemini_response(payload))
     result = llm.call_llm(make_request(question="Explique meu orçamento"))
     assert result.provider == "gemini"
-    assert result.model == "gemini-2.5-flash"
+    assert result.model == "gemini-3.8-flash"
     assert result.answer == payload["answer"]
     assert len(state.requests) == 1
     body = json.loads(state.requests[0].content)
     config = body["generationConfig"]
-    assert config["maxOutputTokens"] == 2048
+    assert config["maxOutputTokens"] == 4096
     assert config["responseMimeType"] == "application/json"
     assert config["responseJsonSchema"]["additionalProperties"] is False
-    assert config["thinkingConfig"] in ({"thinkingBudget": 0}, {"thinking_budget": 0})
+    # Família 3 não desliga o raciocínio; o cliente pede o menor nível comum.
+    assert config["thinkingConfig"] in ({"thinkingLevel": "LOW"}, {"thinking_level": "LOW"})
     assert state.requests[0].extensions["timeout"]["read"] == 30
     assert state.options[0]["http_options"].timeout == 30000
     assert state.options[0]["http_options"].retry_options.attempts == 1
     assert state.clients[0]._api_client._httpx_client.is_closed
+
+
+def test_modelo_configuravel_e_familia_2_desliga_raciocinio(settings, sdk, payload):
+    settings.gemini_model = "gemini-2.5-flash"
+    state = sdk(lambda _: gemini_response(payload))
+    result = llm.call_llm(make_request(question="Explique"))
+    assert result.model == "gemini-2.5-flash"
+    assert "models/gemini-2.5-flash:" in str(state.requests[0].url)
+    config = json.loads(state.requests[0].content)["generationConfig"]
+    assert config["thinkingConfig"] in ({"thinkingBudget": 0}, {"thinking_budget": 0})
+
+
+def test_familia_2_0_nao_envia_configuracao_de_raciocinio(settings, sdk, payload):
+    settings.gemini_model = "gemini-2.0-flash"
+    state = sdk(lambda _: gemini_response(payload))
+    llm.call_llm(make_request(question="Explique"))
+    config = json.loads(state.requests[0].content)["generationConfig"]
+    assert "thinkingConfig" not in config
 
 
 @pytest.mark.parametrize("status", [429, 599])
