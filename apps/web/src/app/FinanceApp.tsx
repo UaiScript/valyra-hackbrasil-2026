@@ -1,6 +1,6 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import type { FC } from 'react';
-import { ArrowLeft, Bell, ChartPie, ChartSpline, Command, Compass, LayoutDashboard, ListOrdered, Menu, Newspaper, Sparkles, Target, Upload, X } from 'lucide-react';
+import { ArrowLeft, Bell, ChartPie, ChartSpline, Command, Compass, LayoutDashboard, ListOrdered, Menu, Newspaper, PanelLeftClose, PanelLeftOpen, Sparkles, Target, Upload, X } from 'lucide-react';
 import { api } from './api/client';
 import { ROUTES, routeFromHash, useHash } from './router';
 import type { AppRoute } from './router';
@@ -12,6 +12,8 @@ import { MODULES, ModuleBadge } from './modules';
 import type { ModuleId } from './modules';
 import { ProfileMenu } from './ProfileUI';
 import { ProfileProvider, useProfile } from './useProfile';
+import { ChatPanel, ValyraChatProvider, questionFromHref, useValyraChat } from './ValyraChat';
+import { AlertsPopover } from './AlertsPopover';
 import './cockpit.css';
 import './app.css';
 
@@ -117,10 +119,23 @@ export default function FinanceApp() {
   return <ProfileProvider><ProfileShell /></ProfileProvider>;
 }
 
-/** Trocar de perfil é trocar de cliente: remontar descarta estado e dados do anterior. */
+/**
+ * Trocar de perfil é trocar de cliente: remontar descarta estado e dados do anterior,
+ * inclusive a conversa com a Valyra AI, que fica dentro da mesma chave.
+ */
 function ProfileShell() {
   const { profile } = useProfile();
-  return <Shell key={profile.id} />;
+  return <ValyraChatProvider key={profile.id}><Shell /></ValyraChatProvider>;
+}
+
+// Menu lateral largo (ícones + nomes) ou só ícones: preferência de visualização guardada
+// no navegador; sem armazenamento, volta ao padrão só ícones.
+const NAV_WIDE_KEY = 'valyra:nav-wide';
+function readNavWide(): boolean {
+  try { return window.localStorage.getItem(NAV_WIDE_KEY) === '1'; } catch { return false; }
+}
+function writeNavWide(wide: boolean) {
+  try { window.localStorage.setItem(NAV_WIDE_KEY, wide ? '1' : '0'); } catch { /* vale só nesta visita */ }
 }
 
 function Shell() {
@@ -129,6 +144,10 @@ function Shell() {
   // O menu segue a ordem de módulos do perfil: o foco do cliente aparece primeiro.
   const groups = profile.modules.map((m) => NAV_GROUPS.find((g) => g.module === m)!);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [navWide, setNavWide] = useState(readNavWide);
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const { openPanel } = useValyraChat();
+  const closeAlerts = useCallback(() => setAlertsOpen(false), []);
   const current = NAV.find((n) => n.route === route)!;
   const newAlerts = useNewAlertCount(route);
   usePrefetchPages();
@@ -138,22 +157,53 @@ function Shell() {
     document.documentElement.lang = 'pt-BR';
     document.title = `${current.label} · Valyra`;
     setMenuOpen(false);
+    setAlertsOpen(false);
   }, [current.label]);
+
+  /*
+   * Links para a Valyra AI e para Alertas abrem a barra de chat e a janela de alertas em
+   * vez de trocar de tela. A interceptação é central para valer em todo atalho do app
+   * ("Por quê?", radar, sugestões do perfil) sem mexer em cada link. Links marcados com
+   * data-full (tela cheia, "ver todos") e cliques com Ctrl/⌘/Shift seguem para a página.
+   */
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const link = (e.target as Element | null)?.closest?.('a[href]');
+      if (!link || link.hasAttribute('data-full')) return;
+      const href = link.getAttribute('href') ?? '';
+      if (href === ROUTES.ai || href.startsWith(`${ROUTES.ai}?`)) {
+        if (route === 'ai') return;
+        e.preventDefault();
+        setMenuOpen(false);
+        setAlertsOpen(false);
+        openPanel(questionFromHref(href));
+      } else if (href === ROUTES.alerts) {
+        if (route === 'alerts') return;
+        e.preventDefault();
+        setMenuOpen(false);
+        setAlertsOpen(true);
+      }
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, [route, openPanel]);
 
   // Atalho de teclado da barra de comando: Ctrl/⌘+K abre a pergunta à IA.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        window.location.hash = ROUTES.ai;
+        if (route === 'ai') document.getElementById('cx-question')?.focus();
+        else { setAlertsOpen(false); openPanel(); }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [route, openPanel]);
 
   return (
-    <div className="app-shell cx">
+    <div className={`app-shell cx${navWide ? ' cx--nav-wide' : ''}`}>
       <aside className={`app-sidebar${menuOpen ? ' app-sidebar--open' : ''}`} aria-label="Módulos">
         <a href={ROUTES.overview} className="cx-brand" aria-label="Valyra — central">
           <span className="cx-brand__mark" aria-hidden="true"><LogoMark size={30} /></span>
@@ -173,6 +223,11 @@ function Shell() {
           ))}
         </nav>
         <div className="cx-sidebar__foot">
+          <button type="button" className="app-nav__back cx-nav-toggle" aria-pressed={navWide} data-tip={navWide ? 'Recolher menu' : 'Expandir menu'}
+            onClick={() => setNavWide((w) => { writeNavWide(!w); return !w; })}>
+            {navWide ? <PanelLeftClose size={18} aria-hidden="true" /> : <PanelLeftOpen size={18} aria-hidden="true" />}
+            <span className="cx-nav__label">{navWide ? 'Recolher menu' : 'Expandir menu'}</span>
+          </button>
           <a className="app-nav__back" href="#top" data-tip="Voltar à landing"><ArrowLeft size={18} aria-hidden="true" /><span className="cx-nav__label">Voltar à landing</span></a>
         </div>
       </aside>
@@ -191,9 +246,13 @@ function Shell() {
             <kbd><Command size={11} aria-hidden="true" />K</kbd>
           </a>
           <ApiStatus route={route} />
-          <a className="cx-icon-link" href={ROUTES.alerts} aria-label={newAlerts ? `Alertas, ${newAlerts} novos` : 'Alertas'}>
-            <Bell size={18} aria-hidden="true" />{newAlerts > 0 && <span className="cx-icon-link__dot" aria-hidden="true" />}
-          </a>
+          <div className="cx-alerts-anchor">
+            <button type="button" className="cx-icon-link" data-alerts-trigger aria-expanded={alertsOpen} aria-haspopup="dialog"
+              aria-label={newAlerts ? `Alertas, ${newAlerts} novos` : 'Alertas'} onClick={() => setAlertsOpen((o) => !o)}>
+              <Bell size={18} aria-hidden="true" />{newAlerts > 0 && <span className="cx-icon-link__dot" aria-hidden="true" />}
+            </button>
+            <AlertsPopover open={alertsOpen} onClose={closeAlerts} />
+          </div>
           <ProfileMenu />
         </header>
         <main className="app-content" id="main">
@@ -213,6 +272,7 @@ function Shell() {
           </p>
         </main>
       </div>
+      <ChatPanel />
     </div>
   );
 }
