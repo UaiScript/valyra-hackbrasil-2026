@@ -5,7 +5,8 @@ import { api, describeError } from '../api/client';
 import type { AccountOut, AccountUpdate } from '../../lib/api/schema';
 import { centsToInput, formatCents, formatIsoDate, formatShortDate, parseReaisToCents } from '../money';
 import { BudgetList, BudgetMeter, usedPercent } from '../Budget';
-import { CandleChart, HeroArt, Sparkline } from '../Market';
+import { CANDLE_PERIODS, CandleChart, HeroArt, Sparkline } from '../Market';
+import type { CandlePeriod } from '../Market';
 import { TickerBar } from '../TickerBar';
 import { ProfileFocus } from '../ProfileUI';
 import { ROUTES } from '../router';
@@ -118,17 +119,39 @@ const BudgetCard: FC<{ reloadKey: number }> = ({ reloadKey }) => {
   );
 };
 
+const PERIOD_KEY = 'valyra:candle-period';
+function readPeriod(): CandlePeriod {
+  try {
+    const v = window.localStorage.getItem(PERIOD_KEY);
+    return v === 'day' || v === 'month' ? v : 'week';
+  } catch { return 'week'; }
+}
+
 const CandlesCard: FC<{ account: AccountOut; reloadKey: number }> = ({ account, reloadKey }) => {
-  const projection = useApi((s) => api.getProjection(account.id, 35, s), [account.id, reloadKey]);
+  // Período de exibição escolhido por quem vê; cada um pede à API o horizonte que precisa.
+  const [period, setPeriod] = useState<CandlePeriod>(readPeriod);
+  const meta = CANDLE_PERIODS[period];
+  const projection = useApi((s) => api.getProjection(account.id, meta.days, s), [account.id, reloadKey, meta.days]);
   const p = projection.state.data;
+  // Enquanto o novo horizonte carrega, a série anterior continua na tela, sem piscar.
+  const shown = p;
+  function choose(next: CandlePeriod) {
+    setPeriod(next);
+    try { window.localStorage.setItem(PERIOD_KEY, next); } catch { /* vale só nesta visita */ }
+  }
   return (
     <section className="app-card cx-panel cx-span-8">
-      <header className="app-card__header">
-        <h2>Projeção semanal</h2>
+      <header className="app-card__header cx-candles__header">
+        <h2>{meta.title}</h2>
+        <div className="vx-segmented cx-period" role="radiogroup" aria-label="Período de cada vela">
+          {(Object.keys(CANDLE_PERIODS) as CandlePeriod[]).map((k) => (
+            <button key={k} type="button" role="radio" aria-checked={period === k} onClick={() => choose(k)}>{CANDLE_PERIODS[k].label}</button>
+          ))}
+        </div>
         <a className="app-link" href={ROUTES.projection}>Detalhar<ArrowUpRight size={14} aria-hidden="true" /></a>
       </header>
-      {p ? <CandleChart projection={p} /> : <span className="app-muted">{projection.state.status === 'error' ? 'Projeção indisponível.' : 'Calculando projeção…'}</span>}
-      {p && <p className="cx-caption">Cada vela é uma semana prevista: abre no saldo da semana anterior e fecha no último dia. Base: saldo realizado de hoje, recorrências detectadas e média de gastos variáveis ({formatCents(p.variable_daily_cents)}/dia).</p>}
+      {shown ? <CandleChart projection={shown} period={period} /> : <span className="app-muted">{projection.state.status === 'error' ? 'Projeção indisponível.' : 'Calculando projeção…'}</span>}
+      {shown && <p className="cx-caption">Cada vela é {period === 'day' ? 'um dia previsto' : period === 'week' ? 'uma semana prevista' : 'um mês previsto'} ({meta.days} dias à frente): abre no saldo do período anterior e fecha no último dia. Base: saldo realizado de hoje, recorrências detectadas e média de gastos variáveis ({formatCents(shown.variable_daily_cents)}/dia).</p>}
     </section>
   );
 };

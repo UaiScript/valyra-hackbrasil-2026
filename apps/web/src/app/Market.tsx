@@ -11,27 +11,62 @@ import { formatCents, formatShortDate } from './money';
 
 type Candle = { start: string; end: string; open: number; close: number; high: number; low: number };
 
-/** Agrupa a projeção diária em velas semanais (abertura, fechamento, máxima, mínima). */
-export function weeklyCandles(p: ProjectionOut): Candle[] {
+/** Período de cada vela: um dia, uma semana (blocos de 7 dias) ou um mês do calendário. */
+export type CandlePeriod = 'day' | 'week' | 'month';
+
+export const CANDLE_PERIODS: Record<CandlePeriod, { label: string; title: string; days: number; up: string; down: string }> = {
+  // Horizonte de cada período escolhido para caber de 10 a 14 velas no dia e na semana; no mês,
+  // o máximo da API (90 dias) dá três ou quatro meses do calendário.
+  day: { label: 'Dia', title: 'Projeção diária', days: 14, up: 'dia em alta', down: 'dia em queda' },
+  week: { label: 'Semana', title: 'Projeção semanal', days: 35, up: 'semana em alta', down: 'semana em queda' },
+  month: { label: 'Mês', title: 'Projeção mensal', days: 90, up: 'mês em alta', down: 'mês em queda' },
+};
+
+/** Chave do grupo de cada dia da projeção, conforme o período escolhido. */
+function groupKey(period: CandlePeriod, date: string, index: number): string {
+  if (period === 'day') return date;
+  if (period === 'month') return date.slice(0, 7);
+  return String(Math.floor(index / 7));
+}
+
+/** Agrupa a projeção diária em velas (abertura, fechamento, máxima, mínima) por período. */
+export function projectionCandles(p: ProjectionOut, period: CandlePeriod = 'week'): Candle[] {
+  const groups: ProjectionOut['items'][] = [];
+  let last = '';
+  p.items.forEach((d, i) => {
+    const key = groupKey(period, d.date, i);
+    if (key !== last || groups.length === 0) groups.push([]);
+    groups[groups.length - 1].push(d);
+    last = key;
+  });
   const out: Candle[] = [];
   let open = p.start_balance_cents;
-  for (let i = 0; i < p.items.length; i += 7) {
-    const week = p.items.slice(i, i + 7);
-    const balances = week.map((d) => d.balance_cents);
+  for (const group of groups) {
+    const balances = group.map((d) => d.balance_cents);
     const close = balances[balances.length - 1];
-    out.push({ start: week[0].date, end: week[week.length - 1].date, open, close, high: Math.max(open, ...balances), low: Math.min(open, ...balances) });
+    out.push({ start: group[0].date, end: group[group.length - 1].date, open, close, high: Math.max(open, ...balances), low: Math.min(open, ...balances) });
     open = close;
   }
   return out;
 }
 
-export const CandleChart: FC<{ projection: ProjectionOut; height?: number }> = ({ projection, height = 220 }) => {
-  const candles = useMemo(() => weeklyCandles(projection), [projection]);
+const MONTH_LABEL = new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' });
+const candleLabel = (period: CandlePeriod, iso: string) =>
+  period === 'month' ? MONTH_LABEL.format(new Date(`${iso}T00:00:00Z`)).replace('.', '') : formatShortDate(iso);
+
+export const CandleChart: FC<{ projection: ProjectionOut; height?: number; period?: CandlePeriod }> = ({ projection, height = 220, period = 'week' }) => {
+  const candles = useMemo(() => projectionCandles(projection, period), [projection, period]);
+  const meta = CANDLE_PERIODS[period];
   const W = 640;
   const pad = { top: 16, right: 12, bottom: 30, left: 12 };
-  const lo = Math.min(0, ...candles.map((c) => c.low));
-  const hi = Math.max(...candles.map((c) => c.high));
-  const span = Math.max(hi - lo, 100);
+  // A escala acompanha a faixa das velas (com folga), e não parte do zero: com o eixo em
+  // zero a variação diária ficava achatada numa linha. A linha do zero aparece se o saldo cruzar.
+  const minLow = Math.min(...candles.map((c) => c.low));
+  const maxHigh = Math.max(...candles.map((c) => c.high));
+  const margin = Math.max(Math.round((maxHigh - minLow) * 0.15), 100);
+  const lo = minLow - margin;
+  const hi = maxHigh + margin;
+  const span = hi - lo;
   const innerW = W - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
   const y = (v: number) => pad.top + innerH * (1 - (v - lo) / span);
@@ -39,8 +74,8 @@ export const CandleChart: FC<{ projection: ProjectionOut; height?: number }> = (
   const body = Math.min(46, slot * 0.42);
   return (
     <figure className="cx-candles">
-      <svg viewBox={`0 0 ${W} ${height}`} role="img" aria-label={`Projeção em velas semanais: ${candles.map((c) => `${formatShortDate(c.start)} a ${formatShortDate(c.end)}, de ${formatCents(c.open)} para ${formatCents(c.close)}`).join('; ')}`}>
-        {lo < 0 && <line className="cx-candles__zero" x1={pad.left} x2={W - pad.right} y1={y(0)} y2={y(0)} />}
+      <svg viewBox={`0 0 ${W} ${height}`} role="img" aria-label={`${meta.title} em velas: ${candles.map((c) => `${formatShortDate(c.start)} a ${formatShortDate(c.end)}, de ${formatCents(c.open)} para ${formatCents(c.close)}`).join('; ')}`}>
+        {lo < 0 && hi > 0 && <line className="cx-candles__zero" x1={pad.left} x2={W - pad.right} y1={y(0)} y2={y(0)} />}
         {candles.map((c, i) => {
           const cx = pad.left + slot * (i + 0.5);
           const up = c.close >= c.open;
@@ -50,15 +85,15 @@ export const CandleChart: FC<{ projection: ProjectionOut; height?: number }> = (
             <g key={c.start} className={up ? 'cx-candle cx-candle--up' : 'cx-candle cx-candle--down'} style={{ animationDelay: `${i * 90}ms` }}>
               <line x1={cx} x2={cx} y1={y(c.high)} y2={y(c.low)} />
               <rect x={cx - body / 2} y={top} width={body} height={h} rx={Math.min(8, body / 4)} />
-              <text x={cx} y={height - 8} textAnchor="middle">{formatShortDate(c.start)}</text>
+              {(candles.length <= 16 || i % 2 === 0) && <text x={cx} y={height - 8} textAnchor="middle">{candleLabel(period, c.start)}</text>}
             </g>
           );
         })}
       </svg>
       <figcaption className="cx-candles__legend">
-        <span className="cx-candles__key cx-candles__key--up">semana em alta</span>
-        <span className="cx-candles__key cx-candles__key--down">semana em queda</span>
-        <span>Saldo previsto, agrupado por semana</span>
+        <span className="cx-candles__key cx-candles__key--up">{meta.up}</span>
+        <span className="cx-candles__key cx-candles__key--down">{meta.down}</span>
+        <span>Saldo previsto, agrupado por {meta.label.toLowerCase()}</span>
       </figcaption>
     </figure>
   );

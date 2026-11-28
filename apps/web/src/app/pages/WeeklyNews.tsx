@@ -9,7 +9,7 @@ import { AI_MESSAGES, askHref, explain } from '../api/ai';
 import type { ExplainResponse } from '../api/ai';
 import type { BudgetReportOut, NewsItemOut, NewsThemeOut, RadarOut, SummaryOut, WeeklyNewsOut } from '../../lib/api/schema';
 import { ROUTES } from '../router';
-import { Answer } from './AskValyra';
+import { Answer } from '../AiAnswer';
 import { BUDGET_STATUS_LABEL, usedPercent } from '../Budget';
 import { compareDecimal, formatCents, formatDecimal, formatInstant } from '../money';
 import { Async, Empty } from '../ui';

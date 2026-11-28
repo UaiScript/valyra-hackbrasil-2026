@@ -597,3 +597,81 @@ test('leituras iguais e simultâneas viram uma só requisição', async ({ page 
   // Destaque, cartão e painel de orçamento pedem o mesmo GET: chega um só à API.
   expect(calls.filter((c) => c.url === '/api/v1/finance/budgets').length).toBe(1);
 });
+
+test('atalhos da IA abrem a barra de chat, que mantém a conversa em tela cheia', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/v1/ai/explain', (route) => json(route, {
+    answer: 'Resposta sintética de teste.', as_of: '2026-11-27T18:00:00Z', uncertainty: 'baixa', limitations: [], evidences: [],
+  }));
+  await page.goto('/#/app');
+  await page.getByRole('link', { name: 'Pergunte ao Valyra (Ctrl+K)' }).click();
+  const panel = page.getByRole('dialog', { name: 'Pergunte ao Valyra' });
+  await expect(panel).toBeVisible();
+  // Continua na Central: a barra abre por cima, sem trocar de tela.
+  expect(page.url()).toMatch(/#\/app$/);
+  await panel.getByLabel('Sua pergunta').fill('Qual é o meu limite diário?');
+  await panel.getByRole('button', { name: 'Enviar pergunta' }).click();
+  await expect(panel.getByText('Resposta sintética de teste.')).toBeVisible();
+  await panel.getByRole('link', { name: 'Abrir em tela cheia' }).click();
+  await expect(page).toHaveURL(/#\/app\/valyra-ai$/);
+  await expect(panel).toBeHidden();
+  await expect(page.locator('.cx-ai').getByText('Resposta sintética de teste.')).toBeVisible();
+});
+
+test('"Por quê?" abre a barra de chat já com a pergunta enviada', async ({ page }) => {
+  await mockApi(page);
+  const asked: string[] = [];
+  await page.route('**/api/v1/ai/explain', (route) => {
+    asked.push(JSON.parse(route.request().postData() ?? '{}').question);
+    return json(route, { answer: 'Explicação sintética.', as_of: '2026-11-27T18:00:00Z', uncertainty: 'baixa', limitations: [], evidences: [] });
+  });
+  await page.goto('/#/app/transacoes');
+  await page.getByRole('link', { name: /Por quê/ }).first().click();
+  const panel = page.getByRole('dialog', { name: 'Pergunte ao Valyra' });
+  await expect(panel.getByText('Explicação sintética.')).toBeVisible();
+  expect(asked[0]).toContain('Cemig energia');
+  await expect(page).toHaveURL(/#\/app\/transacoes$/);
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+});
+
+test('sino abre uma janela de alertas que marca como lido sem sair da tela', async ({ page }) => {
+  const calls = await mockApi(page);
+  await page.goto('/#/app');
+  await page.getByRole('button', { name: /^Alertas/ }).click();
+  const pop = page.getByRole('dialog', { name: 'Alertas' });
+  await expect(pop.getByText('Saldo previsto negativo')).toBeVisible();
+  await expect(pop.getByText(/Menor saldo previsto -R\$ 1\.248,94 em/)).toBeVisible();
+  await pop.getByRole('button', { name: 'Marcar como lido' }).click();
+  await expect.poll(() => calls.some((c) => c.method === 'PATCH' && c.url === '/api/v1/alerts/a-1')).toBe(true);
+  await expect(page).toHaveURL(/#\/app$/);
+  await pop.getByRole('link', { name: 'Ver todos os alertas' }).click();
+  await expect(page).toHaveURL(/#\/app\/alertas$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Alertas' })).toBeVisible();
+});
+
+test('projeção da Central troca o período de cada vela', async ({ page }) => {
+  const calls = await mockApi(page);
+  await page.goto('/#/app');
+  const period = page.getByRole('radiogroup', { name: 'Período de cada vela' });
+  await expect(period.getByRole('radio', { name: 'Semana' })).toHaveAttribute('aria-checked', 'true');
+  await period.getByRole('radio', { name: 'Dia' }).click();
+  await expect(page.getByRole('heading', { name: 'Projeção diária' })).toBeVisible();
+  await expect.poll(() => calls.some((c) => c.url.includes('/projection?days=14'))).toBe(true);
+  await period.getByRole('radio', { name: 'Mês' }).click();
+  await expect(page.getByRole('heading', { name: 'Projeção mensal' })).toBeVisible();
+  await expect.poll(() => calls.some((c) => c.url.includes('/projection?days=90'))).toBe(true);
+});
+
+test('menu lateral expande com os nomes e lembra a escolha', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'No celular a gaveta do menu já mostra os nomes.');
+  await mockApi(page);
+  await page.goto('/#/app');
+  const label = page.locator('.cx-nav').getByText('Resumo do mês');
+  await expect(label).not.toBeInViewport();
+  await page.getByRole('button', { name: 'Expandir menu' }).click();
+  await expect(label).toBeInViewport();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Recolher menu' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(label).toBeInViewport();
+});

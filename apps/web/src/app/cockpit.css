@@ -1293,3 +1293,149 @@ a.cx-card:hover { border-color: var(--cx-glass-line-strong); transform: translat
   .ax-stock__date, .ax-stock .ax-spark { display: none; }
   .ax-drawer__panel { padding: 18px; }
 }
+
+/* ---------- Menu lateral expansível ---------- */
+.cx .cx-nav-toggle { border: 0; background: none; font: inherit; cursor: pointer; }
+.cx .cx-nav-toggle:focus-visible { outline: 2px solid var(--cx-cyan); outline-offset: 2px; }
+/* No celular a gaveta já mostra os nomes: o botão de expandir só existe no desktop. */
+@media (max-width: 900px) {
+  .cx .cx-nav-toggle { display: none; }
+}
+@media (min-width: 901px) {
+  .cx.app-shell { transition: grid-template-columns 260ms var(--cx-ease); }
+  .cx.cx--nav-wide.app-shell { grid-template-columns: 236px minmax(0, 1fr); }
+  .cx--nav-wide .app-sidebar { align-items: stretch; padding: 18px 12px; overflow-y: auto; }
+  .cx--nav-wide .cx-brand { padding: 0 4px; }
+  .cx--nav-wide .cx-brand__text { display: flex; }
+  .cx--nav-wide .cx-nav { align-items: stretch; }
+  .cx--nav-wide .cx-nav__title { position: static; width: auto; height: auto; clip: auto; padding: 0 4px 4px; }
+  .cx--nav-wide .cx-nav__label { position: static; width: auto; height: auto; clip: auto; overflow: hidden; text-overflow: ellipsis; }
+  .cx--nav-wide .cx-nav a,
+  .cx--nav-wide .cx-nav__soon,
+  .cx.cx--nav-wide .app-nav__back { display: flex; justify-content: flex-start; gap: 12px; width: auto; height: auto; padding: 10px 12px; font-size: 0.88rem; }
+  .cx--nav-wide .cx-nav [data-tip]::after,
+  .cx.cx--nav-wide .app-nav__back[data-tip]::after { display: none; }
+  .cx.cx--nav-wide .app-nav__count { position: static; margin-left: auto; }
+  .cx--nav-wide .cx-sidebar__foot { align-items: stretch; }
+}
+
+/* ---------- Período da projeção ---------- */
+.cx .cx-candles__header { flex-wrap: wrap; gap: 10px 14px; }
+.cx .cx-period { margin-left: auto; }
+.cx .cx-period button { padding: 0.3rem 0.85rem; font-size: 0.78rem; }
+
+/* ---------- Barra de chat da Valyra AI ---------- */
+.cx-chat-layer { position: fixed; inset: 0; z-index: calc(var(--z-modal) + 10); pointer-events: none; }
+.cx-chat-scrim { position: absolute; inset: 0; border: 0; background: rgb(4 6 12 / 0.45); pointer-events: auto; animation: cx-fade 200ms ease; }
+.cx-chat-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  width: min(30rem, calc(100vw - 24px));
+  border: 1px solid rgb(82 212 255 / 0.18);
+  border-radius: 24px;
+  background: #0d1222;
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.05);
+  color: var(--cx-text);
+  pointer-events: auto;
+  animation: cx-slide-in 280ms var(--cx-ease);
+}
+.cx-chat-panel__head { display: flex; align-items: center; gap: 12px; padding: 16px 16px 14px 18px; border-bottom: 1px solid var(--cx-glass-line); }
+.cx-chat-panel__head > div { flex: 1; min-width: 0; }
+.cx-chat-panel__head h2 { margin: 0; font-family: var(--cx-display); font-size: 1.05rem; font-weight: 600; letter-spacing: -0.02em; }
+.cx-chat-panel__head small { display: block; color: var(--cx-subtle); font-size: 0.74rem; }
+.cx-chat-panel__orb { display: grid; flex: none; width: 34px; height: 34px; place-items: center; border-radius: 50%; background: radial-gradient(circle at 32% 28%, #c4f1ff, #2f86ff 60%, #0a2a8a); color: #04122e; }
+.cx-chat-panel__btn {
+  display: grid;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--cx-glass-line);
+  border-radius: 11px;
+  background: var(--cx-glass);
+  color: var(--cx-muted);
+  cursor: pointer;
+  text-decoration: none;
+}
+.cx-chat-panel__btn:hover { background: var(--cx-glass-strong); color: var(--cx-text); }
+.cx-chat-panel__btn:focus-visible { outline: 2px solid var(--cx-cyan); outline-offset: 2px; }
+.cx-chat-panel__body { display: flex; flex: 1; flex-direction: column; gap: 14px; min-height: 0; padding: 16px; overflow-y: auto; }
+.cx-chat-panel .cx-suggestions > div { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.cx-chat-panel .cx-suggestion { padding: 11px 14px; font-size: 0.84rem; }
+.cx-chat-panel .cx-composer { position: sticky; bottom: 0; }
+.cx-chat-panel .cx-ai__fine { margin: 0; }
+@keyframes cx-slide-in { from { opacity: 0; transform: translateX(24px); } }
+@keyframes cx-fade { from { opacity: 0; } }
+@media (max-width: 560px) {
+  .cx-chat-panel { top: 0; right: 0; bottom: 0; width: 100vw; border-radius: 0; border-width: 0; }
+}
+
+/* ---------- Janela de alertas ---------- */
+.cx-alerts-anchor { position: relative; flex: none; }
+.cx .cx-icon-link { font: inherit; cursor: pointer; }
+.cx-alerts-pop {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  top: calc(100% + 10px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(22rem, calc(100vw - 24px));
+  padding: 14px;
+  border: 1px solid rgb(82 212 255 / 0.18);
+  border-radius: 20px;
+  background: #0f1426;
+  box-shadow: 0 20px 52px rgb(0 0 0 / 0.55);
+  color: var(--cx-text);
+  animation: cx-fade 160ms ease;
+}
+.cx-alerts-pop:focus { outline: none; }
+.cx-alerts-pop__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
+.cx-alerts-pop__head h2 { margin: 0; font-family: var(--cx-display); font-size: 1rem; font-weight: 600; }
+.cx-alerts-pop__head small { color: var(--cx-subtle); font-size: 0.74rem; }
+.cx-alerts-pop__list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.cx-alerts-pop__item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; padding: 12px; border: 1px solid var(--cx-glass-line); border-radius: 14px; background: var(--cx-glass); }
+.cx-alerts-pop__item > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cx-alerts-pop__item b { font-size: 0.86rem; }
+.cx-alerts-pop__item small { color: var(--cx-muted); font-size: 0.76rem; }
+.cx-alerts-pop__item.is-read { opacity: 0.6; }
+.cx-alerts-pop__icon { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 10px; background: rgb(143 211 255 / 0.12); color: var(--cx-sky); }
+.cx-alerts-pop__item--warning .cx-alerts-pop__icon { background: rgb(255 200 87 / 0.14); color: var(--cx-amber); }
+.cx-alerts-pop__actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.cx-alerts-pop__actions a,
+.cx-alerts-pop__actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--cx-glass-line);
+  border-radius: 999px;
+  background: none;
+  color: var(--cx-text);
+  font: inherit;
+  font-size: 0.74rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.cx-alerts-pop__actions a:hover,
+.cx-alerts-pop__actions button:hover:not(:disabled) { background: var(--cx-glass-strong); }
+.cx-alerts-pop__actions svg { color: var(--cx-cyan); }
+.cx-alerts-pop__empty { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; background: var(--cx-glass); color: var(--cx-muted); font-size: 0.82rem; }
+.cx-alerts-pop__empty p { margin: 0; }
+.cx-alerts-pop__error { margin: 0; padding: 10px 12px; border-radius: 12px; background: rgb(255 122 77 / 0.12); color: #ffb39a; font-size: 0.8rem; }
+.cx-alerts-pop__all { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px; border-radius: 12px; color: var(--cx-cyan); font-size: 0.82rem; text-decoration: none; }
+.cx-alerts-pop__all:hover { background: var(--cx-glass); }
+/* No celular o sino fica no meio do cabeçalho: a janela vira uma faixa fixa com margem
+   dos dois lados, em vez de pendurada no sino e cortada na borda esquerda. */
+@media (max-width: 720px) {
+  .cx-alerts-pop { position: fixed; top: 72px; right: 12px; left: 12px; width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cx-chat-panel, .cx-chat-scrim, .cx-alerts-pop { animation: none; }
+  .cx.app-shell { transition: none; }
+}
