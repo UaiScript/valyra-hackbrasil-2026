@@ -1,10 +1,11 @@
 # HTTP IA e jornada de validação
 
 Contrato gerado em [openapi.json](../packages/contracts/openapi.json), operação
-`ai_explain`. O frontend já pode integrar a rota; resumo, projeções e Alpha
-continuam indisponíveis e aparecem nas limitações. Configuração e fallback em
-[ai-client.md](ai-client.md), montagem em [ai-service.md](ai-service.md) e limites
-da conferência em [ai-validation.md](ai-validation.md).
+`ai_explain`, integrada ao frontend em `#/app/valyra-ai` e no resumo semanal. O
+serviço inclui cálculos do Finance, indicadores do radar Alpha e manchetes da
+semana publicados até o corte, respeitando o limite de 64.000 bytes do prompt.
+Configuração e fallback em [ai-client.md](ai-client.md), montagem em
+[ai-service.md](ai-service.md) e limites da conferência em [ai-validation.md](ai-validation.md).
 
 ## Requisição
 
@@ -43,7 +44,8 @@ quando o status for `200`. Não deve inferir saldo realizado/projeção a partir
 saldo de referência. Em `evidences`, dinheiro Finance usa
 `value.kind="money"`, `amount_cents` inteiro seguro e `currency="BRL"`, sem
 alterar o contrato dos endpoints Finance. O schema gerado descreve as variantes
-de origem e valor; sua existência não significa que Alpha já esteja integrado.
+de origem e valor (`finance_record`, `calculation` e `alpha_signal`), exibidas com
+procedência e datas no frontend.
 
 Sem evidências elegíveis, há `200` com mensagem determinística de insuficiência,
 `evidences: []`, `uncertainty: "alta"` e limitações. Nesse caso não há chamada ao

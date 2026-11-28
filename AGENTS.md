@@ -48,7 +48,7 @@ Make aceita UV=/caminho/uv e ENV_FILE=/caminho/configuração. Usa .env existent
 - Quando envolver schema, CSV ou HTTP → leia [docs/modelagem-db.md](docs/modelagem-db.md), [docs/api-design.md](docs/api-design.md), [docs/revisao-modelagem.md](docs/revisao-modelagem.md).
 - Quando envolver fundação e propostas → leia [docs/spec-tecnica.md](docs/spec-tecnica.md).
 - Quando envolver cliente LLM/configuração → leia [docs/ai-client.md](docs/ai-client.md); fallback GPT-4o-mini ativo com OPENAI_API_KEY, controle de gasto pelo painel da OpenAI; contexto tipado do servidor, LLM cita apenas IDs de evidências; [validação e limites](docs/ai-validation.md).
-- Quando envolver orquestração IA/integração Finance → leia [docs/ai-service.md](docs/ai-service.md) e [contrato HTTP](docs/ai-http.md); autorização antes do contexto/LLM, dados ausentes como limitação; POST /api/v1/ai/explain.
+- Quando envolver orquestração IA/integração Finance → leia [docs/ai-service.md](docs/ai-service.md) e [contrato HTTP](docs/ai-http.md); autorização antes do contexto/LLM, limite diário calculado pelo Finance, contexto selecionado dentro de 64.000 bytes com dependências e omissões explícitas; POST /api/v1/ai/explain.
 - Quando envolver CI/revisão/proteções → leia [docs/github-setup.md](docs/github-setup.md).
 - Para localizar referências → leia [docs/README.md](docs/README.md). Use caminhos comuns, sem imports @.
 

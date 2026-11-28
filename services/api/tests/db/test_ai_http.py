@@ -6,10 +6,76 @@ from uuid import uuid4
 import pytest
 
 from valyra.ai import llm_client
+from valyra.ai.schemas import LLMPayload
 from valyra.core.deps import get_current_user_id
+from valyra.finance.models import Budget
 
 pytestmark = pytest.mark.postgres
 URL = "/api/v1/ai/explain"
+
+
+@pytest.mark.parametrize("limit", [None, 1000, 10000])
+def test_http_explica_limite_diario_do_finance_sem_confundir_ausencia_com_zero(
+    client, app, db_session, reference_rows, insert_transaction, monkeypatch, limit
+):
+    from tests.db.test_ai_service import current_cutoff
+    from valyra.ai import service
+    from valyra.core import clock as business_clock
+
+    account, user, batch, category = (
+        reference_rows[k] for k in ("account", "user", "batch", "category")
+    )
+    tx = insert_transaction()
+    batch.status, batch.rows_total, batch.rows_imported = "completed", 1, 1
+    batch.completed_at = batch.created_at
+    if limit is not None:
+        db_session.add(Budget(user_id=user.id, category_id=category.id, limit_cents=limit))
+    db_session.flush()
+    cut = current_cutoff(account, tx)
+    monkeypatch.setattr(
+        business_clock, "get_today", lambda: cut.astimezone(business_clock.BUSINESS_TIMEZONE).date()
+    )
+    actual = service.explain_for_account
+    monkeypatch.setattr(
+        service,
+        "explain_for_account",
+        lambda session, uid, body: actual(session, uid, body, clock=lambda: cut),
+    )
+    app.dependency_overrides[get_current_user_id] = lambda: user.id
+    expected = client.get("/api/v1/finance/budgets").json()["daily_allowance_cents"]
+
+    def reply(sent):
+        items = {item.evidence_id: item for item in sent.context_data.evidences}
+        if expected is None:
+            assert "budget_daily_allowance" not in items
+            return LLMPayload(
+                answer="Sem limite diário disponível.",
+                evidence_ids=[],
+                uncertainty="alta",
+                limitations=[],
+            )
+        item = items["budget_daily_allowance"]
+        assert item.value.amount_cents == expected
+        assert item.basis == "reference"
+        assert item.source.input_scope.import_batch_ids == [batch.id]
+        return LLMPayload(
+            answer=f"O limite diário do orçamento é {item.display_value}.",
+            evidence_ids=[item.evidence_id],
+            uncertainty="baixa",
+            limitations=[],
+        )
+
+    monkeypatch.setattr(llm_client, "call_llm", reply)
+    response = client.post(
+        URL, json={"question": "Qual meu limite diário?", "account_id": str(account.id)}
+    )
+    assert response.status_code == 200, response.text
+    if expected is None:
+        assert response.json()["evidences"] == []
+        assert any("Limite diário indisponível" in text for text in response.json()["limitations"])
+    else:
+        assert response.json()["evidences"][0]["value"]["amount_cents"] == expected
+        assert expected == 0 if limit == 1000 else expected > 0
 
 
 def test_http_consulta_finance_real_preserva_origem_e_valida_resposta(

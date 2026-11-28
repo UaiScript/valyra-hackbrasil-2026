@@ -69,6 +69,8 @@ Evidência textual com números só pode ser reproduzida literalmente;
 não reaproveite números avulsos.
 Não calcule novos números: explique apenas resultados previamente calculados.
 Preserve a diferença entre saldo de referência, realizado e projetado.
+Não confunda o limite diário do orçamento (teto restante dividido pelos dias do mês)
+com o gasto variável diário estimado na projeção nem com saldo disponível.
 Se faltarem citações, declare a limitação e use incerteza alta, mesmo que haja outros dados.
 Ausência de dados não significa saldo zero, ausência de gastos ou ausência de dívidas.
 Sem evidências, explique apenas a insuficiência de informação, sem números ou fontes.
@@ -128,6 +130,11 @@ def _build_user_prompt(request: LLMRequest) -> str:
     if len(prompt.encode("utf-8")) > _MAX_PROMPT_BYTES:
         raise LLMPromptError("Contexto LLM excede o limite de 64000 bytes")
     return prompt
+
+
+def validate_prompt_size(request: LLMRequest) -> None:
+    """Confere a serialização real antes da seleção do serviço, sem acessar o provedor."""
+    _build_user_prompt(request)
 
 
 def _call_gemini(prompt: str, settings: Settings) -> LLMPayload:

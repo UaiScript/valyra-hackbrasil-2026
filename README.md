@@ -24,7 +24,7 @@ A plataforma reúne três módulos em uma aplicação web responsiva:
 
 O objetivo é permitir uma jornada de **planejar → monitorar → compreender**: visualizar o orçamento, acompanhar sinais relevantes e consultar as evidências por trás de cada análise.
 
-### Exemplo de uso planejado
+### Exemplo de uso
 
 Uma pessoa consulta a projeção de saldo e identifica uma possível concentração de despesas nas próximas semanas. No radar econômico, encontra um sinal sobre a cadeia agrícola relacionado ao setor de um ativo que acompanha. Ao abrir a explicação, vê a origem das informações, suas datas e as limitações da análise.
 
@@ -43,22 +43,27 @@ O replay histórico é uma entrega adicional, condicionada à conclusão das pri
 
 ## Dados e uso de inteligência artificial
 
-A demonstração utilizará transações sintéticas e dados econômicos públicos, com identificação clara de informações simuladas. INMET, CONAB, MDIC/Comex Stat e B3 são fontes candidatas; disponibilidade, cobertura histórica e condições de uso serão avaliadas antes da integração.
+A demonstração usa transações sintéticas e dados econômicos públicos, com identificação das informações simuladas. Os coletores implementados consultam SGS/BCB, brapi e Open-Meteo; notícias vêm de feeds da Agência Brasil, BCB e IBGE, conforme as fontes e condições registradas nas ADRs [0012](docs/adr/0012-fontes-alpha.md) e [0013](docs/adr/0013-relatorio-semanal-noticias.md). A disponibilidade no ambiente publicado depende da configuração e execução das coletas. INMET, CONAB, MDIC/Comex Stat e integração direta com a B3 continuam candidatos futuros.
 
-As projeções numéricas serão produzidas por cálculos e modelos verificáveis. A IA terá o papel de explicar as evidências, preservando sua origem e suas limitações. O uso de dados alternativos para melhorar previsões é uma hipótese de pesquisa a ser comparada com modelos de referência; ainda não há ganho preditivo comprovado.
+As projeções numéricas são produzidas por cálculos determinísticos do Finance. A IA explica as evidências, preservando sua origem e suas limitações; a resposta passa por validação de citações e números no servidor. Indicadores e manchetes não demonstram causalidade nem sustentam probabilidades de queda de uma ação. O uso de dados alternativos para melhorar previsões continua uma hipótese de pesquisa; ainda não há ganho preditivo comprovado.
 
 O MVP não inclui integração bancária real, execução de operações ou recomendações personalizadas de compra e venda. Análises históricas deverão respeitar as datas de publicação e as versões dos dados disponíveis no período simulado.
 
 ## Landing page
 
-A página de apresentação e a aplicação Finance ficam em [`apps/web/`](apps/web/README.md). A landing (`/`) usa exemplos visuais sintéticos e não depende da API; a aplicação (`#/app`) consome a API Finance e Alerts: contas, resumo mensal, projeção de caixa, transações com recorrência e gasto atípico, correção de categoria, alertas e importação de CSV.
+A página de apresentação e a aplicação ficam em [`apps/web/`](apps/web/README.md). A landing (`/`) usa exemplos visuais sintéticos e não depende da API. A aplicação (`#/app`) integra Finance, Alerts, radar Alpha, notícias da semana e explicações da IA com evidências. O [roteiro da demonstração](docs/demo.md) descreve preparação, perguntas e alternativas quando fontes ou provedor estiverem indisponíveis.
 
 Com Node.js 22.12 ou superior, execute `npm --prefix apps/web ci --ignore-scripts` e `npm --prefix apps/web run dev`. Com `make dev` rodando, abra <http://127.0.0.1:3000/#/app>. Validação, destino dos links e hospedagem estão no README de apps/web.
 
 ## Base técnica e estágio do projeto
 
-A arquitetura definida é um **monorepo com frontend React e TypeScript e backend único FastAPI, organizado nos domínios Finance, Alpha e AI**. Estão previstos PostgreSQL para os dados da aplicação e DuckDB/Parquet para séries históricas. A [spec de fundação técnica](docs/spec-tecnica.md) detalha a arquitetura e identifica as propostas técnicas ainda em discussão.
+A arquitetura é um **monorepo com frontend React e TypeScript e backend único FastAPI**, organizado nos domínios Finance, Alerts, Alpha e AI, com PostgreSQL e migrações Alembic. DuckDB/Parquet continuam planejados. A [arquitetura atual](docs/architecture.md) distingue a implementação das propostas da [fundação técnica](docs/spec-tecnica.md).
 
-Este README apresenta a proposta e o escopo do rascunho. O projeto está em desenvolvimento; as funcionalidades descritas representam as entregas planejadas para o MVP.
+Implementado no MVP:
 
-A persistência inicial do Finance possui modelos SQLAlchemy, migração Alembic, seed e testes em `services/api/`. Comandos, dependências mínimas e limitações de validação estão no [registro da Issue #10](docs/revisao-modelagem.md); ainda não há endpoints ou importador CSV implementados.
+- Finance: importação CSV com rejeições e duplicatas, categorias, resumo, recorrências, gastos atípicos, orçamento por categoria, limite diário, projeção e alertas de caixa.
+- Alpha: radar de indicadores, cotações em variação percentual, clima por região e relatório semanal de notícias com fonte e publicação.
+- IA: `POST /api/v1/ai/explain`, contexto obtido no servidor, cliente Gemini/OpenAI, seleção dentro do limite do prompt e resposta com evidências originais. Ausência de dados é declarada; a explicação exige provedor configurado.
+- Validação: testes de integração PostgreSQL, jornadas HTTP com LLM simulado, testes de navegador e CI no GitHub Actions. Execuções automáticas não fazem chamadas pagas ao LLM.
+
+Continuam pendentes login, conexão bancária, histórico persistido de conversas, previsão de retorno/probabilidades e replay completo de Finance. Execução local em [CONTRIBUTING.md](CONTRIBUTING.md), contrato em [api-design.md](docs/api-design.md) e limites da IA em [ai-validation.md](docs/ai-validation.md).

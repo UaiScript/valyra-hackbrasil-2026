@@ -13,7 +13,7 @@ from google import genai
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from tests.ai.factories import ACCOUNT_ID
+from tests.ai.factories import ACCOUNT_ID, crowded_context
 from valyra.ai import llm_client, service
 from valyra.ai.domain import EvidenceContextError, EvidenceReferenceError, UnsupportedClaimError
 from valyra.ai.llm_client import (
@@ -22,7 +22,7 @@ from valyra.ai.llm_client import (
     LLMPromptError,
     LLMUnavailableError,
 )
-from valyra.ai.schemas import LLMPayload, LLMResponse
+from valyra.ai.schemas import EvidenceContext, LLMPayload, LLMResponse
 from valyra.alpha.news_service import WeeklyReport
 from valyra.alpha.service import Radar
 from valyra.core.config import Settings
@@ -118,7 +118,10 @@ def test_http_monta_contexto_autoriza_valida_e_serializa_apenas_contrato_publico
     stack.session.rollback.assert_not_called()
 
 
-def test_jornada_http_inclui_prompt_sdk_parsing_e_dominio_sem_chamada_paga(stack, monkeypatch):
+@pytest.mark.parametrize("large_context", [False, True])
+def test_jornada_http_inclui_prompt_sdk_parsing_e_dominio_sem_chamada_paga(
+    stack, monkeypatch, large_context
+):
     # Restaura o cliente real: somente o transporte HTTP do SDK é substituído.
     real_client = genai.Client
     captured = []
@@ -130,10 +133,20 @@ def test_jornada_http_inclui_prompt_sdk_parsing_e_dominio_sem_chamada_paga(stack
         _env_file=None,
     )
     monkeypatch.setattr(llm_client, "get_settings", lambda: settings)
+    original = None
+    if large_context:
+
+        def provider(_session, _uid, _account, cut, _clock):
+            nonlocal original
+            original = EvidenceContext.model_validate(crowded_context(as_of=cut, built_at=cut))
+            return original
+
+        monkeypatch.setattr(service, "_finance_context", provider)
 
     def transport(request):
         wire = json.loads(request.content)
         prompt = json.loads(wire["contents"][0]["parts"][0]["text"])
+        assert len(wire["contents"][0]["parts"][0]["text"].encode("utf-8")) <= 64000
         captured.append(prompt)
         evidence = prompt["context_data"]["evidences"][0]
         payload = {
@@ -165,6 +178,16 @@ def test_jornada_http_inclui_prompt_sdk_parsing_e_dominio_sem_chamada_paga(stack
     assert len(captured) == 1 and captured[0]["question"] == BODY["question"]
     assert captured[0]["context_data"]["account_id"] == ACCOUNT_ID
     assert response.json()["evidences"][0]["value"]["amount_cents"] == 500000
+    if large_context:
+        sent = captured[0]["context_data"]
+        assert len(sent["evidences"]) < len(original.evidences)
+        ids = {item["evidence_id"] for item in sent["evidences"]}
+        assert {"e1", "input_tx", "e3"} <= ids
+        for item in sent["evidences"]:
+            assert set(item["source"].get("input_evidence_ids", [])) <= ids
+        assert any("Contexto parcial" in text for text in response.json()["limitations"])
+        assert any("Publicação estimada" in text for text in response.json()["limitations"])
+        assert len(original.evidences) == 33
 
 
 @pytest.mark.parametrize(

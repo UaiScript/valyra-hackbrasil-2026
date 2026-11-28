@@ -284,6 +284,48 @@ test('Pergunte ao Valyra avisa quando a rota de IA não existe na API', async ({
   await expect(page.getByText('A explicação por IA ainda não está publicada nesta API.')).toBeVisible();
 });
 
+test('IA mostra origem e publicação das evidências e só oferece links HTTP seguros', async ({ page }, testInfo) => {
+  await mockApi(page);
+  const source = {
+    kind: 'alpha_signal', source_id: '00000000-0000-0000-0000-000000000301',
+    signal_id: '00000000-0000-0000-0000-000000000401', signal_key: 'synthetic:news', revision_id: 1,
+    source_url: 'https://agenciabrasil.ebc.com.br/economia/noticia/teste', observation_date: '2026-11-26',
+    published_at: '2026-11-26T15:00:00Z', published_at_estimated: true, ingested_at: '2026-11-27T10:00:00Z',
+  };
+  const period = { start: '2026-11-26', end: '2026-11-26' };
+  await page.route('**/api/v1/ai/explain', (route) => json(route, {
+    answer: 'O limite diário vem do orçamento. A manchete é contexto público, sem relação causal demonstrada.',
+    as_of: '2026-11-27T18:00:00Z', uncertainty: 'alta', limitations: ['Dados sintéticos de teste.'],
+    evidences: [
+      { evidence_id: 'news', metric_key: 'alpha.news.agro', basis: 'observed', label: 'Manchete sintética da cadeia da soja', period, source,
+        value: { kind: 'text', value_text: 'Chuva e condições de plantio são acompanhadas pelos produtores' } },
+      { evidence_id: 'daily', metric_key: 'finance.budget.daily_allowance', basis: 'reference', label: 'Limite diário do orçamento desta conta', period,
+        source: { kind: 'calculation', module: 'finance', method_key: 'finance.budget_report', method_version: 'adr-0010', computed_at: '2026-11-27T18:00:00Z', input_scope: { period, account_id: ACCOUNT.id, import_batch_ids: ['00000000-0000-0000-0000-000000000201'] } },
+        value: { kind: 'money', amount_cents: 1250, currency: 'BRL' } },
+      { evidence_id: 'balance', metric_key: 'finance.account.reference_balance', basis: 'reference', label: 'Saldo informado', period,
+        source: { kind: 'finance_record', record_type: 'account', record_id: ACCOUNT.id, recorded_at: '2026-11-26T10:00:00Z' },
+        value: { kind: 'money', amount_cents: 500000, currency: 'BRL' } },
+      { evidence_id: 'unsafe', metric_key: 'alpha.news.agro', basis: 'observed', label: 'URL inválida sem link', period,
+        source: { ...source, signal_key: 'synthetic:unsafe', source_url: 'javascript:alert(1)', published_at_estimated: false },
+        value: { kind: 'text', value_text: 'Link indisponível' } },
+    ],
+  }));
+  await page.goto('/#/app/valyra-ai');
+  await page.getByLabel('Sua pergunta').fill('Qual é o meu limite diário?');
+  await page.getByRole('button', { name: 'Enviar pergunta' }).click();
+  const evidence = page.getByRole('region', { name: 'Evidências citadas' });
+  await expect(evidence.getByRole('link')).toHaveCount(1);
+  await expect(evidence.getByRole('link')).toHaveAttribute('href', source.source_url);
+  await expect(evidence.getByRole('link')).toHaveAttribute('rel', 'noopener noreferrer');
+  await expect(evidence.getByText('Publicação estimada em', { exact: false })).toBeVisible();
+  await expect(evidence.getByText('Publicado em', { exact: false })).toBeVisible();
+  await expect(evidence.getByText('Calculado pelo Finance em', { exact: false })).toBeVisible();
+  await expect(evidence.getByText('Registro da conta em', { exact: false })).toBeVisible();
+  await expect(evidence.getByText('R$ 12,50')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('ai-evidencias.png'), fullPage: true });
+});
+
 test('resumo do mês mostra totais, categorias e navega para o mês anterior', async ({ page }) => {
   const calls = await mockApi(page);
   await page.goto('/#/app/resumo');

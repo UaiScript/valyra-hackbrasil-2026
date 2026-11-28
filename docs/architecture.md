@@ -5,7 +5,7 @@ Visão operacional da branch integrada. Histórico e propostas permanecem nos tr
 ```text
 apps/web — React/TypeScript: landing estática em / e aplicação em #/app (Finance, radar Alpha, IA)
                          | /api/v1/finance (importação, consultas, resumo, projeção, orçamento) · /api/v1/alerts · /api/v1/alpha · /api/v1/ai
-services/api — FastAPI único: /health, Finance (13 operações), Alerts (2 operações), Alpha (1 operação), IA (1 operação) e OpenAPI
+services/api — FastAPI único: /health, Finance, Alerts, Alpha (radar e notícias), IA e OpenAPI
 core · finance (router → service → domínio CSV | analytics | repository → ORM)
      · alerts (router → service → domínio | repository → ORM; Finance chama só o service)
         | PostgreSQL 18
@@ -14,7 +14,7 @@ core · finance (router → service → domínio CSV | analytics | repository �
                 + Finance via service público (referência, movimentações e cálculos)
                 + Alpha via service público (radar no corte)
         + alpha (router → service → domínio | repository → ORM; só leitura na API)
-        + scripts/ingest_alpha ← GitHub Actions agendado ← SGS do BCB, brapi.dev e Open-Meteo (único escritor)
+        + scripts/ingest_alpha e scripts/ingest_news ← GitHub Actions ← fontes públicas permitidas
 ```
 
 ## Estado efetivo
@@ -34,7 +34,9 @@ core · finance (router → service → domínio CSV | analytics | repository �
 - CI: PostgreSQL/Compose, API consolidada e workflow independente da landing. Claude preparado; configuração externa e primeiro review são verificação separada. Resultados desta integração no PR e em [integração](integracao-11-12.md).
 - IA: cliente Gemini com saída estruturada e parsing estrito, timeout e tentativas limitadas; testes com HTTP simulado. Fallback GPT-4o-mini ativo quando `OPENAI_API_KEY` estiver configurada; controle de gasto pelo hard spend limit do painel da OpenAI ([ADR-0002](adr/0002-provedor-llm.md)). Contratos tipados e resolução de citações da [ADR-0011](adr/0011-contrato-evidencias-ia.md): o LLM devolve IDs e o servidor recupera dados originais. O domínio revalida metadados e confere os literais numéricos contra as citações ([regras e limites](ai-validation.md)); não certifica semântica ou causalidade. O [serviço](ai-service.md) autoriza via Finance público, monta saldo de referência, até vinte movimentações e, com lote concluído, resumo, orçamento e projeção calculados pelo Finance, além dos dois últimos pontos de cada série Alpha publicada até o corte, executa o cliente e valida a resposta. Contexto/cliente substituíveis nos testes; dados ausentes geram limitações e contexto vazio não chama provedor. A rota HTTP está descrita abaixo; persistência de conversas permanece pendente. Configuração no [guia](ai-client.md).
 - HTTP IA: `POST /api/v1/ai/explain`, operação `ai_explain`, recebe somente pergunta/conta, usa a identidade demo e devolve explicação validada com evidências originais. Erros conhecidos usam o envelope existente, declarado no OpenAPI. Jornada sintética com SDK/transporte simulado e integração Finance real com PostgreSQL dedicado; smoke com provedor real depende de chave local. Contrato e roteiro em [ai-http.md](ai-http.md).
-- Não implementados: categorização ML, DuckDB, alertas `market_signal`, notícias, `^BVSP` e IPCA acumulado em 12 meses (ainda não verificados) e dinheiro Alpha (cotações em reais).
+- Notícias: coleta por `scripts/ingest_news`, persistência append-only como `news_event` e `GET /api/v1/alpha/news/weekly`, com classificação temática heurística conforme [ADR-0013](adr/0013-relatorio-semanal-noticias.md). A IA recebe manchetes elegíveis com fonte e publicação; não calcula probabilidades ou causalidade a partir delas.
+- Contexto IA: o limite diário vem do orçamento calculado pelo Finance para a conta. A seleção respeita cem evidências e o teto real de 64.000 bytes do prompt, preservando dependências e declarando omissões. A interface apresenta a procedência e os instantes das evidências citadas; detalhes em [ai-service.md](ai-service.md).
+- Não implementados: categorização ML, DuckDB, alertas `market_signal`, `^BVSP` e IPCA acumulado em 12 meses (ainda não verificados) e dinheiro Alpha (cotações em reais).
 
 ## Fronteiras
 

@@ -4,6 +4,7 @@ import { ArrowUp, Bot, CircleHelp, Loader2, ShieldCheck, Sparkles, TriangleAlert
 import { api, ApiError, describeError } from '../api/client';
 import { AI_MESSAGES, explain, formatEvidenceValue } from '../api/ai';
 import type { EvidenceItem, ExplainResponse } from '../api/ai';
+import type { AlphaSignalSource, CalculationSource, FinanceRecordSource } from '../../lib/api/schema';
 import { formatIsoDate } from '../money';
 import { useApi } from '../useApi';
 import { useProfile } from '../useProfile';
@@ -34,6 +35,30 @@ function formatInstant(iso: string): string {
   return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
 }
 
+const EvidenceOrigin: FC<{ evidence: EvidenceItem }> = ({ evidence }) => {
+  // O gerador mantém esta união como unknown; reconhecemos somente as origens do contrato.
+  const source = evidence.source as Partial<AlphaSignalSource & CalculationSource & FinanceRecordSource> | null;
+  if (!source || typeof source !== 'object') return null;
+  if (source.kind === 'alpha_signal') {
+    let url: URL | undefined;
+    try {
+      const candidate = new URL(source.source_url ?? '');
+      if (candidate.protocol === 'https:' || candidate.protocol === 'http:') url = candidate;
+    } catch { /* Uma origem sem URL válida continua mostrando a data, sem link. */ }
+    return <small className="cx-evidence__source">
+      {url && <a className="app-link" href={url.href} target="_blank" rel="noopener noreferrer">Consultar fonte original · {url.hostname}</a>}
+      {source.published_at && <span>{source.published_at_estimated ? 'Publicação estimada em ' : 'Publicado em '}<time dateTime={source.published_at}>{formatInstant(source.published_at)}</time></span>}
+    </small>;
+  }
+  if (source.kind === 'calculation' && source.computed_at) {
+    return <small className="cx-evidence__source">Calculado pelo {source.module === 'finance' ? 'Finance' : 'Alpha'} em <time dateTime={source.computed_at}>{formatInstant(source.computed_at)}</time></small>;
+  }
+  if (source.kind === 'finance_record' && source.recorded_at) {
+    return <small className="cx-evidence__source">Registro {source.record_type === 'account' ? 'da conta' : 'da movimentação'} em <time dateTime={source.recorded_at}>{formatInstant(source.recorded_at)}</time></small>;
+  }
+  return null;
+};
+
 type Turn =
   | { id: number; question: string; status: 'loading' }
   | { id: number; question: string; status: 'done'; response: ExplainResponse }
@@ -53,7 +78,7 @@ export const Answer: FC<{ r: ExplainResponse }> = ({ r }) => (
           {r.evidences.map((e) => (
             <li key={e.evidence_id}>
               <span className={`cx-basis cx-basis--${e.basis}`}>{BASIS_LABEL[e.basis]}</span>
-              <span className="cx-evidence__label">{e.label}<small>{formatPeriod(e.period)}</small></span>
+              <span className="cx-evidence__label">{e.label}<small>{formatPeriod(e.period)}</small><EvidenceOrigin evidence={e} /></span>
               <strong className="cx-evidence__value">{formatEvidenceValue(e.value)}</strong>
             </li>
           ))}

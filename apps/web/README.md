@@ -14,6 +14,7 @@ Este pacote serve duas coisas: a **landing** em `/` (estática, dados sintético
 | Alertas | `#/app/alertas` | `alerts_list`, `alerts_update` (marcar como lido) |
 | Pergunte ao Valyra | `#/app/valyra-ai` | `ai_explain` (`POST /api/v1/ai/explain`, ADR-0011; se a API publicada não tiver a rota, a tela avisa); aceita `?q=` com a pergunta pronta, usado pelo botão “Por quê?” do selo atípico |
 | Radar econômico (Alternative Alpha) | `#/app/alpha` | `alpha_get_radar` (com `as_of` do campo "Ver como estava em", horário de Brasília): pulso, filtros por tema, clima por região, painel de detalhe, sinais com dados observados e limitações e saúde das fontes; valores decimais exibidos por texto, sem float |
+| Relatório da semana (Alternative Alpha) | `#/app/alpha/semana` | `alpha_get_weekly_news` (manchetes de 7 dias até `as_of`, agrupadas pela regra `news_theme_v3` com fonte, publicação e link externo) e `ai_explain` (resumo da semana com evidências) |
 | Importar CSV | `#/app/importar` | `finance_create_import_batch` (inclui `alerts_created`), `finance_list_import_batches` |
 
 Todas as operações do contrato atual têm tela. Valores previstos (projeção, evidências de alerta) aparecem sempre rotulados como previstos, separados do saldo realizado. O score de gasto atípico é exibido como indicador (ADR-0010), sem porcentagem nem causa.
@@ -37,6 +38,7 @@ Abra <http://127.0.0.1:3000/#/app> e importe `datasets/samples/transactions_demo
 - **Chamadas à API:** em dev e preview o Vite repassa `/api` e `/health` para `VITE_API_PROXY_TARGET` (padrão `http://127.0.0.1:8000`), então o navegador fala só com a própria origem e não depende de CORS. Para um build publicado com a API em outro domínio, defina `VITE_API_URL` (HTTPS fora de localhost); a origem entra no `connect-src` da CSP. Veja `.env.example`.
 - **Contrato:** os tipos em `src/lib/api/schema.ts` são gerados de `packages/contracts/openapi.json`. Não edite à mão: após `make openapi`, rode `npm --prefix apps/web run gen:api`. O `check` (e portanto o `build`) falha se os tipos estiverem desatualizados. O cliente escrito à mão fica em `src/app/api/client.ts`.
 - **Dinheiro:** valores chegam em centavos inteiros e são formatados/lidos por `src/app/money.ts` sem ponto flutuante. Totais e cálculos financeiros ficam no backend. O gráfico de projeção (`src/app/ProjectionChart.tsx`) usa ponto flutuante só para posicionar pixels; todo rótulo vem de `formatCents`.
+- **Evidências da IA:** a tela `#/app/valyra-ai` e o resumo da semana mostram a origem de cada evidência citada. Fontes Alpha incluem link HTTP(S) e publicação, identificada quando estimada; Finance diferencia registro e cálculo e mostra o instante correspondente. O limite diário é calculado pelo Finance, por conta no contexto IA, e não representa saldo disponível. O servidor declara omissões quando o contexto ultrapassa o teto do prompt.
 - **Testes:** `tests/money.test.ts` cobre a conversão e `tests/profiles.test.ts`, os perfis; `tests/browser/app.spec.ts` simula a API com `page.route`, sem precisar de banco.
 
 ## Landing (`/`)
