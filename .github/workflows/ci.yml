@@ -48,16 +48,13 @@ jobs:
         run: make sync
       - name: Lint e arquitetura
         run: make lint
-      - name: Domínio sem PostgreSQL
+      - name: Testes sem PostgreSQL ou provedor real
         env:
           DATABASE_URL: postgresql+psycopg://127.0.0.1:1/unreachable
           TEST_DATABASE_URL: postgresql+psycopg://127.0.0.1:1/unreachable_test
-        run: make test-domain
-      - name: Cliente IA sem rede ou PostgreSQL
-        env:
-          DATABASE_URL: postgresql+psycopg://127.0.0.1:1/unreachable
-          TEST_DATABASE_URL: postgresql+psycopg://127.0.0.1:1/unreachable_test
-        run: make test-ai
+          GEMINI_API_KEY: ""
+          OPENAI_API_KEY: ""
+        run: make test-unit
       - name: Iniciar PostgreSQL isolado do runner
         run: |
           cp .env.example .env
@@ -73,7 +70,7 @@ jobs:
           uv run --locked --env-file "$PWD/.env" --directory services/api alembic check
           uv run --locked --directory services/api python -c 'from alembic.config import Config; from alembic.script import ScriptDirectory; heads = ScriptDirectory.from_config(Config("alembic.ini")).get_heads(); assert len(heads) == 1, heads'
       - name: Suíte integrada em banco dedicado
-        run: make test
+        run: make test-integration
       - name: Contrato gerado e documentação
         run: |
           make openapi

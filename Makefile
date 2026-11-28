@@ -2,7 +2,7 @@ UV ?= uv
 ENV_FILE ?= $(abspath $(if $(wildcard .env),.env,.env.example))
 RUN = "$(UV)" run --locked --env-file "$(ENV_FILE)" --directory services/api
 
-.PHONY: sync dev test test-domain test-ai lint migrate seed openapi
+.PHONY: sync dev test test-unit test-integration test-domain test-ai lint migrate seed openapi
 sync:
 	"$(UV)" sync --project services/api --locked
 dev:
@@ -10,6 +10,10 @@ dev:
 	$(RUN) uvicorn valyra.main:create_app --factory --reload
 test:
 	$(RUN) pytest
+test-unit:
+	$(RUN) pytest -m "not postgres"
+test-integration:
+	$(RUN) pytest -m postgres
 test-domain:
 	$(RUN) pytest tests/finance/test_domain.py tests/finance/test_analytics.py tests/core/test_clock.py \
 		tests/alerts/test_alerts_domain.py tests/alpha/test_domain.py tests/alpha/test_news_domain.py

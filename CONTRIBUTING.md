@@ -23,6 +23,23 @@ Make usa .env existente, ou .env.example se ausente. Passa esse arquivo ao proce
 
 make dev sobe somente postgres e inicia uvicorn em reload. make test-domain executa a suíte pura sem precisar de PostgreSQL, mesmo que TEST_DATABASE_URL esteja ausente. A suíte completa exige banco dedicado; sem TEST_DATABASE_URL, testes de banco são explicitamente ignorados, não validados. Não use SQLite para substituir a validação PostgreSQL.
 
+Para trabalhar por grupo, `make test-unit` executa todos os testes sem PostgreSQL
+(`pytest -m "not postgres"`) e `make test-integration` só os que usam banco
+(`pytest -m postgres`). A coleta marca automaticamente os testes que dependem de
+`test_destination`, inclusive por fixtures como `client` e `db_session`; a marcação
+explícita `@pytest.mark.postgres` também é respeitada. Novas fixtures de banco devem
+usar essa mesma barreira de segurança. O CI roda esses grupos separados, sem repetir
+os testes de domínio e IA na etapa de integração. `make test` continua disponível
+para rodar tudo; `test-domain` e `test-ai` são recortes locais.
+
+A suíte prioriza jornadas HTTP/persistência. Mantenha unitários para regras que
+essas jornadas não exercitam, como limites e arredondamento financeiro, recuperação
+de CSV malformado, corte temporal, evidências adulteradas e falhas/custos do LLM.
+Getters, detalhes privados e validações do framework já exercitadas pela API não
+precisam de uma segunda bateria unitária. Ao reduzir testes, preserve os cenários
+de integração e explicite quais regras de borda continuam verificadas; menos casos
+significa menos cenários exercitados, não uma garantia de cobertura equivalente.
+
 O init roda em volume novo. Em volume existente, preserve os dados e execute apenas o [script idempotente](infra/postgres/init/01-create-test-db.sql) via psql conforme [registro](docs/revisao-modelagem.md); respeite POSTGRES_DB e não apague volumes. Fixtures criam schemas aleatórios no banco de testes validado; nunca limpam desenvolvimento.
 
 ## Landing
