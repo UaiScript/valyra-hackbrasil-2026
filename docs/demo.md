@@ -52,3 +52,67 @@ A projeção não usa o dia do mês: cada recorrência é prevista a partir da �
 - **API dormindo ou lenta:** abra `/health` em outra aba e continue falando pela landing; o app tenta de novo sozinho.
 - **Importação ao vivo falhou:** importe `demo_novembro.csv` assim que a API responder, ou siga pelas telas se ele já tiver sido importado. O resumo, a projeção e o alerta continuam iguais.
 - **Números diferentes do roteiro:** quase sempre é dado de teste antigo na conta ou `DEMO_TODAY` ausente; confira os dois itens da preparação.
+
+## Jornada completa: Finance, Alpha e IA
+
+Extensão sugerida para uma apresentação de até 5 minutos. O roteiro Finance e
+seus números históricos acima foram preservados; esta extensão exige um novo
+ensaio no ambiente que será apresentado, sem presumir os valores atuais das fontes.
+
+### Preparação adicional
+
+- Depois de importar os dois CSVs, abra **Orçamento**, escolha uma categoria de
+  saída e defina um teto acima do gasto exibido. Confirme que salvar e remover
+  um teto funcionam no site publicado, onde navegador e API usam origens diferentes.
+  Deixe o orçamento preparado e confira o limite diário mostrado pelo Finance.
+- Confira **Alternative Alpha** e **Notícias da semana**: devem existir dados
+  coletados, com fonte e publicação. Verifique o horário da última coleta e as
+  limitações de cobertura. O radar pode ficar vazio se a coleta não tiver ocorrido;
+  isso não demonstra ausência de eventos no mercado.
+- Configure a chave do provedor somente no ambiente do backend. Antes do evento,
+  faça uma pergunta de ensaio na tela **Valyra AI** e confira resposta, evidências
+  citadas e limitações. A chamada real consome cota; os testes automáticos usam
+  transporte simulado e não comprovam a qualidade da resposta do provedor real.
+- `DEMO_TODAY` fixa os cálculos Finance; o corte de conhecimento da IA continua
+  sendo o instante real do servidor. O radar também tem seu próprio corte explícito.
+  Não apresente a combinação como replay histórico completo da conta.
+
+### Sequência sugerida
+
+1. **Finance — 2min30.** Siga importação, resumo e projeção do roteiro. Mostre o
+   alerta e um orçamento configurado. Explique: o limite diário vem do teto
+   restante dividido pelos dias do mês pelo Finance; não é saldo disponível nem
+   a estimativa de gasto diário usada na projeção. Os tetos são do usuário e o
+   painel agrega suas contas; a explicação da IA usa o consumo da conta consultada.
+2. **Alpha — 1min.** Abra o radar, escolha clima em uma região produtora e mostre
+   observação, publicação e fonte. Na semana, abra uma manchete sobre agro/soja
+   ou um ativo acompanhado, conforme o que realmente estiver coletado. Diga:
+   “Isso oferece contexto para acompanhar; não é uma probabilidade de queda nem
+   prova que a notícia causou uma mudança no preço.”
+3. **IA — 1min.** Pergunte “Qual é meu limite diário de orçamento e de onde vem
+   esse valor?”. Confira o valor com o Finance. Depois use **Gerar resumo** na
+   semana ou pergunte sobre as notícias e indicadores disponíveis. Abra uma fonte
+   citada e mostre sua publicação. Diferencie registros, cálculos e fontes públicas;
+   indique quando a publicação for estimada. O modelo explica resultados que o
+   servidor já calculou, e não precisa citar todas as evidências disponíveis.
+4. **Fechamento — 30s.** Retome o alerta de caixa, o contexto econômico e a
+   explicação com evidências. Declare as limitações: conta sintética, cobertura
+   parcial das fontes e ausência de previsão probabilística de retorno.
+
+### Verificação de aceite antes de apresentar
+
+- [ ] Salvar e excluir orçamento funcionam no navegador publicado.
+- [ ] O limite diário aparece na resposta com origem Finance; zero e ausência de
+      teto não são tratados como o mesmo caso.
+- [ ] Uma conta com mais categorias/indicadores ainda recebe explicação, com aviso
+      quando parte do contexto precisar ser omitida pelo limite do prompt.
+- [ ] Fontes HTTP(S) abrem em nova aba e a publicação é visível nas evidências Alpha.
+- [ ] A pergunta de ensaio funciona com o provedor configurado, sem expor chave ou
+      resposta descartada. Se a validação rejeitar a resposta, registre a falha;
+      não apresente o texto rejeitado como explicação validada.
+
+Sem Alpha/notícias, mostre a limitação de cobertura e siga com Finance. Sem
+provedor, siga com os números e as fontes das telas e declare que a explicação
+está indisponível. Não substitua uma falha por resposta pré-escrita apresentada
+como chamada ao vivo. Os itens acima são verificações pendentes de ensaio, não
+um registro de validação em produção.

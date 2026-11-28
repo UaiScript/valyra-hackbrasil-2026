@@ -42,6 +42,39 @@ def test_sem_limites_devolve_lista_vazia(client, seed):
     assert body["daily_allowance_cents"] is None
 
 
+def test_cors_permite_criar_e_remover_orcamento_da_origem_configurada(client, seed):
+    origin = "http://127.0.0.1:5173"
+    target = f"{URL}/{categoria(client, 'mercado')}"
+    for method in ("PUT", "DELETE"):
+        preflight = client.options(
+            target,
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": method,
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+        assert preflight.status_code == 200
+        assert preflight.headers["access-control-allow-origin"] == origin
+    saved = client.put(target, json={"limit_cents": 40000}, headers={"Origin": origin})
+    assert saved.status_code == 200
+    assert saved.headers["access-control-allow-origin"] == origin
+    assert saved.json()["items"][0]["limit_cents"] == 40000
+    removed = client.delete(target, headers={"Origin": origin})
+    assert removed.status_code == 204
+    assert removed.headers["access-control-allow-origin"] == origin
+    assert client.get(URL).json()["items"] == []
+    blocked = client.options(
+        target,
+        headers={
+            "Origin": "https://untrusted.example",
+            "Access-Control-Request-Method": "PUT",
+        },
+    )
+    assert blocked.status_code == 400
+    assert "access-control-allow-origin" not in blocked.headers
+
+
 def test_define_limite_e_calcula_consumo_e_status(client, gastos):
     mercado = categoria(client, "mercado")
     restaurantes = categoria(client, "restaurantes")

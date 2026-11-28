@@ -13,14 +13,16 @@ from tests.ai.factories import (
     AS_OF,
     BUILT_AT,
     context_data,
+    crowded_context,
     money_evidence,
 )
 from valyra.ai import service
-from valyra.ai.domain import EvidenceContextError, UnsupportedClaimError
+from valyra.ai.domain import EvidenceContextError, EvidenceReferenceError, UnsupportedClaimError
 from valyra.ai.schemas import (
     EvidenceContext,
     EvidenceItem,
     ExplainRequest,
+    HistoryMessage,
     LLMPayload,
 )
 from valyra.alpha.news_service import WeeklyReport
@@ -119,6 +121,32 @@ def test_cliente_nao_pode_adulterar_contexto_e_validar_seu_numero_inventado():
     with pytest.raises(UnsupportedClaimError):
         service.explain_with_context(request(), original, client=malicious)
     assert original.model_dump_json() == before
+
+
+def test_evidencia_omitida_pelo_tamanho_nao_pode_ser_citada_pelo_modelo():
+    original = EvidenceContext.model_validate(crowded_context())
+    omitted_id = original.evidences[-1].evidence_id
+
+    def client(sent):
+        assert omitted_id not in {item.evidence_id for item in sent.context_data.evidences}
+        return reply("Informação sem suporte.", (omitted_id,))
+
+    with pytest.raises(EvidenceReferenceError):
+        service.explain_with_context(request(), original, client=client)
+
+
+def test_historico_antigo_e_omitido_antes_das_evidencias_sem_cortar_mensagens():
+    history = [HistoryMessage(role="user", content="á" * 4000) for _ in range(10)]
+
+    def client(sent):
+        assert 0 < len(sent.history) < len(history)
+        assert all(message.content == "á" * 4000 for message in sent.history)
+        assert sent.context_data.evidences == context().evidences
+        return reply()
+
+    response = service.explain_with_context(request(), context(), history=history, client=client)
+    assert any("histórico de conversa" in text for text in response.limitations)
+    assert len(history) == 10
 
 
 def test_finance_autoriza_antes_de_produtor_substituivel_e_cliente(finance):

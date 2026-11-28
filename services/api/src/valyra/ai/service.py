@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from valyra.ai import llm_client
 from valyra.ai.domain import EvidenceContextError, build_explain_response
 from valyra.ai.schemas import (
+    CalculationSource,
     DecimalValue,
     EvidenceContext,
     EvidenceItem,
@@ -78,6 +79,8 @@ _UNSAFE_MONEY = (
 )
 _AFTER_CUTOFF = "Há registros posteriores ao corte e omitidos deste contexto."
 _EMPTY_CONTEXT = "Não foram disponibilizadas evidências elegíveis para esta explicação."
+_PROMPT_TRIMMED = "Contexto parcial: evidências omitidas para respeitar o limite de tamanho."
+_HISTORY_TRIMMED = "Parte do histórico de conversa foi omitida pelo limite de tamanho."
 
 
 @dataclass(frozen=True)
@@ -107,6 +110,70 @@ def _snapshot(context: EvidenceContext) -> EvidenceContext:
         raise EvidenceContextError("Contexto do servidor incompatível com o contrato IA") from None
 
 
+def _bounded_request(request: LLMRequest) -> LLMRequest:
+    """Remove itens inteiros; o snapshot de validação terá só o que o LLM recebeu."""
+    context = request.context_data
+    items = list(context.evidences)
+    history = list(request.history)
+    # Preserva avisos temporais mesmo se a evidência que os motivou precisar sair.
+    limitations = list(context.limitations)
+
+    def record(message: str) -> None:
+        if not any(message in entry for entry in limitations):
+            if len(limitations) < 20:
+                limitations.append(message)
+            else:
+                # Não descartar um aviso existente para abrir espaço para o corte.
+                for i, entry in enumerate(limitations):
+                    if len(entry) + len(message) + 1 <= 2000:
+                        limitations[i] = f"{entry} {message}"
+                        break
+                else:
+                    raise llm_client.LLMPromptError("Sem espaço para registrar contexto parcial")
+
+    while True:
+        try:
+            llm_client.validate_prompt_size(request)
+            return request
+        except llm_client.LLMPromptError:
+            for message in context.temporal_limitations():
+                record(message)
+            if history:
+                history.pop(0)
+                record(_HISTORY_TRIMMED)
+            elif items:
+                dependencies = {
+                    key
+                    for item in items
+                    if isinstance(item.source, CalculationSource)
+                    for key in item.source.input_evidence_ids
+                }
+
+                # Resumos, limites e projeções têm precedência sobre exemplos de
+                # transações. Só folhas saem, para nunca deixar um cálculo órfão.
+                def priority(item: EvidenceItem) -> int:
+                    if item.metric_key == "finance.transaction.amount":
+                        return 3
+                    if item.metric_key in {"finance.month.category_total", "finance.budget.status"}:
+                        return 2
+                    return 1 if item.source.kind == "alpha_signal" else 0
+
+                removable = [
+                    i for i, item in enumerate(items) if item.evidence_id not in dependencies
+                ]
+                index = max(removable, key=lambda i: (priority(items[i]), i))
+                items.pop(index)
+                record(_PROMPT_TRIMMED)
+            else:
+                # Pergunta/avisos também têm limites; não esconder erro estrutural
+                # nem enviar ao provedor um pedido que continua grande demais.
+                raise
+        context = EvidenceContext.model_validate(
+            context.model_dump() | {"evidences": items, "limitations": limitations}
+        )
+        request = LLMRequest(question=request.question, context_data=context, history=history)
+
+
 def explain_with_context(
     request: ExplainRequest,
     context: EvidenceContext,
@@ -126,6 +193,9 @@ def explain_with_context(
         context_data=_snapshot(original),
         history=list(history),
     )
+    if original.evidences:
+        llm_request = _bounded_request(llm_request)
+        original = _snapshot(llm_request.context_data)
     if not original.evidences:
         # Ausência de dados tem resposta determinística; não pagar ao LLM para inferir zero.
         result = LLMPayload(
@@ -554,6 +624,21 @@ def _calculation_evidences(
             "finance.budget_report",
             month_span,
             TextValue(value_text=_BUDGET_STATUS_TEXT[line.status]),
+        )
+
+    if budget.daily_allowance_cents is not None:
+        add(
+            "budget_daily_allowance",
+            "finance.budget.daily_allowance",
+            "Limite diário do orçamento desta conta até o fim do mês; não é saldo disponível",
+            "reference",
+            "finance.budget_report",
+            month_span,
+            budget.daily_allowance_cents,
+        )
+    else:
+        limitations.append(
+            "Limite diário indisponível: sem tetos de orçamento ou período já encerrado."
         )
 
     # Só dias depois do corte são futuros: com DEMO_TODAY anterior ao relógio real,

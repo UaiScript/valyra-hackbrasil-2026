@@ -22,9 +22,9 @@ Contratos na [ADR-0011](adr/0011-contrato-evidencias-ia.md).
    publicação estimada e ingestão posterior ao corte em reconstituições públicas.
 
 A função não consulta o banco para comprovar que a evidência é verdadeira.
-O [serviço IA](ai-service.md) autoriza a conta e monta contexto corrente pelo
-service público de Finance. Selecionar revisões Alpha continua pendente do
-respectivo service e de sua futura integração.
+O [serviço IA](ai-service.md) autoriza a conta e monta o contexto pelos services
+públicos de Finance e Alpha (incluindo indicadores do radar e manchetes da semana
+publicados até o corte), selecionando evidências inteiras dentro de 64.000 bytes.
 
 ## Regra conservadora de números
 

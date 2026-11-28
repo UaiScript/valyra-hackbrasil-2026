@@ -85,3 +85,34 @@ def context_data(**changes):
 
 def make_request(**changes):
     return LLMRequest(**({"question": "Explique", "context_data": context_data()} | changes))
+
+
+def crowded_context(**changes):
+    """Evidências válidas com textos UTF-8 que ultrapassam o teto de bytes do prompt."""
+    transaction = money_evidence(
+        evidence_id="input_tx",
+        metric_key="finance.transaction.amount",
+        basis="observed",
+        source={
+            "kind": "finance_record",
+            "record_type": "transaction",
+            "record_id": "00000000-0000-0000-0000-000000000501",
+            "recorded_at": "2026-11-01T12:00:00Z",
+            "import_batch_id": BATCH_ID,
+        },
+    )
+    calculation = calculation_evidence(
+        basis="observed", period={"start": "2026-11-01", "end": "2026-11-01"}
+    )
+    calculation["source"]["input_evidence_ids"] = ["input_tx"]
+    items = [money_evidence(), transaction, calculation]
+    for n in range(30):
+        item = alpha_evidence(
+            evidence_id=f"alpha_{n}",
+            label="Título sintético " + "á" * 1000,
+            value={"kind": "text", "value_text": "Evidência sintética " + "ç" * 1900},
+        )
+        item["source"]["signal_key"] = f"synthetic:{n}"
+        item["source"]["published_at_estimated"] = n == 29
+        items.append(item)
+    return context_data(evidences=items) | changes

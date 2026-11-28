@@ -5,8 +5,8 @@ O cliente implementa Gemini como primário e OpenAI como fallback
 [ADR-0011](adr/0011-contrato-evidencias-ia.md), aprovada em 17/11/2026, define os
 contratos tipados e a resolução de citações implementados neste incremento.
 O [serviço IA](ai-service.md) já consulta Finance, executa o cliente e valida a
-resposta. A [rota HTTP](ai-http.md) já está disponível; integração Alpha e
-conversa persistida continuam pendentes.
+resposta. A [rota HTTP](ai-http.md) já está disponível, integrada ao Finance,
+radar Alpha e manchetes da semana; conversa persistida continua pendente.
 O domínio confere citações, metadados temporais e reprodução lexical de números.
 Ele não comprova semântica, causalidade ou veracidade externa; regras e limites em
 [ai-validation.md](ai-validation.md). O cliente isolado retorna payload bruto do
@@ -39,7 +39,10 @@ e 4.096 tokens de saída, incluindo o raciocínio do modelo.
 Variáveis: `LLM_TIMEOUT_SECONDS`, `LLM_MAX_ATTEMPTS`,
 `LLM_MAX_OUTPUT_TOKENS` (revise valores antigos de 2048 já definidos no
 ambiente, que deixam pouco espaço ao JSON). Não são um prazo global para todas as tentativas.
-O prompt aceita até 64.000 bytes UTF-8; contextos grandes falham antes da rede.
+O prompt aceita até 64.000 bytes UTF-8. O serviço seleciona evidências inteiras
+com limitação explícita antes de chamar o cliente; chamadas diretas ao cliente
+com contexto ainda grande falham antes da rede. A medida inclui a serialização
+real de pergunta, contexto, histórico e dicas de apresentação.
 
 ## Contratos e confiança
 
