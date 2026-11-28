@@ -25,6 +25,15 @@ from valyra.main import create_app
 API_ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.hookimpl(tryfirst=True)
+def pytest_collection_modifyitems(items):
+    # Inclui dependências indiretas (client -> db_session -> test_destination):
+    # o CI separa o banco sem manter uma segunda lista de arquivos de integração.
+    for item in items:
+        if "test_destination" in item.fixturenames:
+            item.add_marker(pytest.mark.postgres)
+
+
 def migration_config(connection=None) -> Config:
     config = Config(str(API_ROOT / "alembic.ini"))
     if connection is not None:

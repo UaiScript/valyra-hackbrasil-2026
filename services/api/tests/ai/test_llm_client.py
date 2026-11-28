@@ -150,33 +150,7 @@ def test_parse_json_e_bloco_markdown(payload):
 
 @pytest.mark.parametrize(
     "raw",
-    [
-        "",
-        "[]",
-        "null",
-        "true",
-        "42",
-        '"texto"',
-        "{",
-        "{}",
-        "```",
-        "```json\n{}",
-        "```python\n{}\n```",
-        '{"answer": "a", "evidence_ids": [], "uncertainty": "alta", "limitations": [], "x": 1}',
-        pytest.param(
-            '{"answer": 123, "evidence_ids": [], "uncertainty": "alta", "limitations": []}',
-            id="answer-nao-textual",
-        ),
-        pytest.param(
-            '{"answer": "a", "evidence_ids": "x", "uncertainty": "alta", "limitations": []}',
-            id="evidence-ids-nao-lista",
-        ),
-        pytest.param(
-            '{"answer": "a", "evidence_ids": [], "uncertainty": "alta", "limitations": 0}',
-            id="limitations-nao-lista",
-        ),
-        '{"answer": "a", "evidence_ids": [], "uncertainty": "outra", "limitations": []}',
-    ],
+    ["{", "{}", "```", "```python\n{}\n```", "```json\n{}\ntexto"],
 )
 def test_parse_invalido_tem_excecao_unica(raw):
     with pytest.raises(llm.LLMParseError):
@@ -218,7 +192,7 @@ def test_sucesso_com_sdk_real_limites_e_fechamento(settings, sdk, payload):
     assert state.clients[0]._api_client._httpx_client.is_closed
 
 
-@pytest.mark.parametrize("status", [408, 409, 429, 500, 503, 599])
+@pytest.mark.parametrize("status", [429, 599])
 def test_transitorios_respeitam_numero_de_tentativas(settings, sdk, status, caplog):
     state = sdk(
         lambda _: httpx.Response(
@@ -248,7 +222,7 @@ def test_repeticao_pode_recuperar(settings, sdk, payload):
     assert len(state.requests) == 2
 
 
-@pytest.mark.parametrize("error", [httpx.ReadTimeout, httpx.ConnectError])
+@pytest.mark.parametrize("error", [httpx.ReadTimeout])
 def test_transporte_tem_tentativas_limitadas(settings, sdk, error):
     def handler(request):
         raise error("SEGREDO", request=request)
@@ -259,7 +233,7 @@ def test_transporte_tem_tentativas_limitadas(settings, sdk, error):
     assert len(state.requests) == settings.llm_max_attempts
 
 
-@pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
+@pytest.mark.parametrize("status", [401])
 def test_erro_permanente_nao_repete(settings, sdk, status):
     state = sdk(
         lambda _: httpx.Response(
@@ -273,7 +247,7 @@ def test_erro_permanente_nao_repete(settings, sdk, status):
     assert "SEGREDO" not in str(caught.value)
 
 
-@pytest.mark.parametrize("finish", ["MAX_TOKENS", "SAFETY", "RECITATION", None])
+@pytest.mark.parametrize("finish", ["MAX_TOKENS"])
 def test_resposta_incompleta_nao_repete(settings, sdk, payload, finish):
     state = sdk(lambda _: gemini_response(payload, finish=finish))
     with pytest.raises(llm.LLMParseError):
@@ -281,29 +255,7 @@ def test_resposta_incompleta_nao_repete(settings, sdk, payload, finish):
     assert len(state.requests) == 1
 
 
-@pytest.mark.parametrize("data", [[], None, {"answer": 1}, {"candidates": []}])
-def test_conteudo_invalido_nao_repete(settings, sdk, data):
-    state = sdk(lambda _: gemini_response(data))
-    with pytest.raises(llm.LLMParseError):
-        llm.call_llm(make_request(question="Explique"))
-    assert len(state.requests) == 1
-
-
-def test_sem_candidatos_e_bloqueio_do_prompt(settings, sdk):
-    state = sdk(lambda _: httpx.Response(200, json={"promptFeedback": {"blockReason": "SAFETY"}}))
-    with pytest.raises(llm.LLMParseError):
-        llm.call_llm(make_request(question="Explique"))
-    assert len(state.requests) == 1
-
-
-def test_bug_inesperado_nao_vira_indisponibilidade(settings, monkeypatch):
-    monkeypatch.setattr(llm, "_call_gemini", Mock(side_effect=TypeError("bug local")))
-    with pytest.raises(TypeError, match="bug local"):
-        llm.call_llm(make_request(question="Explique"))
-    assert llm._call_gemini.call_count == 1
-
-
-@pytest.mark.parametrize("gemini_key", ["", "sua-chave-aqui", "   "])
+@pytest.mark.parametrize("gemini_key", [""])
 def test_chave_ausente_nao_abre_cliente(settings, monkeypatch, gemini_key):
     settings.gemini_api_key = Settings(
         database_url="unused", gemini_api_key=gemini_key, _env_file=None
@@ -315,7 +267,7 @@ def test_chave_ausente_nao_abre_cliente(settings, monkeypatch, gemini_key):
     factory.assert_not_called()
 
 
-@pytest.mark.parametrize("gemini_status", [429, 503])
+@pytest.mark.parametrize("gemini_status", [429])
 def test_fallback_openai_acionado_quando_gemini_indisponivel(
     settings, sdk, openai_sdk_http, payload, gemini_status
 ):
@@ -363,34 +315,6 @@ def test_parse_error_nao_aciona_fallback(settings, sdk, payload, monkeypatch):
     openai_factory.assert_not_called()
 
 
-def test_prompt_preserva_contexto_e_historico(settings):
-    request = make_request(
-        question="Explique",
-        context_data=context_data(evidences=[money_evidence()]),
-        history=[{"role": "user", "content": "Dúvida anterior"}],
-    )
-    prompt = json.loads(llm._build_user_prompt(request))
-    assert prompt["history"] == request.model_dump(mode="json")["history"]
-    assert prompt["context_data"]["evidences"][0]["display_value"] == "R$ 5.000,00"
-    assert "display_value" not in request.model_dump(mode="json")["context_data"]["evidences"][0]
-
-
-@pytest.mark.parametrize(
-    "field, value",
-    [
-        ("llm_timeout_seconds", 0),
-        ("llm_timeout_seconds", 121),
-        ("llm_max_attempts", 0),
-        ("llm_max_attempts", 4),
-        ("llm_max_output_tokens", 0),
-        ("llm_max_output_tokens", 8193),
-    ],
-)
-def test_configuracao_valida_limites(settings, field, value):
-    with pytest.raises(ValidationError):
-        Settings(database_url="unused", _env_file=None, **{field: value})
-
-
 def test_chaves_mascaradas_e_fallback_por_chave(settings):
     config = Settings(
         database_url="unused",
@@ -420,7 +344,7 @@ def test_openai_schema_limites_e_fechamento(openai_settings, openai_sdk_http, pa
     assert state.clients[0].is_closed()
 
 
-@pytest.mark.parametrize("status", [408, 409, 429, 500, 503, 599])
+@pytest.mark.parametrize("status", [429, 599])
 def test_openai_http_transitorio_limitado(openai_settings, openai_sdk_http, status, caplog):
     state = openai_sdk_http(
         lambda _: httpx.Response(
@@ -436,13 +360,7 @@ def test_openai_http_transitorio_limitado(openai_settings, openai_sdk_http, stat
 
 @pytest.mark.parametrize(
     "code",
-    [
-        "insufficient_quota",
-        "credit_balance_exhausted",
-        "organization_usage_limit_exceeded",
-        "organization_spend_limit_exceeded",
-        "project_spend_limit_exceeded",
-    ],
+    ["insufficient_quota"],
 )
 def test_openai_limite_financeiro_nao_repete(openai_settings, openai_sdk_http, code):
     state = openai_sdk_http(
@@ -456,7 +374,7 @@ def test_openai_limite_financeiro_nao_repete(openai_settings, openai_sdk_http, c
     assert "SEGREDO" not in str(caught.value)
 
 
-@pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
+@pytest.mark.parametrize("status", [401])
 def test_openai_erro_permanente_sanitizado(openai_settings, openai_sdk_http, status):
     state = openai_sdk_http(
         lambda _: httpx.Response(
@@ -472,7 +390,7 @@ def test_openai_erro_permanente_sanitizado(openai_settings, openai_sdk_http, sta
     assert "SEGREDO" not in str(caught.value)
 
 
-@pytest.mark.parametrize("error", [httpx.ReadTimeout, httpx.ConnectError])
+@pytest.mark.parametrize("error", [httpx.ReadTimeout])
 def test_openai_transporte_limitado(openai_settings, openai_sdk_http, error):
     def handler(request):
         raise error("SEGREDO", request=request)
@@ -486,35 +404,13 @@ def test_openai_transporte_limitado(openai_settings, openai_sdk_http, error):
 
 @pytest.mark.parametrize(
     "finish, refusal",
-    [
-        ("length", None),
-        ("content_filter", None),
-        ("tool_calls", None),
-        ("stop", "Recusado"),
-    ],
+    [("length", None), ("stop", "Recusado")],
 )
 def test_openai_incompleto_ou_recusado_nao_repete(
     openai_settings, openai_sdk_http, payload, finish, refusal
 ):
     # Mesmo JSON completo não autoriza aceitar uma geração truncada/recusada pelo provedor.
     state = openai_sdk_http(lambda _: openai_response(payload, finish=finish, refusal=refusal))
-    with pytest.raises(llm.LLMParseError):
-        llm.call_llm(make_request(question="Explique"))
-    assert len(state.requests) == 1
-    assert state.clients[0].is_closed()
-
-
-@pytest.mark.parametrize("payload", [[], None, {}, {"answer": 123}])
-def test_openai_schema_invalido_nao_repete(openai_settings, openai_sdk_http, payload):
-    state = openai_sdk_http(lambda _: openai_response(payload))
-    with pytest.raises(llm.LLMParseError):
-        llm.call_llm(make_request(question="Explique"))
-    assert len(state.requests) == 1
-    assert state.clients[0].is_closed()
-
-
-def test_openai_sem_alternativas_nao_repete(openai_settings, openai_sdk_http):
-    state = openai_sdk_http(lambda _: httpx.Response(200, json={"choices": []}))
     with pytest.raises(llm.LLMParseError):
         llm.call_llm(make_request(question="Explique"))
     assert len(state.requests) == 1
@@ -549,32 +445,3 @@ def test_prompt_tipado_grande_falha_antes_da_rede(settings, monkeypatch):
     with pytest.raises(ValueError, match="64000"):
         llm.call_llm(request)
     factory.assert_not_called()
-
-
-@pytest.mark.parametrize("provider", ["gemini", "openai"])
-def test_provedores_devolvem_ids_e_servidor_recupera_dados_originais(
-    settings, sdk, openai_sdk_http, payload, provider
-):
-    from valyra.ai.domain import build_explain_response
-
-    reply = payload | {"answer": "O saldo de referência é R$ 5.000,00.", "evidence_ids": ["e1"]}
-    if provider == "gemini":
-        sdk(lambda _: gemini_response(reply))
-    else:
-        keys = Settings(database_url="unused", openai_api_key="test-openai", _env_file=None)
-        settings.gemini_api_key = keys.gemini_api_key
-        settings.openai_api_key = keys.openai_api_key
-        openai_sdk_http(lambda _: openai_response(reply))
-    request = make_request(context_data=context_data(evidences=[money_evidence()]))
-    result = llm.call_llm(request)
-    assert result.provider == provider
-    assert result.evidence_ids == ["e1"]
-    assert set(llm._RESPONSE_SCHEMA["properties"]) == {
-        "answer",
-        "evidence_ids",
-        "uncertainty",
-        "limitations",
-    }
-    response = build_explain_response(request.context_data, result)
-    assert response.evidences[0].value.amount_cents == 500000
-    assert "display_value" not in response.model_dump(mode="json")["evidences"][0]

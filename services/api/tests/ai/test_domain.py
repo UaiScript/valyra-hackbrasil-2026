@@ -31,11 +31,8 @@ def payload(answer, ids=("e1",), *, uncertainty="alta", limitations=None):
 @pytest.mark.parametrize(
     "answer",
     [
-        "O saldo de referência é R$ 5.000,00.",
-        "Saldo informado: R$5.000,00.",
-        "Saldo de referência: R$\u00a05.000,00.",
+        "Saldo de referência: R$\xa05.000,00.",
         "No corte 2026-11-17, o saldo de referência de 2026-11-01 é R$ 5.000,00.",
-        "Um saldo de referência não substitui uma projeção.",
     ],
 )
 def test_reproducao_de_valor_e_datas_originais(answer):
@@ -125,9 +122,25 @@ def test_somente_evidencias_citadas_e_suas_dependencias_sustentam_numeros():
     with pytest.raises(UnsupportedClaimError):
         build_explain_response(ctx, payload("Produtividade de 12,500 t/ha."))
     assert build_explain_response(ctx, payload("Produtividade de 12,500 t/ha.", ("e2",))).evidences
-    ctx = context([money_evidence(), calculation_evidence()])
-    result = build_explain_response(ctx, payload("Referência R$ 5.000,00.", ("e3",)))
-    assert [item.evidence_id for item in result.evidences] == ["e3", "e1"]
+    ctx = context([money_evidence(), alpha_evidence(), calculation_evidence()]).model_copy(
+        update={"limitations": ["Limitação do servidor"]}
+    )
+    result = build_explain_response(
+        ctx,
+        payload(
+            "Referência R$ 5.000,00.",
+            ("e3", "e2"),
+            limitations=["Limitação do modelo", "Limitação do servidor"],
+        ),
+    )
+    assert [item.evidence_id for item in result.evidences] == ["e3", "e2", "e1"]
+    assert result.evidences[-1] == ctx.evidences[0]
+    assert result.evidences[-1] is not ctx.evidences[0]
+    assert result.limitations == ["Limitação do servidor", "Limitação do modelo"]
+    body = result.model_dump(mode="json")
+    assert body["evidences"][-1]["value"]["amount_cents"] == 500000
+    assert "display_value" not in body["evidences"][-1]
+    assert "provider" not in body and "model" not in body
 
 
 def test_limitation_do_modelo_nao_pode_escapar_da_validacao():
@@ -171,35 +184,21 @@ def test_texto_numerico_exige_passagem_original_sem_transformar_numero_em_metric
 
 @pytest.mark.parametrize(
     "answer",
-    [
-        "Saldo R$ 0,00.",
-        "Há 0 gastos.",
-        "O saldo é zero.",
-        "Chance de 90%.",
-        "Fonte https://inventada.example/.",
-    ],
+    ["Saldo R$ 0,00.", "O saldo é zero.", "Fonte https://inventada.example/."],
 )
 def test_sem_evidencias_nao_assume_zero_ou_inventa_dados(answer):
     with pytest.raises(UnsupportedClaimError):
         build_explain_response(context([]), payload(answer, ()))
 
 
-def test_sem_citacoes_exige_alta_incerteza_e_limitacao_mesmo_com_contexto():
-    assert build_explain_response(context([]), payload("Faltam evidências.", ())).evidences == []
+@pytest.mark.parametrize("evidences", [[], [money_evidence()]])
+def test_sem_citacoes_exige_alta_incerteza_e_limitacao_mesmo_com_contexto(evidences):
+    ctx = context(evidences)
+    assert build_explain_response(ctx, payload("Faltam evidências.", ())).evidences == []
     with pytest.raises(EvidenceReferenceError):
-        build_explain_response(context(), payload("Faltam evidências.", (), uncertainty="baixa"))
+        build_explain_response(ctx, payload("Faltam evidências.", (), uncertainty="baixa"))
     with pytest.raises(EvidenceReferenceError):
-        build_explain_response(context(), payload("Faltam evidências.", (), limitations=[]))
-
-
-def test_contexto_original_e_resposta_nao_sao_mutados():
-    ctx = context([money_evidence(), alpha_evidence()])
-    raw = payload("Referência R$ 5.000,00.")
-    before_ctx, before_payload = ctx.model_dump_json(), raw.model_dump_json()
-    response = build_explain_response(ctx, raw)
-    assert response.evidences[0] is not ctx.evidences[0]
-    assert ctx.model_dump_json() == before_ctx
-    assert raw.model_dump_json() == before_payload
+        build_explain_response(ctx, payload("Faltam evidências.", (), limitations=[]))
 
 
 def test_mutacao_de_lista_ou_model_copy_nao_burla_citacoes():

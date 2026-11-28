@@ -23,11 +23,11 @@ Na raiz, com GNU Make, uv e Docker Compose; instalação e Windows em [CONTRIBUT
 
 | Área | Comandos disponíveis |
 | --- | --- |
-| Backend | make sync; make dev; make test; make test-domain; make test-ai; make lint; make migrate; make seed; make openapi |
+| Backend | make sync; make dev; make test; make test-unit; make test-integration; make test-domain; make test-ai; make lint; make migrate; make seed; make openapi |
 | Web (landing + app) | npm --prefix apps/web ci --ignore-scripts; npm --prefix apps/web run dev; npm --prefix apps/web run check; npm --prefix apps/web run build; npm --prefix apps/web test; npm --prefix apps/web run gen:api |
 | Documentação | python infra/check_docs.py |
 
-Make aceita UV=/caminho/uv e ENV_FILE=/caminho/configuração. Usa .env existente ou .env.example, sem sobrescrever configuração. Suíte de banco exige TEST_DATABASE_URL no processo e banco dedicado. make test-domain e make test-ai não conectam ao banco; test-ai usa HTTP simulado, sem provedor real.
+Make aceita UV=/caminho/uv e ENV_FILE=/caminho/configuração. Usa .env existente ou .env.example, sem sobrescrever configuração. make test-unit não conecta ao banco; make test-integration exige TEST_DATABASE_URL no processo e banco dedicado. A marca postgres deriva das fixtures de banco, inclusive indiretas; o CI executa cada grupo uma vez. make test executa ambos; test-domain e test-ai são recortes locais sem banco ou provedor real.
 
 ## Mapa de pastas
 
