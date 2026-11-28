@@ -99,7 +99,7 @@ def _transport(request: httpx.Request) -> httpx.Response:
         code = request.url.path.split("bcdata.sgs.")[1].split("/")[0]
         if code == "12":
             return httpx.Response(503, text="manutenção")
-        value = {"432": "15.00", "433": "0,09"}[code]
+        value = {"432": "15.00", "433": "0,09", "1": "5,3712", "27575": "301,25"}[code]
         return httpx.Response(200, json=[{"data": "01/11/2026", "valor": value}])
     ticker = request.url.path.rsplit("/", 1)[1]
     assert "token" not in request.url.params
@@ -121,6 +121,8 @@ def test_coleta_grava_series_e_tolera_fonte_fora_do_ar(client, db_session, test_
         report = ingest_alpha.ingest(factory, http, now=lambda: T0)
     assert report[CDI.key].startswith("erro")
     assert report[SELIC.key] == 1 and report[STOCK_SERIES[0].key] == 1
+    # Séries só das previsões (ADR-0016) entram na coleta, mas não no radar.
+    assert report["bcb:sgs:1"] == 1 and report["bcb:sgs:27575"] == 1
     radar = client.get(URL).json()
     values = {i["key"]: i["latest"]["value"] for i in radar["indicators"]}
     # A variação da brapi chega como texto decimal exato, sem passar por float.

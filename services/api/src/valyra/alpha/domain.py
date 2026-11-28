@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 BUSINESS_ZONE = ZoneInfo("America/Sao_Paulo")
 Periodicity = Literal["daily", "monthly"]
 # Temas da tela e dos filtros; um indicador pertence a um só tema.
-Theme = Literal["juros", "inflacao", "acoes", "clima"]
+Theme = Literal["juros", "inflacao", "acoes", "clima", "mercado"]
 
 
 @dataclass(frozen=True)
@@ -73,6 +73,35 @@ SGS_SERIES: tuple[Series, ...] = (
         kind="macro_indicator",
         theme="inflacao",
         sgs_code=433,
+    ),
+)
+# Séries só das previsões (ADR-0016): coletadas como as outras, mas fora do radar, que tem
+# temas e telas próprios. Códigos do SGS: 1 = dólar comercial de venda (diário) e 27575 = Índice
+# de Commodities - Brasil, segmento agropecuária (mensal). Conferir na primeira coleta.
+FORECAST_SGS_SERIES: tuple[Series, ...] = (
+    Series(
+        key="bcb:sgs:1",
+        source_slug="bcb-sgs",
+        title="Dólar comercial (venda)",
+        unit="index",
+        unit_label="reais por dólar",
+        periodicity="daily",
+        metric_key="alpha.bcb.usd_brl",
+        kind="macro_indicator",
+        theme="mercado",
+        sgs_code=1,
+    ),
+    Series(
+        key="bcb:sgs:27575",
+        source_slug="bcb-sgs",
+        title="IC-Br Agropecuária",
+        unit="index",
+        unit_label="pontos do índice",
+        periodicity="monthly",
+        metric_key="alpha.bcb.icbr_agro",
+        kind="macro_indicator",
+        theme="mercado",
+        sgs_code=27575,
     ),
 )
 # Tickers que a brapi libera sem token; com token o plano gratuito aceita outros.

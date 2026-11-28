@@ -379,3 +379,43 @@ def test_manchetes_da_semana_viram_evidencia_textual_com_fonte(
     assert news.value.value_text == "Gasolina sobe nos postos"
     assert str(news.source.source_url) == link
     assert any("news_theme_v3" in text for text in response.limitations)
+
+
+def test_previsao_com_dados_coletados_vira_evidencia_projetada_citavel(
+    db_session, reference_rows, insert_transaction
+):
+    from decimal import Decimal
+
+    from valyra.alpha import service as alpha_service
+    from valyra.alpha.domain import SGS_SERIES
+    from valyra.alpha.forecast import add_months
+
+    tx = insert_transaction()
+    account, user = reference_rows["account"], reference_rows["user"]
+    cut = current_cutoff(account, tx)
+    for i in range(36):
+        alpha_service.record_observation(
+            db_session, SGS_SERIES[2], add_months(date(2023, 9, 1), i),
+            Decimal("0.30") + Decimal(i % 5) / 10, ingested_at=cut - timedelta(days=2),
+            source_url="https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados", backfill=True,
+        )  # fmt: skip
+    db_session.flush()
+    client = Mock(side_effect=reference_reply)
+    response = explain_for_account(
+        db_session,
+        user.id,
+        ExplainRequest(question="E a inflação?", account_id=account.id),
+        client=client,
+        clock=lambda: cut,
+    )
+    sent = client.call_args.args[0].context_data
+    by_id = {e.evidence_id: e for e in sent.evidences}
+    central = by_id["forecast_ipca_12m_p50"]
+    assert central.basis == "projected" and central.source.module == "alpha"
+    assert central.period.start > cut.date() and central.value.unit == "%"
+    assert {"forecast_ipca_12m_p10", "forecast_ipca_12m_p90", "forecast_ipca_12m_chance"} <= set(
+        by_id
+    )
+    # Selic e ações estão sem histórico: a reserva sintética nunca chega ao LLM.
+    assert not any(key.startswith("forecast_selic") for key in by_id)
+    assert any("reserva sintéticas" in text for text in response.limitations)

@@ -32,3 +32,11 @@ test('byPriority sobe os temas do perfil e mantém a ordem dos demais', () => {
   assert.deepEqual(byPriority(keys, (k) => k, ['agro', 'juros']), ['agro', 'juros', 'acoes', 'alimentos', 'renda']);
   assert.deepEqual(byPriority(keys, (k) => k, []), keys);
 });
+
+// As previsões de cada perfil moram na API; um id trocado só de um lado cairia no padrão.
+test('cada perfil tem previsões próprias na API', () => {
+  const backend = readFileSync(new URL('../../../services/api/src/valyra/alpha/forecast.py', import.meta.url), 'utf8');
+  const block = backend.slice(backend.indexOf('PROFILE_SPECS'), backend.indexOf('DEFAULT_SPECS'));
+  const keys = [...block.matchAll(/^\s+"([a-z-]+)": \(/gm)].map((m) => m[1]).sort();
+  assert.deepEqual(PROFILES.map((p) => p.id).sort(), keys);
+});

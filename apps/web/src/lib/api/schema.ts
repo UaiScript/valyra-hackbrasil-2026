@@ -45,6 +45,24 @@ export type AlphaSignalSource = {
   /** uri */ source_url: string;
 };
 
+/** Previsões refeitas em datas passadas: a faixa de 80% acertou `hits` de `trials`. */
+export type BacktestOut = {
+  hits: number;
+  horizon_label: string;
+  model_mae: string | null;
+  naive_mae: string | null;
+  trials: number;
+};
+
+/** Quantis dos cenários simulados: 80% entre p10 e p90, 95% entre p2_5 e p97_5. */
+export type BandOut = {
+  p10: string;
+  p2_5: string;
+  p50: string;
+  p90: string;
+  p97_5: string;
+};
+
 export type Body_finance_create_import_batch = {
   file: string;
 };
@@ -112,6 +130,16 @@ export type CategoryTotalOut = {
   total_cents: number;
 };
 
+export type ChanceOut = {
+  event_label: string;
+  pct: string;
+};
+
+export type ChartPointOut = {
+  /** date */ day: string;
+  value: string;
+};
+
 export type DecimalValue = {
   kind?: string;
   unit: "%" | "pp" | "fraction" | "count" | "t" | "kg" | "ha" | "kg/ha" | "t/ha" | "mm" | "°C" | "index";
@@ -171,12 +199,54 @@ export type ExplainResponse = {
   uncertainty: "baixa" | "média" | "alta";
 };
 
+export type FanPointOut = {
+  band: BandOut;
+  /** date */ day: string;
+};
+
 export type FinanceRecordSource = {
   import_batch_id?: string | null;
   kind?: string;
   /** uuid */ record_id: string;
   record_type: "account" | "transaction";
   /** date-time */ recorded_at: string;
+};
+
+export type ForecastOut = {
+  backtest: BacktestOut | null;
+  chance: ChanceOut | null;
+  chart_unit: string;
+  current: string;
+  current_label: string;
+  data_origin: "coleta" | "reserva" | "misto";
+  fan: FanPointOut[];
+  headline: BandOut;
+  history: ChartPointOut[];
+  horizon: number;
+  horizon_label: string;
+  inputs: InputSeriesOut[];
+  key: string;
+  limitations: string[];
+  method: "holt_damped" | "random_walk";
+  method_label: string;
+  method_version: string;
+  params: Record<string, unknown>;
+  paths: number;
+  question: string;
+  tickers: TickerRangeOut[];
+  title: string;
+  unit: string;
+  unit_label: string;
+  view: ViewOut;
+};
+
+/** Previsões do perfil no corte `as_of`, calculadas em código, sem LLM. */
+export type ForecastsOut = {
+  /** date-time */ as_of: string;
+  /** date-time */ computed_at: string;
+  items: ForecastOut[];
+  notes: string[];
+  profile: "orcamento-apertado" | "comecando-a-investir" | "investidor" | null;
 };
 
 export type HealthResponse = {
@@ -238,6 +308,26 @@ export type IndicatorOut = {
   title: string;
   unit: string;
   unit_label: string;
+};
+
+export type InputSeriesOut = {
+  /** date */ first_day: string;
+  key: string;
+  /** date */ last_day: string;
+  last_ingested_at: string | null;
+  last_published_at: string | null;
+  observations: number;
+  origin: "coleta" | "reserva";
+  published_at_estimated: boolean;
+  source: InputSourceOut;
+  title: string;
+};
+
+export type InputSourceOut = {
+  license: string;
+  name: string;
+  slug: string;
+  url: string;
 };
 
 export type IntegerValue = {
@@ -391,6 +481,13 @@ export type TextValue = {
   value_text: string;
 };
 
+export type TickerRangeOut = {
+  band: BandOut;
+  chance_up_pct: string;
+  daily_vol_pct: string;
+  ticker: string;
+};
+
 export type TransactionCategoryOut = {
   /** uuid */ id: string;
   name: string;
@@ -416,6 +513,14 @@ export type TransactionUpdate = {
   /** uuid */ category_id: string;
 };
 
+/** Leitura da Valyra por regra fixa sobre os números acima; não é recomendação. */
+export type ViewOut = {
+  headline: string;
+  rule: string;
+  stance: "atencao" | "neutra" | "favoravel";
+  text: string;
+};
+
 /** Notícias publicadas nos 7 dias até `as_of`, agrupadas por tema pela regra `rule`. */
 export type WeeklyNewsOut = {
   /** date-time */ as_of: string;
@@ -431,6 +536,11 @@ export type WeeklyNewsOut = {
 export type AlertsListQuery = {
   limit?: number;
   offset?: number;
+};
+
+export type AlphaGetForecastsQuery = {
+  profile?: "orcamento-apertado" | "comecando-a-investir" | "investidor" | null;
+  as_of?: string | null;
 };
 
 export type AlphaGetWeeklyNewsQuery = {
@@ -484,6 +594,7 @@ export const OPERATIONS = {
   ai_explain: { method: 'POST', path: '/api/v1/ai/explain' },
   alerts_list: { method: 'GET', path: '/api/v1/alerts' },
   alerts_update: { method: 'PATCH', path: '/api/v1/alerts/{id}' },
+  alpha_get_forecasts: { method: 'GET', path: '/api/v1/alpha/forecasts' },
   alpha_get_weekly_news: { method: 'GET', path: '/api/v1/alpha/news/weekly' },
   alpha_get_radar: { method: 'GET', path: '/api/v1/alpha/radar' },
   finance_list_accounts: { method: 'GET', path: '/api/v1/finance/accounts' },

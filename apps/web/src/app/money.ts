@@ -82,6 +82,22 @@ export function formatDecimal(value: string): string {
   return `${negative ? '-' : ''}${grouped}${frac ? `,${frac}` : ''}`;
 }
 
+/**
+ * Texto decimal da API arredondado a `places` casas (meio para cima) e mostrado em pt-BR,
+ * sem passar por float: "4.349" com 1 casa vira "4,3"; "-0.04" vira "0,0".
+ */
+export function roundDecimal(value: string, places: number): string {
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(value);
+  if (!match) return value;
+  const [, sign, int, frac = ''] = match;
+  const scaled = BigInt(int + (frac + '0'.repeat(places + 1)).slice(0, places + 1));
+  const rounded = scaled / 10n + (scaled % 10n >= 5n ? 1n : 0n);
+  const digits = rounded.toString().padStart(places + 1, '0');
+  const whole = digits.slice(0, digits.length - places);
+  const dec = places ? `.${digits.slice(digits.length - places)}` : '';
+  return formatDecimal(`${sign && rounded !== 0n ? '-' : ''}${whole}${dec}`);
+}
+
 /** Instante UTC da API mostrado no horário de Brasília, ex.: "27/11/2026, 14:07". */
 export function formatInstant(iso: string): string {
   return new Intl.DateTimeFormat('pt-BR', {

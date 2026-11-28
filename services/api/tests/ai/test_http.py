@@ -23,6 +23,7 @@ from valyra.ai.llm_client import (
     LLMUnavailableError,
 )
 from valyra.ai.schemas import EvidenceContext, LLMPayload, LLMResponse
+from valyra.alpha.forecast_service import ProfileForecasts
 from valyra.alpha.news_service import WeeklyReport
 from valyra.alpha.service import Radar
 from valyra.core.config import Settings
@@ -41,6 +42,13 @@ EMPTY_NEWS = WeeklyReport(
     unmatched=0,
     sources=[],
     last_ingested_at=None,
+)
+
+NO_FORECASTS = ProfileForecasts(
+    profile=None,
+    as_of=datetime(2026, 1, 1, tzinfo=UTC),
+    computed_at=datetime(2026, 1, 1, tzinfo=UTC),
+    items=[],
 )
 
 URL = "/api/v1/ai/explain"
@@ -73,6 +81,8 @@ def stack(app, monkeypatch):
     monkeypatch.setattr(service.alpha_service, "get_radar", Mock(return_value=EMPTY_RADAR))
     # Sem notícias coletadas: o relatório semanal não acrescenta evidências.
     monkeypatch.setattr(service.news_service, "get_weekly_report", Mock(return_value=EMPTY_NEWS))
+    # Sem previsões: o contexto destes testes não depende da coleta Alpha (ADR-0016).
+    monkeypatch.setattr(service.forecast_service, "get_forecasts", Mock(return_value=NO_FORECASTS))
     monkeypatch.setattr(llm_client, "call_llm", llm)
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[get_current_user_id] = lambda: USER_ID

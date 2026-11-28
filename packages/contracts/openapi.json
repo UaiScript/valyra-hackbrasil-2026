@@ -216,6 +216,88 @@
         "title": "AlphaSignalSource",
         "type": "object"
       },
+      "BacktestOut": {
+        "description": "Previs\u00f5es refeitas em datas passadas: a faixa de 80% acertou `hits` de `trials`.",
+        "properties": {
+          "hits": {
+            "title": "Hits",
+            "type": "integer"
+          },
+          "horizon_label": {
+            "title": "Horizon Label",
+            "type": "string"
+          },
+          "model_mae": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Mae"
+          },
+          "naive_mae": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Naive Mae"
+          },
+          "trials": {
+            "title": "Trials",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "horizon_label",
+          "trials",
+          "hits",
+          "model_mae",
+          "naive_mae"
+        ],
+        "title": "BacktestOut",
+        "type": "object"
+      },
+      "BandOut": {
+        "description": "Quantis dos cen\u00e1rios simulados: 80% entre p10 e p90, 95% entre p2_5 e p97_5.",
+        "properties": {
+          "p10": {
+            "title": "P10",
+            "type": "string"
+          },
+          "p2_5": {
+            "title": "P2 5",
+            "type": "string"
+          },
+          "p50": {
+            "title": "P50",
+            "type": "string"
+          },
+          "p90": {
+            "title": "P90",
+            "type": "string"
+          },
+          "p97_5": {
+            "title": "P97 5",
+            "type": "string"
+          }
+        },
+        "required": [
+          "p2_5",
+          "p10",
+          "p50",
+          "p90",
+          "p97_5"
+        ],
+        "title": "BandOut",
+        "type": "object"
+      },
       "Body_finance_create_import_batch": {
         "properties": {
           "file": {
@@ -523,6 +605,43 @@
           "count"
         ],
         "title": "CategoryTotalOut",
+        "type": "object"
+      },
+      "ChanceOut": {
+        "properties": {
+          "event_label": {
+            "title": "Event Label",
+            "type": "string"
+          },
+          "pct": {
+            "title": "Pct",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pct",
+          "event_label"
+        ],
+        "title": "ChanceOut",
+        "type": "object"
+      },
+      "ChartPointOut": {
+        "properties": {
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "day",
+          "value"
+        ],
+        "title": "ChartPointOut",
         "type": "object"
       },
       "DecimalValue": {
@@ -857,6 +976,24 @@
         "title": "ExplainResponse",
         "type": "object"
       },
+      "FanPointOut": {
+        "properties": {
+          "band": {
+            "$ref": "#/components/schemas/BandOut"
+          },
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          }
+        },
+        "required": [
+          "day",
+          "band"
+        ],
+        "title": "FanPointOut",
+        "type": "object"
+      },
       "FinanceRecordSource": {
         "additionalProperties": false,
         "properties": {
@@ -903,6 +1040,230 @@
           "recorded_at"
         ],
         "title": "FinanceRecordSource",
+        "type": "object"
+      },
+      "ForecastOut": {
+        "properties": {
+          "backtest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BacktestOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "chance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChanceOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "chart_unit": {
+            "title": "Chart Unit",
+            "type": "string"
+          },
+          "current": {
+            "title": "Current",
+            "type": "string"
+          },
+          "current_label": {
+            "title": "Current Label",
+            "type": "string"
+          },
+          "data_origin": {
+            "enum": [
+              "coleta",
+              "reserva",
+              "misto"
+            ],
+            "title": "Data Origin",
+            "type": "string"
+          },
+          "fan": {
+            "items": {
+              "$ref": "#/components/schemas/FanPointOut"
+            },
+            "title": "Fan",
+            "type": "array"
+          },
+          "headline": {
+            "$ref": "#/components/schemas/BandOut"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ChartPointOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "horizon": {
+            "title": "Horizon",
+            "type": "integer"
+          },
+          "horizon_label": {
+            "title": "Horizon Label",
+            "type": "string"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/InputSeriesOut"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "method": {
+            "enum": [
+              "holt_damped",
+              "random_walk"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "method_label": {
+            "title": "Method Label",
+            "type": "string"
+          },
+          "method_version": {
+            "title": "Method Version",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Params",
+            "type": "object"
+          },
+          "paths": {
+            "title": "Paths",
+            "type": "integer"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "tickers": {
+            "items": {
+              "$ref": "#/components/schemas/TickerRangeOut"
+            },
+            "title": "Tickers",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "unit_label": {
+            "title": "Unit Label",
+            "type": "string"
+          },
+          "view": {
+            "$ref": "#/components/schemas/ViewOut"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "question",
+          "method",
+          "method_label",
+          "method_version",
+          "paths",
+          "horizon",
+          "horizon_label",
+          "unit",
+          "unit_label",
+          "current",
+          "current_label",
+          "headline",
+          "chance",
+          "chart_unit",
+          "history",
+          "fan",
+          "backtest",
+          "view",
+          "data_origin",
+          "inputs",
+          "tickers",
+          "params",
+          "limitations"
+        ],
+        "title": "ForecastOut",
+        "type": "object"
+      },
+      "ForecastsOut": {
+        "description": "Previs\u00f5es do perfil no corte `as_of`, calculadas em c\u00f3digo, sem LLM.",
+        "properties": {
+          "as_of": {
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "computed_at": {
+            "format": "date-time",
+            "title": "Computed At",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ForecastOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "enum": [
+                  "orcamento-apertado",
+                  "comecando-a-investir",
+                  "investidor"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          }
+        },
+        "required": [
+          "profile",
+          "as_of",
+          "computed_at",
+          "items",
+          "notes"
+        ],
+        "title": "ForecastsOut",
         "type": "object"
       },
       "HealthResponse": {
@@ -1215,6 +1576,113 @@
           "history"
         ],
         "title": "IndicatorOut",
+        "type": "object"
+      },
+      "InputSeriesOut": {
+        "properties": {
+          "first_day": {
+            "format": "date",
+            "title": "First Day",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "last_day": {
+            "format": "date",
+            "title": "Last Day",
+            "type": "string"
+          },
+          "last_ingested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Ingested At"
+          },
+          "last_published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Published At"
+          },
+          "observations": {
+            "title": "Observations",
+            "type": "integer"
+          },
+          "origin": {
+            "enum": [
+              "coleta",
+              "reserva"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "published_at_estimated": {
+            "title": "Published At Estimated",
+            "type": "boolean"
+          },
+          "source": {
+            "$ref": "#/components/schemas/InputSourceOut"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "origin",
+          "source",
+          "observations",
+          "first_day",
+          "last_day",
+          "last_published_at",
+          "last_ingested_at",
+          "published_at_estimated"
+        ],
+        "title": "InputSeriesOut",
+        "type": "object"
+      },
+      "InputSourceOut": {
+        "properties": {
+          "license": {
+            "title": "License",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "url",
+          "license"
+        ],
+        "title": "InputSourceOut",
         "type": "object"
       },
       "IntegerValue": {
@@ -1941,6 +2409,33 @@
         "title": "TextValue",
         "type": "object"
       },
+      "TickerRangeOut": {
+        "properties": {
+          "band": {
+            "$ref": "#/components/schemas/BandOut"
+          },
+          "chance_up_pct": {
+            "title": "Chance Up Pct",
+            "type": "string"
+          },
+          "daily_vol_pct": {
+            "title": "Daily Vol Pct",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "band",
+          "chance_up_pct",
+          "daily_vol_pct"
+        ],
+        "title": "TickerRangeOut",
+        "type": "object"
+      },
       "TransactionCategoryOut": {
         "properties": {
           "id": {
@@ -2063,6 +2558,40 @@
           "category_id"
         ],
         "title": "TransactionUpdate",
+        "type": "object"
+      },
+      "ViewOut": {
+        "description": "Leitura da Valyra por regra fixa sobre os n\u00fameros acima; n\u00e3o \u00e9 recomenda\u00e7\u00e3o.",
+        "properties": {
+          "headline": {
+            "title": "Headline",
+            "type": "string"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "stance": {
+            "enum": [
+              "atencao",
+              "neutra",
+              "favoravel"
+            ],
+            "title": "Stance",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stance",
+          "headline",
+          "text",
+          "rule"
+        ],
+        "title": "ViewOut",
         "type": "object"
       },
       "WeeklyNewsOut": {
@@ -2336,6 +2865,81 @@
         "summary": "Alerts Update",
         "tags": [
           "alerts"
+        ]
+      }
+    },
+    "/api/v1/alpha/forecasts": {
+      "get": {
+        "operationId": "alpha_get_forecasts",
+        "parameters": [
+          {
+            "description": "Perfil da demo; ausente usa o conjunto padr\u00e3o de previs\u00f5es",
+            "in": "query",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "orcamento-apertado",
+                    "comecando-a-investir",
+                    "investidor"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Perfil da demo; ausente usa o conjunto padr\u00e3o de previs\u00f5es",
+              "title": "Profile"
+            }
+          },
+          {
+            "description": "Corte do replay, com fuso; ausente usa o instante atual",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Corte do replay, com fuso; ausente usa o instante atual",
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Entrada inv\u00e1lida"
+          }
+        },
+        "summary": "Alpha Get Forecasts",
+        "tags": [
+          "alpha"
         ]
       }
     },

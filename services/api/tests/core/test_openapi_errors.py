@@ -21,6 +21,7 @@ EXPECTED_4XX = {
     "finance_delete_budget": {"404", "422"},
     "alerts_list": {"422"},
     "alerts_update": {"404", "422"},
+    "alpha_get_forecasts": {"422"},
     "alpha_get_radar": {"422"},
     "alpha_get_weekly_news": {"422"},
 }

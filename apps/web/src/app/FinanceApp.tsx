@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import type { FC } from 'react';
-import { ArrowLeft, Bell, ChartPie, ChartSpline, Command, Compass, LayoutDashboard, ListOrdered, Menu, Newspaper, PanelLeftClose, PanelLeftOpen, Sparkles, Target, Upload, X } from 'lucide-react';
+import { ArrowLeft, Bell, Calculator, ChartPie, ChartSpline, Command, Compass, LayoutDashboard, ListOrdered, Menu, Newspaper, PanelLeftClose, PanelLeftOpen, Sparkles, Target, Upload, X } from 'lucide-react';
 import { api } from './api/client';
 import { ROUTES, routeFromHash, useHash } from './router';
 import type { AppRoute } from './router';
@@ -31,6 +31,7 @@ const PAGE_LOADERS = {
   ai: () => import('./pages/AskValyra').then((m) => ({ default: m.AskValyra })),
   alpha: () => import('./pages/Alpha').then((m) => ({ default: m.Alpha })),
   news: () => import('./pages/WeeklyNews').then((m) => ({ default: m.WeeklyNews })),
+  forecasts: () => import('./pages/Forecasts').then((m) => ({ default: m.Forecasts })),
   import: () => import('./pages/ImportCsv').then((m) => ({ default: m.ImportCsv })),
 } as const;
 const PAGES = Object.fromEntries(Object.entries(PAGE_LOADERS).map(([k, load]) => [k, lazy(load)])) as Record<keyof typeof PAGE_LOADERS, ReturnType<typeof lazy>>;
@@ -69,6 +70,7 @@ const NAV_GROUPS: { module: ModuleId; items: NavItem[] }[] = [
     module: 'alpha',
     items: [
       { route: 'alpha', label: 'Radar econômico', icon: Compass },
+      { route: 'forecasts', label: 'Previsões', icon: Calculator },
       { route: 'news', label: 'Relatório da semana', icon: Newspaper },
     ],
   },
@@ -264,6 +266,8 @@ function Shell() {
           <p className="cx-footnote" role="note">
             {route === 'alpha'
               ? 'Dados públicos do Banco Central, da brapi.dev e da Open-Meteo, com fonte e instante de coleta. Contexto econômico, não recomendação de investimento.'
+              : route === 'forecasts'
+              ? 'Previsões calculadas em código sobre dados públicos do Banco Central e da brapi.dev, com 1.000 cenários e teste com o passado. Leitura estatística, não recomendação de investimento.'
               : route === 'news'
               ? 'Manchetes da Agência Brasil, do Banco Central e do IBGE, com fonte e data e link para a matéria original. Contexto, não recomendação de investimento.'
               : chosen
