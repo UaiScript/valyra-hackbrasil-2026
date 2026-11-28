@@ -118,7 +118,12 @@ body:has(.cx) { background: #0a0c13; }
   border: 1px solid var(--cx-glass-line);
   border-radius: 26px;
   background: rgb(11 14 24 / 0.82);
- 
+}
+/* O trilho é sticky e, por isso, forma a própria camada de empilhamento. Sem z-index,
+   os cards da Central (com backdrop-filter) vinham depois no DOM e eram pintados por
+   cima do rótulo flutuante, deixando o texto dos painéis atravessando a dica. */
+@media (min-width: 901px) {
+  .cx .app-sidebar { z-index: var(--z-sticky); }
 }
 .cx-brand,
 .cx .cx-brand:hover { display: flex; align-items: center; gap: 12px; color: var(--cx-text); text-decoration: none; }
@@ -173,11 +178,13 @@ body:has(.cx) { background: #0a0c13; }
   top: 50%;
   z-index: 5;
   padding: 7px 12px;
-  border: 1px solid var(--cx-glass-line);
+  border: 1px solid rgb(82 212 255 / 0.22);
   border-radius: 10px;
-  background: rgb(28 27 32 / 0.96);
+  background: #0e1428;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.5), inset 0 1px 0 rgb(255 255 255 / 0.06);
   color: var(--cx-text);
   font-size: 0.8rem;
+  font-weight: 500;
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
@@ -1004,7 +1011,8 @@ a.cx-card:hover { border-color: var(--cx-glass-line-strong); transform: translat
     padding: 20px 14px;
     border-radius: 0 26px 26px 0;
     overflow-y: auto;
-    background: rgb(12 15 26 / 0.97);
+    /* Gaveta opaca: com 3% de transparência o texto da Central aparecia por trás dos itens. */
+    background: #0c0f1a;
   }
   .cx-brand__text { display: flex; }
   .cx-nav { align-items: stretch; }
