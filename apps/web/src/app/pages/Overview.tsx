@@ -131,10 +131,11 @@ const CandlesCard: FC<{ account: AccountOut; reloadKey: number }> = ({ account, 
   // Período de exibição escolhido por quem vê; cada um pede à API o horizonte que precisa.
   const [period, setPeriod] = useState<CandlePeriod>(readPeriod);
   const meta = CANDLE_PERIODS[period];
-  const projection = useApi((s) => api.getProjection(account.id, meta.days, s), [account.id, reloadKey, meta.days]);
-  const p = projection.state.data;
-  // Enquanto o novo horizonte carrega, a série anterior continua na tela, sem piscar.
-  const shown = p;
+  // A resposta guarda o período que a pediu: useApi mantém o dado anterior durante a
+  // recarga, e desenhar 35 dias como "mês" mostraria velas e legenda erradas por um instante.
+  const projection = useApi((s) => api.getProjection(account.id, meta.days, s).then((data) => ({ period, data })), [account.id, reloadKey, period]);
+  const loaded = projection.state.data;
+  const shown = loaded && loaded.period === period ? loaded.data : undefined;
   function choose(next: CandlePeriod) {
     setPeriod(next);
     try { window.localStorage.setItem(PERIOD_KEY, next); } catch { /* vale só nesta visita */ }

@@ -95,7 +95,8 @@ export const ValyraChatProvider: FC<{ children: ReactNode }> = ({ children }) =>
     setPanelOpen(true);
     if (question?.trim()) setPending(question);
   }, []);
-  const closePanel = useCallback(() => setPanelOpen(false), []);
+  // Fechar descarta a pergunta que esperava a conta carregar: ela não dispara depois, sem aviso.
+  const closePanel = useCallback(() => { setPanelOpen(false); setPending(null); }, []);
 
   const value = useMemo<ChatState>(() => ({
     account, turns, busy, suggestions, ask: (q) => void ask(q), panelOpen, openPanel, closePanel,
@@ -179,16 +180,21 @@ export const ChatPanel: FC = () => {
 
   useEffect(() => {
     if (!panelOpen) return;
+    // O foco volta para o atalho que abriu o chat quando ele fecha.
+    const opener = document.activeElement as HTMLElement | null;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closePanel(); };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      if (opener?.isConnected && opener !== document.body) opener.focus();
+    };
   }, [panelOpen, closePanel]);
 
   if (!panelOpen) return null;
   return (
     <div className="cx-chat-layer">
       <button type="button" className="cx-chat-scrim" aria-label="Fechar chat" tabIndex={-1} onClick={closePanel} />
-      <aside ref={panelRef} className="cx-chat-panel" role="dialog" aria-modal="false" aria-labelledby="cx-chat-title">
+      <aside ref={panelRef} className="cx-chat-panel" role="dialog" aria-modal="true" aria-labelledby="cx-chat-title">
         <header className="cx-chat-panel__head">
           <span className="cx-chat-panel__orb" aria-hidden="true"><Sparkles size={16} /></span>
           <div>

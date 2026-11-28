@@ -186,7 +186,7 @@ function Shell() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         if (route === 'ai') document.getElementById('cx-question')?.focus();
-        else openPanel();
+        else { setAlertsOpen(false); openPanel(); }
       }
     };
     window.addEventListener('keydown', onKey);

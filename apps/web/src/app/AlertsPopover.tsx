@@ -30,12 +30,16 @@ export const AlertsPopover: FC<{ open: boolean; onClose: () => void }> = ({ open
       if (boxRef.current?.contains(target as Node) || target?.closest('[data-alerts-trigger]')) return;
       onClose();
     };
+    // Ao fechar, o foco volta para quem abriu a janela (sino ou atalho), para quem usa teclado.
+    const opener = document.activeElement as HTMLElement | null;
     window.addEventListener('keydown', onKey);
     window.addEventListener('pointerdown', onDown);
     boxRef.current?.focus();
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('pointerdown', onDown);
+      const active = document.activeElement;
+      if (opener?.isConnected && (active === null || active === document.body || boxRef.current?.contains(active))) opener.focus();
     };
   }, [open, onClose]);
 
@@ -84,7 +88,7 @@ export const AlertsPopover: FC<{ open: boolean; onClose: () => void }> = ({ open
                   <b>{a.title}</b>
                   <small>Menor saldo previsto {formatCents(a.evidence.min_balance_cents)} em {formatShortDate(a.evidence.min_balance_date)}</small>
                   <span className="cx-alerts-pop__actions">
-                    <a href={askHref('Por que meu saldo previsto fica abaixo de zero nos próximos 30 dias?')} onClick={onClose}><Sparkles size={13} aria-hidden="true" />Por quê?</a>
+                    <a href={askHref(`O que explica o alerta "${a.title}" com menor saldo previsto em ${formatShortDate(a.evidence.min_balance_date)}?`)} onClick={onClose}><Sparkles size={13} aria-hidden="true" />Por quê?</a>
                     {a.status === 'new' && (
                       <button type="button" disabled={busyId === a.id} onClick={() => void markRead(a)}>
                         <Check size={13} aria-hidden="true" />{busyId === a.id ? 'Marcando…' : 'Marcar como lido'}

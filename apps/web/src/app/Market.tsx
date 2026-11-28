@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import type { FC } from 'react';
 import type { ProjectionOut } from '../lib/api/schema';
+import { CANDLE_PERIODS, projectionCandles } from './candles';
+import type { CandlePeriod } from './candles';
 import { formatCents, formatShortDate } from './money';
 
 /*
@@ -9,46 +11,8 @@ import { formatCents, formatShortDate } from './money';
  * para pixels usa ponto flutuante só para desenhar, nunca para um número mostrado.
  */
 
-type Candle = { start: string; end: string; open: number; close: number; high: number; low: number };
-
-/** Período de cada vela: um dia, uma semana (blocos de 7 dias) ou um mês do calendário. */
-export type CandlePeriod = 'day' | 'week' | 'month';
-
-export const CANDLE_PERIODS: Record<CandlePeriod, { label: string; title: string; days: number; up: string; down: string }> = {
-  // Horizonte de cada período escolhido para caber de 10 a 14 velas no dia e na semana; no mês,
-  // o máximo da API (90 dias) dá três ou quatro meses do calendário.
-  day: { label: 'Dia', title: 'Projeção diária', days: 14, up: 'dia em alta', down: 'dia em queda' },
-  week: { label: 'Semana', title: 'Projeção semanal', days: 35, up: 'semana em alta', down: 'semana em queda' },
-  month: { label: 'Mês', title: 'Projeção mensal', days: 90, up: 'mês em alta', down: 'mês em queda' },
-};
-
-/** Chave do grupo de cada dia da projeção, conforme o período escolhido. */
-function groupKey(period: CandlePeriod, date: string, index: number): string {
-  if (period === 'day') return date;
-  if (period === 'month') return date.slice(0, 7);
-  return String(Math.floor(index / 7));
-}
-
-/** Agrupa a projeção diária em velas (abertura, fechamento, máxima, mínima) por período. */
-export function projectionCandles(p: ProjectionOut, period: CandlePeriod = 'week'): Candle[] {
-  const groups: ProjectionOut['items'][] = [];
-  let last = '';
-  p.items.forEach((d, i) => {
-    const key = groupKey(period, d.date, i);
-    if (key !== last || groups.length === 0) groups.push([]);
-    groups[groups.length - 1].push(d);
-    last = key;
-  });
-  const out: Candle[] = [];
-  let open = p.start_balance_cents;
-  for (const group of groups) {
-    const balances = group.map((d) => d.balance_cents);
-    const close = balances[balances.length - 1];
-    out.push({ start: group[0].date, end: group[group.length - 1].date, open, close, high: Math.max(open, ...balances), low: Math.min(open, ...balances) });
-    open = close;
-  }
-  return out;
-}
+export { CANDLE_PERIODS, projectionCandles } from './candles';
+export type { CandlePeriod } from './candles';
 
 const MONTH_LABEL = new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' });
 const candleLabel = (period: CandlePeriod, iso: string) =>
