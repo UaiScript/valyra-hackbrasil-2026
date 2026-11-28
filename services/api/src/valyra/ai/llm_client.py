@@ -1,6 +1,6 @@
 """Adaptadores LLM da ADR-0002; validação de evidências pertence ao domínio IA.
 
-Primário:  Gemini 2.5 Flash  — habilitado com GEMINI_API_KEY.
+Primário:  Gemini (GEMINI_MODEL, padrão gemini-3.8-flash) — habilitado com GEMINI_API_KEY.
 Fallback:  GPT-4o-mini       — habilitado com OPENAI_API_KEY; controle de gasto
                                pelo hard spend limit do projeto no painel da OpenAI.
 
@@ -23,7 +23,6 @@ from valyra.ai.schemas import LLMPayload, LLMRequest, LLMResponse
 from valyra.core.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
-_GEMINI_MODEL = "gemini-2.5-flash"
 _OPENAI_MODEL = "gpt-4o-mini"
 _TRANSIENT_STATUS = {408, 409, 429, 500, 502, 503, 504}
 _MAX_PROMPT_BYTES = 64_000
@@ -130,6 +129,15 @@ def _build_user_prompt(request: LLMRequest) -> str:
     return prompt
 
 
+def _thinking_config(model: str, types: Any) -> Any:
+    # A família 2.5 aceita desligar o raciocínio, deixando o orçamento de saída para o JSON.
+    # Da família 3 em diante o controle é por nível (thinking_level) e não há opção de
+    # desligar; "low" é o menor nível comum aos Flash atuais (o 3.8 recusa "minimal").
+    if model.startswith("gemini-2."):
+        return types.ThinkingConfig(thinking_budget=0)
+    return types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW)
+
+
 def _call_gemini(prompt: str, settings: Settings) -> LLMPayload:
     from google import genai
     from google.genai import errors, types
@@ -145,7 +153,7 @@ def _call_gemini(prompt: str, settings: Settings) -> LLMPayload:
             ),
         ) as client:
             response = client.models.generate_content(
-                model=_GEMINI_MODEL,
+                model=settings.gemini_model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=_SYSTEM_INSTRUCTIONS,
@@ -153,8 +161,7 @@ def _call_gemini(prompt: str, settings: Settings) -> LLMPayload:
                     response_json_schema=_RESPONSE_SCHEMA,
                     temperature=0.2,
                     max_output_tokens=settings.llm_max_output_tokens,
-                    # O orçamento de saída fica disponível para o JSON, sem raciocínio oculto.
-                    thinking_config=types.ThinkingConfig(thinking_budget=0),
+                    thinking_config=_thinking_config(settings.gemini_model, types),
                 ),
             )
     except httpx.TransportError:
@@ -247,7 +254,9 @@ def call_llm(request: LLMRequest) -> LLMResponse:
             payload = _run_provider(
                 lambda: _call_gemini(prompt, settings), settings.llm_max_attempts, "gemini"
             )
-            return LLMResponse(provider="gemini", model=_GEMINI_MODEL, **payload.model_dump())
+            return LLMResponse(
+                provider="gemini", model=settings.gemini_model, **payload.model_dump()
+            )
         except LLMUnavailableError:
             logger.warning("Gemini indisponível; tentando fallback OpenAI")
 

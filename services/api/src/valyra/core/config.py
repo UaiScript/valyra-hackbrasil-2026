@@ -26,9 +26,14 @@ class Settings(BaseSettings):
     # Chaves ficam mascaradas no repr para não vazarem em diagnóstico de configuração.
     gemini_api_key: SecretStr = SecretStr("")
     openai_api_key: SecretStr = SecretStr("")
+    # Configurável porque o Google desativa versões do Gemini sem novo deploy de código:
+    # trocar a variável no Render basta para seguir um modelo novo.
+    gemini_model: str = Field(default="gemini-3.8-flash", min_length=1)
     llm_timeout_seconds: int = Field(default=30, ge=1, le=120)
     llm_max_attempts: int = Field(default=2, ge=1, le=3)
-    llm_max_output_tokens: int = Field(default=2048, ge=128, le=8192)
+    # Nos modelos com raciocínio, os tokens de pensamento entram neste teto; 2048 deixava
+    # pouco espaço para o JSON e a resposta podia ser cortada antes de terminar.
+    llm_max_output_tokens: int = Field(default=4096, ge=128, le=8192)
     # Token gratuito da brapi (ADR-0012); vazio limita a coleta aos tickers liberados sem token.
     brapi_token: SecretStr = SecretStr("")
 

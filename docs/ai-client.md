@@ -19,13 +19,22 @@ O `.env.example` deixa as chaves vazias para a API e o CI funcionarem sem proved
 Com `OPENAI_API_KEY`, há fallback em caso de indisponibilidade/cota do Gemini;
 sem chave Gemini, OpenAI pode atender diretamente. Nunca versione as chaves.
 
+O modelo Gemini vem de `GEMINI_MODEL` (padrão `gemini-3.8-flash`). O Google
+desativa versões antigas: em novembro de 2026, `gemini-2.5-flash` respondia 404
+para parte das chaves, o que aparecia como `AI_CONFIGURATION_ERROR`. Trocar a
+variável basta para seguir outro modelo. Na família 2.5 o cliente desliga o
+raciocínio (`thinking_budget=0`); da família 3 em diante usa `thinking_level`
+baixo, porque esses modelos não oferecem desligamento. A chave precisa ser do
+Google AI Studio (Gemini Developer API); uma chave do Google Cloud sem a
+Generative Language API ativada é recusada.
+
 Configure o hard spend limit no projeto da chave OpenAI antes da apresentação.
 Esse limite é externo à aplicação, mensal e sujeito a pequeno excedente durante
 sua propagação. Guia: [OpenAI spend limits](https://developers.openai.com/api/docs/guides/spend-limits).
 Não há contador de gasto diário interno.
 
 Os padrões são 30 segundos por operação HTTP, duas tentativas totais por provedor
-e 2.048 tokens de saída. Variáveis: `LLM_TIMEOUT_SECONDS`, `LLM_MAX_ATTEMPTS`,
+e 4.096 tokens de saída, que incluem os tokens de raciocínio do modelo. Variáveis: `LLM_TIMEOUT_SECONDS`, `LLM_MAX_ATTEMPTS`,
 `LLM_MAX_OUTPUT_TOKENS`. Não são um prazo global para todas as tentativas.
 O prompt aceita até 64.000 bytes UTF-8; contextos grandes falham antes da rede.
 
