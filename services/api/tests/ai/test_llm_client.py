@@ -204,6 +204,14 @@ def test_modelo_configuravel_e_familia_2_desliga_raciocinio(settings, sdk, paylo
     assert config["thinkingConfig"] in ({"thinkingBudget": 0}, {"thinking_budget": 0})
 
 
+def test_familia_2_0_nao_envia_configuracao_de_raciocinio(settings, sdk, payload):
+    settings.gemini_model = "gemini-2.0-flash"
+    state = sdk(lambda _: gemini_response(payload))
+    llm.call_llm(make_request(question="Explique"))
+    config = json.loads(state.requests[0].content)["generationConfig"]
+    assert "thinkingConfig" not in config
+
+
 @pytest.mark.parametrize("status", [429, 599])
 def test_transitorios_respeitam_numero_de_tentativas(settings, sdk, status, caplog):
     state = sdk(

@@ -131,10 +131,13 @@ def _build_user_prompt(request: LLMRequest) -> str:
 
 def _thinking_config(model: str, types: Any) -> Any:
     # A família 2.5 aceita desligar o raciocínio, deixando o orçamento de saída para o JSON.
+    # Modelos 2.0 não têm raciocínio, então não recebem configuração alguma.
     # Da família 3 em diante o controle é por nível (thinking_level) e não há opção de
     # desligar; "low" é o menor nível comum aos Flash atuais (o 3.8 recusa "minimal").
-    if model.startswith("gemini-2."):
+    if model.startswith("gemini-2.5"):
         return types.ThinkingConfig(thinking_budget=0)
+    if model.startswith("gemini-2."):
+        return None
     return types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW)
 
 
