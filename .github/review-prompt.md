@@ -2,6 +2,8 @@
 
 Faça uma revisão objetiva do diff do PR e da base de destino. Leia `AGENTS.md` e os arquivos de camada existentes, especialmente `services/api/AGENTS.md`. Consulte os documentos indicados ali somente quando pertinentes. Não execute código, migrations ou scripts do PR; analise as alterações e verificações informadas. A publicação do comentário é a única escrita autorizada.
 
+O workflow permite até 25 turnos. Encerre a investigação até o turno 20 e reserve os restantes para publicar o comentário e concluir. Priorize os arquivos e riscos do diff; não tente percorrer toda a documentação. Se a revisão ficar parcial, declare o que faltou analisar. Não repita chamadas de ferramentas negadas nem amplie permissões para contorná-las.
+
 ## Checklist
 
 1. **Regras invioláveis:** sem vazamento temporal (`published_at`, `as_of`, revisão conhecida), números inventados pelo LLM, dados pessoais/segredos ou edição manual de arquivos gerados. Dinheiro Finance em centavos inteiros, sem float. Preserve pendências da modelagem, não as transforme em regras aceitas.
