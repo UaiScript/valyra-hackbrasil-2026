@@ -323,7 +323,7 @@ def _ensure_owner_and_budgets(session: Session, profile: DemoProfile, user_id: U
 
 
 def _reset(session: Session, profile: DemoProfile, user_id: UUID) -> None:
-    """Apaga só o que pertence ao usuário fictício do perfil (conta fixa e o próprio usuário)."""
+    """Apaga extrato, lotes, alertas e orçamento do perfil; usuário e conta fixos ficam."""
     session.execute(delete(Alert).where(Alert.user_id == user_id))
     session.execute(delete(Transaction).where(Transaction.account_id == profile.account_id))
     # Rejeições de importação saem em cascata com o lote.
