@@ -21,7 +21,8 @@ sem chave Gemini, OpenAI pode atender diretamente. Nunca versione as chaves.
 
 Com `GROQ_API_KEY` (gratuita em https://console.groq.com/keys), o Groq entra antes da
 OpenAI: atende quando o Gemini está indisponível, sem cota ou recusa a chave/modelo.
-A OpenAI, paga, continua sem receber chamadas depois de erro de configuração do Gemini.
+A OpenAI, paga, continua sem receber chamadas depois de erro de configuração do Gemini;
+chave inválida do próprio Groq ou resposta dele fora do schema seguem para a OpenAI.
 O modelo vem de `GROQ_MODEL` (padrão `openai/gpt-oss-120b`, com saída por JSON Schema
 em modo best-effort e raciocínio baixo); `GROQ_BASE_URL` só muda em testes ou proxies.
 O plano gratuito limita tokens por minuto: prompt grande demais recebe HTTP 413 e

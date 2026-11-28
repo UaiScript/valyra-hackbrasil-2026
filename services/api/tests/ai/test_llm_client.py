@@ -609,3 +609,45 @@ def test_chave_groq_mascarada_e_aparada():
     assert config.groq_fallback_enabled
     assert "test-groq" not in repr(config)
     assert not Settings(database_url="unused", _env_file=None).groq_fallback_enabled
+
+
+def test_chave_groq_invalida_nao_bloqueia_openai(settings, sdk, openai_sdk_http, payload):
+    _groq_key(settings)
+    settings.openai_api_key = Settings(
+        database_url="unused", openai_api_key="test-openai", _env_file=None
+    ).openai_api_key
+    sdk(_gemini_error(429))
+
+    def handler(request):
+        if request.url.host == "api.groq.com":
+            return httpx.Response(401, json={"error": {"message": "x", "code": "invalid_api_key"}})
+        return openai_response(payload)
+
+    state = openai_sdk_http(handler)
+    assert llm.call_llm(make_request(question="Explique")).provider == "openai"
+    assert _hosts(state) == ["api.groq.com", "openai.test"]
+
+
+def test_resposta_invalida_do_groq_passa_a_openai(settings, sdk, openai_sdk_http, payload):
+    _groq_key(settings)
+    settings.openai_api_key = Settings(
+        database_url="unused", openai_api_key="test-openai", _env_file=None
+    ).openai_api_key
+    sdk(_gemini_error(429))
+
+    def handler(request):
+        if request.url.host == "api.groq.com":
+            return openai_response(payload, finish="length")
+        return openai_response(payload)
+
+    state = openai_sdk_http(handler)
+    assert llm.call_llm(make_request(question="Explique")).provider == "openai"
+    assert _hosts(state) == ["api.groq.com", "openai.test"]
+
+
+def test_resposta_invalida_do_groq_sem_openai(settings, sdk, openai_sdk_http, payload):
+    _groq_key(settings)
+    sdk(_gemini_error(429))
+    openai_sdk_http(lambda _: openai_response(payload, finish="length"))
+    with pytest.raises(llm.LLMParseError):
+        llm.call_llm(make_request(question="Explique"))

@@ -317,10 +317,14 @@ class _ChainStep:
     name: Literal["gemini", "groq", "openai"]
     model: str
     enabled: bool
-    # Provedor pago não recebe a chamada depois de um erro de configuração: o mesmo pedido
-    # provavelmente seria recusado de novo e cobrado. Reserva gratuita pode tentar.
+    # Provedor pago não recebe a chamada depois de erro de configuração do primário: o mesmo
+    # pedido provavelmente seria recusado de novo e cobrado. Reserva gratuita pode tentar.
     paid: bool
     call: Callable[[], LLMPayload]
+    primary: bool = False
+    # Saída fora do schema no modo best-effort indica o modelo, não o pedido; o próximo
+    # provedor pode atender. No primário segue sem reserva, como na ADR-0002.
+    parse_falls_through: bool = False
 
 
 def call_llm(request: LLMRequest) -> LLMResponse:
@@ -328,7 +332,9 @@ def call_llm(request: LLMRequest) -> LLMResponse:
 
     Indisponibilidade (cota, rede, 5xx) passa ao próximo provedor habilitado.
     Erro de configuração do Gemini (chave inválida, acesso negado, modelo desativado)
-    passa apenas à reserva gratuita do Groq. LLMParseError não aciona nenhuma reserva.
+    passa apenas à reserva gratuita do Groq; erro de configuração do próprio Groq (chave
+    dele) não bloqueia a OpenAI. LLMParseError do Gemini não aciona reserva; do Groq,
+    em modo best-effort, passa à OpenAI.
     Controle de gasto da OpenAI é responsabilidade do hard spend limit do projeto.
     """
     settings = get_settings()
@@ -340,6 +346,7 @@ def call_llm(request: LLMRequest) -> LLMResponse:
             settings.gemini_enabled,
             False,
             lambda: _call_gemini(prompt, settings),
+            primary=True,
         ),
         _ChainStep(
             "groq",
@@ -347,6 +354,7 @@ def call_llm(request: LLMRequest) -> LLMResponse:
             settings.groq_fallback_enabled,
             False,
             lambda: _call_groq(prompt, settings),
+            parse_falls_through=True,
         ),
         _ChainStep(
             "openai",
@@ -359,8 +367,10 @@ def call_llm(request: LLMRequest) -> LLMResponse:
 
     configuration_error: LLMConfigurationError | None = None
     unavailable_error: LLMUnavailableError | None = None
+    parse_error: LLMParseError | None = None
+    primary_misconfigured = False
     for step in chain:
-        if not step.enabled or (configuration_error is not None and step.paid):
+        if not step.enabled or (primary_misconfigured and step.paid):
             continue
         try:
             payload = _run_provider(step.call, settings.llm_max_attempts, step.name)
@@ -371,12 +381,21 @@ def call_llm(request: LLMRequest) -> LLMResponse:
         except LLMConfigurationError as exc:
             logger.warning("Provedor %s recusou a configuração; tentando reserva", step.name)
             configuration_error = configuration_error or exc
+            primary_misconfigured = primary_misconfigured or step.primary
+            continue
+        except LLMParseError as exc:
+            if not step.parse_falls_through:
+                raise
+            logger.warning("Provedor %s devolveu resposta inválida; tentando o próximo", step.name)
+            parse_error = exc
             continue
         return LLMResponse(provider=step.name, model=step.model, **payload.model_dump())
 
     # Erro de configuração prevalece: indica algo a corrigir no ambiente, não só esperar.
     if configuration_error is not None:
         raise configuration_error
+    if parse_error is not None:
+        raise parse_error
     if unavailable_error is not None:
         raise unavailable_error
     raise LLMUnavailableError(

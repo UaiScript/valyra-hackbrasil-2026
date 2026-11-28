@@ -33,9 +33,13 @@ que o limite de tokens por minuto recebe HTTP 413.
    HTTP 413 do Groq passa ao próximo sem repetir.
 6. Erro de configuração do Gemini (chave inválida, acesso negado, modelo desativado)
    passa ao Groq, que é gratuito, mas continua sem acionar a OpenAI paga, como na
-   ADR-0002. Se nenhum provedor atender, um erro de configuração prevalece sobre
+   ADR-0002. Erro de configuração do próprio Groq (chave dele inválida) não bloqueia a
+   OpenAI. Se nenhum provedor atender, um erro de configuração prevalece sobre
    indisponibilidade, para apontar o que precisa ser corrigido no ambiente.
-7. `LLMParseError` (resposta truncada, recusada ou fora do schema) não aciona reserva.
+7. `LLMParseError` (resposta truncada, recusada ou fora do schema) do Gemini não aciona
+   reserva. Do Groq, que usa modo best-effort, passa à OpenAI se configurada.
+8. Só dados sintéticos da demonstração vão ao Groq, como já vão ao Gemini. Antes de
+   enviar dados reais, revisar a política de retenção e uso de dados do plano gratuito.
 
 ## Alternativas consideradas
 
