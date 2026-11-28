@@ -177,3 +177,13 @@ def client(app, db_session):
     app.dependency_overrides[get_session] = lambda: db_session
     with TestClient(app) as client:
         yield client
+
+
+@pytest.fixture(autouse=True)
+def _forecast_cache_limpo():
+    # As previsões (ADR-0016) ficam em memória por minutos; entre testes, sem herança.
+    from valyra.alpha import forecast_service
+
+    forecast_service.clear_cache()
+    yield
+    forecast_service.clear_cache()

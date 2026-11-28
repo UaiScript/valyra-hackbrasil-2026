@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from valyra.ai.router import router as ai_router
 from valyra.alerts.router import router as alerts_router
+from valyra.alpha.forecast_router import router as alpha_forecast_router
 from valyra.alpha.news_router import router as alpha_news_router
 from valyra.alpha.router import router as alpha_router
 from valyra.core.config import get_settings
@@ -31,5 +32,6 @@ def create_app() -> FastAPI:
     app.include_router(alerts_router)
     app.include_router(alpha_router)
     app.include_router(alpha_news_router)
+    app.include_router(alpha_forecast_router)
     app.include_router(ai_router)
     return app

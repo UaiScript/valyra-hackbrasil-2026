@@ -7,6 +7,7 @@ corpo HTTP. O domínio lexical não certifica a semântica ou causalidade da res
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -28,8 +29,10 @@ from valyra.ai.schemas import (
     MoneyValue,
     TextValue,
 )
-from valyra.alpha import news_service
+from valyra.alpha import forecast_service, news_service
 from valyra.alpha import service as alpha_service
+from valyra.alpha.forecast import METHOD_VERSION as _FORECAST_VERSION
+from valyra.core.demo_profiles import DEMO_PROFILE_USERS
 from valyra.core.errors import AppError
 from valyra.finance import service as finance_service
 
@@ -156,6 +159,8 @@ def _bounded_request(request: LLMRequest) -> LLMRequest:
                         return 3
                     if item.metric_key in {"finance.month.category_total", "finance.budget.status"}:
                         return 2
+                    if item.metric_key.startswith("alpha.forecast."):
+                        return 1
                     return 1 if item.source.kind == "alpha_signal" else 0
 
                 removable = [
@@ -309,6 +314,11 @@ def _finance_context(
     room = _EVIDENCE_CAP - len(evidences)
     evidences.extend(_alpha_evidences(session, as_of, limitations, room))
     evidences.extend(_news_evidences(session, as_of, limitations, _EVIDENCE_CAP - len(evidences)))
+    evidences.extend(
+        _forecast_evidences(
+            session, user_id, as_of, limitations, evidences, _EVIDENCE_CAP - len(evidences)
+        )
+    )
     built_at = _aware(clock())
     if built_at < as_of:
         raise EvidenceContextError("Relógio retrocedeu durante a montagem do contexto")
@@ -441,6 +451,108 @@ def _news_evidences(
     if items:
         limitations.append(_NEWS_RULE)
     return items
+
+
+_PROFILE_BY_USER = {user: profile for profile, user in DEMO_PROFILE_USERS.items()}
+_FORECAST_RULE = (
+    "Previsões Alpha calculadas em código (forecast_v1), não pelo modelo de linguagem: "
+    "cenário central e faixa de 80% de 1.000 cenários simulados, e a chance é a fração "
+    "desses cenários. São leitura estatística, não recomendação de investimento."
+)
+_FORECAST_RESERVE = (
+    "Previsões com séries de reserva sintéticas ficaram fora do contexto: só entram "
+    "previsões feitas com dados coletados."
+)
+
+
+def _forecast_evidences(
+    session: Session,
+    user_id: UUID,
+    as_of: datetime,
+    limitations: list[str],
+    present: list[EvidenceItem],
+    room: int,
+) -> list[EvidenceItem]:
+    """Previsões do perfil (ADR-0016) como resultados prontos; o LLM só cita e explica."""
+    if room <= 0:
+        return []
+    # Sem nova leitura do relógio: o corte é o "agora" do contexto e o cálculo não passa dele.
+    now = as_of
+    result = forecast_service.get_forecasts(session, _PROFILE_BY_USER.get(user_id), as_of, now=now)
+    known = {item.evidence_id for item in present}
+    cutoff_day = as_of.astimezone(_BUSINESS_ZONE).date()
+    start = cutoff_day + timedelta(days=1)
+    items: list[EvidenceItem] = []
+    skipped = False
+    for forecast, inputs in result.items:
+        if any(i.origin != "coleta" or i.last_signal_id is None for i in inputs):
+            skipped = True
+            continue
+        spec = forecast.spec
+        end = max(forecast.fan[-1].day, start)
+        if spec.frequency == "monthly":
+            # Mês de referência: o período projetado vai até o fim daquele mês.
+            end = max(date(end.year + end.month // 12, end.month % 12 + 1, 1) - timedelta(1), start)
+        source = {
+            "kind": "calculation",
+            "module": "alpha",
+            "method_key": f"alpha.forecast.{spec.method}",
+            "method_version": _FORECAST_VERSION,
+            "computed_at": min(_aware(result.computed_at), now),
+            "input_scope": {
+                "period": {
+                    "start": min(i.first_day for i in inputs),
+                    "end": max(i.last_day for i in inputs),
+                },
+                "record_ids": list(dict.fromkeys(i.last_signal_id for i in inputs)),
+            },
+            "input_evidence_ids": [
+                key
+                for i in inputs
+                if (key := f"alpha_{i.last_signal_id.hex}") in known  # type: ignore[union-attr]
+            ],
+        }
+
+        def add(suffix: str, label: str, value, spec=spec, source=source, end=end) -> None:
+            items.append(
+                EvidenceItem(
+                    evidence_id=f"forecast_{spec.kind}_{suffix}",
+                    metric_key=f"alpha.forecast.{spec.kind}.{suffix}",
+                    label=label,
+                    basis="projected",
+                    source=source,
+                    value=value,
+                    period={"start": start, "end": end},
+                )
+            )
+
+        band = forecast.headline
+        base = f"{spec.title}, {spec.horizon_label}"
+        add("p50", f"{base}: cenário central", _pct(band.p50))
+        add("p10", f"{base}: limite de baixo da faixa de 80%", _pct(band.p10))
+        add("p90", f"{base}: limite de cima da faixa de 80%", _pct(band.p90))
+        if forecast.chance is not None and spec.event is not None:
+            add(
+                "chance",
+                f"{base}: chance de {spec.event.label}, em % dos cenários",
+                _pct(forecast.chance * 100, 0),
+            )
+        add("view", f"Leitura da Valyra para {spec.title.lower()}", TextValue(
+            value_text=forecast.view.headline
+        ))  # fmt: skip
+    if skipped:
+        limitations.append(_FORECAST_RESERVE)
+    items = items[:room]
+    if items:
+        limitations.append(_FORECAST_RULE)
+    return items
+
+
+def _pct(value: float, digits: int = 2) -> DecimalValue:
+    text = f"{value:.{digits}f}"
+    if float(text) == 0:
+        text = "0"
+    return DecimalValue(value_decimal=alpha_service.format_value(Decimal(text)), unit="%")
 
 
 def _calculation_evidences(

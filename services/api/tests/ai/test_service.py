@@ -25,6 +25,7 @@ from valyra.ai.schemas import (
     HistoryMessage,
     LLMPayload,
 )
+from valyra.alpha.forecast_service import ProfileForecasts
 from valyra.alpha.news_service import WeeklyReport
 from valyra.alpha.service import Radar
 
@@ -39,6 +40,13 @@ EMPTY_NEWS = WeeklyReport(
     unmatched=0,
     sources=[],
     last_ingested_at=None,
+)
+
+NO_FORECASTS = ProfileForecasts(
+    profile=None,
+    as_of=datetime(2026, 1, 1, tzinfo=UTC),
+    computed_at=datetime(2026, 1, 1, tzinfo=UTC),
+    items=[],
 )
 
 CUT = datetime.fromisoformat(AS_OF.replace("Z", "+00:00"))
@@ -95,6 +103,8 @@ def finance(monkeypatch):
     monkeypatch.setattr(service.alpha_service, "get_radar", Mock(return_value=EMPTY_RADAR))
     # Sem notícias coletadas: o relatório semanal não acrescenta evidências.
     monkeypatch.setattr(service.news_service, "get_weekly_report", Mock(return_value=EMPTY_NEWS))
+    # Sem previsões (ADR-0016): estes testes não dependem da coleta Alpha.
+    monkeypatch.setattr(service.forecast_service, "get_forecasts", Mock(return_value=NO_FORECASTS))
     return SimpleNamespace(
         account=account,
         get=get,

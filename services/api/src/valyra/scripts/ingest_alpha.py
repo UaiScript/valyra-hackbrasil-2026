@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from valyra.alpha import service
 from valyra.alpha.domain import (
     BUSINESS_ZONE,
+    FORECAST_SGS_SERIES,
     NORMAL_YEARS,
     RAIN_WINDOW_DAYS,
     REGIONS,
@@ -100,10 +101,47 @@ def fetch_sgs(
     return found
 
 
-def fetch_brapi(client: httpx.Client, series: Series, *, token: str) -> list[Observation]:
+def _brapi_history(series: Series, quote: dict, url: str) -> list[Observation]:
+    """Variação de cada pregão a partir dos fechamentos diários (carga histórica, ADR-0016).
+
+    Fechamento faltando ou inválido só encurta o histórico: a cotação do dia continua valendo.
+    """
+    rows = quote.get("historicalDataPrice")
+    if not isinstance(rows, list):
+        return []
+    closes: dict[date, Decimal] = {}
+    for row in rows:
+        if not isinstance(row, dict) or isinstance(row.get("date"), bool):
+            continue
+        try:
+            moment = datetime.fromtimestamp(int(row["date"]), UTC)
+            close = parse_decimal(str(row.get("close", "")))
+        except (KeyError, TypeError, ValueError, OverflowError, OSError):
+            continue
+        if close > 0:
+            closes[moment.astimezone(BUSINESS_ZONE).date()] = close
+    days = sorted(closes)
+    return [
+        Observation(
+            series,
+            today,
+            ((closes[today] / closes[before] - 1) * 100).quantize(Decimal("0.01")),
+            url,
+        )
+        for before, today in zip(days, days[1:], strict=False)
+    ]
+
+
+def fetch_brapi(
+    client: httpx.Client, series: Series, *, token: str, history: bool = False
+) -> list[Observation]:
     assert series.ticker is not None
     url = BRAPI_URL.format(ticker=series.ticker)
-    response = client.get(url, params={"token": token} if token else None)
+    params = {"token": token} if token else {}
+    if history:
+        # Plano gratuito: até 3 meses de fechamentos diários por ticker.
+        params |= {"range": "3mo", "interval": "1d"}
+    response = client.get(url, params=params or None)
     response.raise_for_status()
     # parse_float=Decimal: a variação nunca passa por float.
     body = response.json(parse_float=Decimal)
@@ -119,8 +157,14 @@ def fetch_brapi(client: httpx.Client, series: Series, *, token: str) -> list[Obs
     if moment.tzinfo is None:
         raise SgsFormatError("horário da cotação sem fuso")
     value = parse_decimal(str(quote.get("regularMarketChangePercent", "")))
+    day = moment.astimezone(BUSINESS_ZONE).date()
+    past = (
+        [o for o in _brapi_history(series, quote, url) if o.observation_date < day]
+        if history
+        else []
+    )
     # A URL pública não leva o token: ele é segredo do repositório.
-    return [Observation(series, moment.astimezone(BUSINESS_ZONE).date(), value, url)]
+    return past + [Observation(series, day, value, url)]
 
 
 def _daily_rain(body: object) -> dict[date, Decimal]:
@@ -198,7 +242,7 @@ def ingest(
     # Cada tarefa coleta um grupo de séries; uma falha marca todas as séries do grupo.
     tasks: list[tuple[tuple[Series, ...], Callable[[], list[Observation]]]] = []
     if "bcb" in sources:
-        for series in SGS_SERIES:
+        for series in SGS_SERIES + FORECAST_SGS_SERIES:
             tasks.append(
                 (
                     (series,),
@@ -207,7 +251,18 @@ def ingest(
             )
     if "brapi" in sources:
         for series in STOCK_SERIES:
-            tasks.append(((series,), partial(fetch_brapi, client, series, token=token)))
+            tasks.append(
+                (
+                    (series,),
+                    partial(
+                        fetch_brapi,
+                        client,
+                        series,
+                        token=token,
+                        history=backfill_days is not None,
+                    ),
+                )
+            )
     if "clima" in sources:
         for region in REGIONS:
             tasks.append(

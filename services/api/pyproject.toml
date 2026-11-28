@@ -149,6 +149,24 @@ layers = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "Previsões Alpha sem banco, HTTP, IA ou configuração"
+type = "forbidden"
+source_modules = ["valyra.alpha.forecast", "valyra.alpha.forecast_reserve"]
+forbidden_modules = [
+    "sqlalchemy", "fastapi", "httpx", "requests", "openai", "google", "valyra.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "Camadas das previsões Alpha"
+type = "layers"
+layers = [
+    "valyra.alpha.forecast_router",
+    "valyra.alpha.forecast_service",
+    "valyra.alpha.forecast_reserve | valyra.alpha.repository",
+    "valyra.alpha.forecast",
+]
+
+[[tool.importlinter.contracts]]
 name = "Camadas do Alpha"
 type = "layers"
 layers = [
