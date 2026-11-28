@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { centsToInput, compareDecimal, formatCents, formatDecimal, formatInstant, formatIsoDate, formatMonth, formatScore, formatShortDate, parseReaisToCents, shiftMonth } from '../src/app/money.ts';
+import { centsToInput, compareDecimal, formatCents, formatDecimal, formatInstant, formatIsoDate, formatMonth, formatScore, formatShortDate, parseReaisToCents, roundDecimal, shiftMonth } from '../src/app/money.ts';
 
 test('formatCents usa centavos inteiros sem float', () => {
   assert.equal(formatCents(500000), 'R$ 5.000,00');
@@ -65,4 +65,14 @@ test('compareDecimal compara texto decimal sem float', () => {
   assert.equal(compareDecimal('10', '9.999'), 1);
   assert.equal(compareDecimal('15.00', '15'), 0);
   assert.equal(compareDecimal('-0', '0'), 0);
+});
+
+test('roundDecimal arredonda texto decimal sem float', () => {
+  assert.equal(roundDecimal('4.349', 1), '4,3');
+  assert.equal(roundDecimal('4.35', 1), '4,4');
+  assert.equal(roundDecimal('9.96', 1), '10,0');
+  assert.equal(roundDecimal('-0.04', 1), '0,0');
+  assert.equal(roundDecimal('-6.02', 1), '-6,0');
+  assert.equal(roundDecimal('15', 2), '15,00');
+  assert.equal(roundDecimal('1234.5', 0), '1.235');
 });

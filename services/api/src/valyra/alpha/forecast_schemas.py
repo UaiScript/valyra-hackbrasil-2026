@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 ProfileId = Literal["orcamento-apertado", "comecando-a-investir", "investidor"]
 
@@ -106,7 +106,7 @@ class ForecastOut(BaseModel):
     view: ViewOut
     data_origin: Literal["coleta", "reserva", "misto"]
     inputs: list[InputSeriesOut]
-    tickers: list[TickerRangeOut] = Field(default_factory=list)
+    tickers: list[TickerRangeOut]
     params: dict[str, str]
     limitations: list[str]
 

@@ -3,7 +3,8 @@
  *
  * Os perfis são só dados. Trocar uma persona é editar este arquivo, sem mexer em telas:
  * a Central, o menu, o ticker, o radar Alpha, o relatório da semana e o Pergunte ao Valyra
- * leem daqui o que destacar.
+ * leem daqui o que destacar. As previsões de cada perfil ficam na API
+ * (PROFILE_SPECS em services/api/src/valyra/alpha/forecast.py), com os mesmos ids.
  *
  * Cada perfil também é um cliente fictício com extrato próprio na API: o id é enviado no
  * cabeçalho X-Valyra-Profile e precisa existir em services/api/src/valyra/core/demo_profiles.py,
@@ -24,7 +25,7 @@ export type TickerMode = 'bolsa' | 'manchetes' | 'clima';
 export type AlphaFocus = 'todos' | 'juros' | 'inflacao' | 'acoes' | 'clima';
 
 /** Rotas do app que um atalho pode abrir (mesmos ids de router.ts). */
-export type ShortcutRoute = 'overview' | 'summary' | 'budgets' | 'projection' | 'transactions' | 'alerts' | 'alpha' | 'news';
+export type ShortcutRoute = 'overview' | 'summary' | 'budgets' | 'projection' | 'transactions' | 'alerts' | 'alpha' | 'news' | 'forecasts';
 
 export type ProfileShortcut =
   | { module: Exclude<ModuleId, 'ai'>; route: ShortcutRoute; title: string; hint: string }
@@ -68,10 +69,10 @@ export const PROFILES: Profile[] = [
     newsThemes: ['alimentos', 'renda', 'juros'],
     shortcuts: [
       { module: 'finance', route: 'budgets', title: 'Quanto cabe por dia', hint: 'Tetos por categoria e o valor diário até o fim do mês' },
-      { module: 'alpha', route: 'news', title: 'O que pesa no mercado', hint: 'Manchetes da semana ligadas às suas categorias' },
+      { module: 'alpha', route: 'forecasts', title: 'Inflação e preços à frente', hint: 'IPCA, agro e juros nos próximos meses, com faixa e chance' },
       { module: 'ai', question: 'Meu orçamento aguenta até o fim do mês?', title: 'Meu orçamento aguenta?', hint: 'Resposta com os cálculos do Finance citados' },
     ],
-    questions: ['Meu orçamento aguenta até o fim do mês?', 'Onde estou gastando mais neste mês?'],
+    questions: ['Meu orçamento aguenta até o fim do mês?', 'O que as previsões de inflação da Valyra dizem para o meu orçamento?', 'Onde estou gastando mais neste mês?'],
   },
   {
     id: 'comecando-a-investir',
@@ -85,11 +86,11 @@ export const PROFILES: Profile[] = [
     alphaFocus: 'juros',
     newsThemes: ['juros', 'renda', 'acoes'],
     shortcuts: [
-      { module: 'alpha', route: 'alpha', title: 'Radar de juros e ações', hint: 'Selic, CDI, IPCA e a variação do dia, com fonte e data' },
+      { module: 'alpha', route: 'forecasts', title: 'A renda fixa ganha da inflação?', hint: 'Selic, CDI e IPCA à frente, com faixa, chance e a visão da Valyra' },
       { module: 'finance', route: 'summary', title: 'Quanto sobrou no mês', hint: 'Entradas, saídas e resultado para guardar' },
       { module: 'ai', question: 'O que o radar mostra sobre juros e ações nesta semana?', title: 'O que mudou no cenário?', hint: 'Explicação com os sinais do radar citados' },
     ],
-    questions: ['O que o radar mostra sobre juros e ações nesta semana?', 'O que mudou nos meus gastos em relação ao mês passado?'],
+    questions: ['A renda fixa deve ganhar da inflação nos próximos 12 meses?', 'O que o radar mostra sobre juros e ações nesta semana?', 'O que mudou nos meus gastos em relação ao mês passado?'],
   },
   {
     id: 'investidor',
@@ -103,11 +104,11 @@ export const PROFILES: Profile[] = [
     alphaFocus: 'acoes',
     newsThemes: ['acoes', 'juros', 'inflacao'],
     shortcuts: [
-      { module: 'alpha', route: 'alpha', title: 'Bolsa, juros e inflação', hint: 'Ações, Selic, CDI e IPCA com fonte e data de coleta' },
+      { module: 'alpha', route: 'forecasts', title: 'Bolsa, dólar e juros à frente', hint: 'Quanto pode oscilar no próximo mês, com faixa e chance' },
       { module: 'finance', route: 'projection', title: 'Caixa depois dos aportes', hint: 'Saldo previsto com aportes, proventos e contas fixas' },
       { module: 'ai', question: 'O que o radar mostra sobre ações, juros e inflação nesta semana?', title: 'O que mudou no mercado?', hint: 'Explicação com os sinais do radar citados' },
     ],
-    questions: ['O que o radar mostra sobre ações, juros e inflação nesta semana?', 'Quanto entrou de proventos e quanto aportei neste mês?'],
+    questions: ['Quanto a bolsa e o dólar podem oscilar no próximo mês, segundo as previsões?', 'O que o radar mostra sobre ações, juros e inflação nesta semana?', 'Quanto entrou de proventos e quanto aportei neste mês?'],
   },
 ];
 

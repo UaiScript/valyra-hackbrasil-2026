@@ -233,7 +233,7 @@ export type ForecastOut = {
   params: Record<string, unknown>;
   paths: number;
   question: string;
-  tickers?: TickerRangeOut[];
+  tickers: TickerRangeOut[];
   title: string;
   unit: string;
   unit_label: string;
